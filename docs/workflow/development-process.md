@@ -88,12 +88,8 @@ After every commit:
 
 ---
 
-## Phase Implementation Plans
+## Slice Plan
 
-| Phase | Plan |
-|-------|------|
-| Phase 0 — Foundation | [phase-0-units.md](./phase-0-units.md) |
-| Phase 1 — Order Core | Planned after Phase 0 review |
-| Phase 2 — Payments | Planned after Phase 1 review |
-| Phase 3 — Discovery | Planned after Phase 2 review |
-| Phase 4 — Polish | Planned after Phase 3 review |
+Development follows a vertical slice approach. Each slice delivers an observable, end-to-end feature increment.
+
+See [vertical-slices.md](./vertical-slices.md) for the full slice map and specifications.

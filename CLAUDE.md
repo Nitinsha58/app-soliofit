@@ -4,14 +4,14 @@
 ```
 docs/
   README.md                    — Overview and ADR index
-  adr/                         — Architecture Decision Records (ADR-0001 to ADR-0005)
+  adr/                         — Architecture Decision Records (ADR-0001 to ADR-0003; future ADRs added per slice)
   product/README.md            — Pointer to product vault
   workflow/
     development-process.md     — Incremental review-driven workflow rules
-    phase-0-units.md           — Phase 0 broken into 16 reviewable implementation units
+    vertical-slices.md         — 19 vertical slices (VS-00 through VS-18) with specs and review checkpoints
 ```
 
-Development follows an **incremental, review-driven workflow**: one unit at a time, review before continuing. See `docs/workflow/development-process.md` for the full process definition.
+Development follows a **vertical slice approach**: each slice delivers an observable, end-to-end feature increment. One slice at a time, review before continuing. ADRs are written only when the current slice requires a documented decision — never pre-planned. See `docs/workflow/vertical-slices.md` for the full slice map.
 
 ---
 
