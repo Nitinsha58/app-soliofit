@@ -32,8 +32,8 @@ Development follows a vertical slice approach. Each slice delivers an observable
 
 | Slice | Description | Status |
 |-------|-------------|--------|
-| VS-00 | Foundation shell | Not started |
-| VS-01 | Authentication | Not started |
+| VS-00 | Foundation shell | Complete |
+| VS-01 | Authentication | Complete |
 | VS-02 | App shell | Not started |
 | VS-03 | Customer management | Not started |
 | VS-04 | Order creation | Not started |
