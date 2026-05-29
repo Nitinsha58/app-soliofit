@@ -17,10 +17,15 @@ interface PaginatedResponse<T> {
   results: T[]
 }
 
-export async function listCustomers(search?: string): Promise<Customer[]> {
+export interface CustomersResult {
+  customers: Customer[]
+  total: number
+}
+
+export async function listCustomers(search?: string): Promise<CustomersResult> {
   const params = search ? `?search=${encodeURIComponent(search)}` : ''
   const data = await apiRequest<PaginatedResponse<Customer>>(`/api/customers/${params}`)
-  return data.results
+  return { customers: data.results, total: data.count }
 }
 
 export async function createCustomer(data: {

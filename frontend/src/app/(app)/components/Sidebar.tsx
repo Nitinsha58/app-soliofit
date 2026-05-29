@@ -156,14 +156,19 @@ export default function Sidebar() {
         </Link>
 
         <div className="px-3 py-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#FBF3E3] flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-semibold text-[#C8952A]">
-              {user?.owner_name?.charAt(0)?.toUpperCase() ?? '?'}
+          <div className="w-9 h-9 rounded-lg bg-[#FBF3E3] flex items-center justify-center flex-shrink-0">
+            <span className="text-sm font-bold text-[#C8952A]">
+              {(user?.business_name ?? user?.owner_name ?? 'S').charAt(0).toUpperCase()}
             </span>
           </div>
-          <p className="flex-1 text-sm font-medium text-[#1A1A18] truncate">
-            {user?.owner_name ?? ''}
-          </p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#1A1A18] truncate leading-tight">
+              {user?.business_name || 'My Boutique'}
+            </p>
+            {user?.owner_name && (
+              <p className="text-xs text-[#6B6B67] truncate mt-0.5">{user.owner_name}</p>
+            )}
+          </div>
         </div>
 
         <button

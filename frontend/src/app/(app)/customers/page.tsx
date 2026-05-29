@@ -25,6 +25,7 @@ function PlusIcon() {
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -33,8 +34,9 @@ export default function CustomersPage() {
   async function fetchCustomers(q: string) {
     setLoading(true)
     try {
-      const data = await listCustomers(q.trim() || undefined)
+      const { customers: data, total: count } = await listCustomers(q.trim() || undefined)
       setCustomers(data)
+      setTotal(count)
     } finally {
       setLoading(false)
     }
@@ -53,17 +55,28 @@ export default function CustomersPage() {
   async function handleDelete(id: string) {
     await deleteCustomer(id)
     setCustomers((prev) => prev.filter((c) => c.id !== id))
+    setTotal((prev) => prev - 1)
   }
 
   function handleCreated(customer: Customer) {
     setCustomers((prev) => [customer, ...prev])
+    setTotal((prev) => prev + 1)
     setShowCreate(false)
   }
 
+  const countLabel = loading
+    ? ''
+    : search
+    ? `${customers.length} result${customers.length === 1 ? '' : 's'}`
+    : `${total} customer${total === 1 ? '' : 's'}`
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-[#1A1A18]">Customers</h1>
+    <div className="p-6">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-[#1A1A18]">Customers</h1>
+          <p className="text-xs text-[#A0A09C] mt-0.5">{countLabel}</p>
+        </div>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] transition-colors"
@@ -73,7 +86,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      <div className="relative mb-6">
+      <div className="relative mb-5">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A09C] pointer-events-none">
           <SearchIcon />
         </span>
@@ -114,7 +127,7 @@ export default function CustomersPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {customers.map((customer) => (
             <CustomerCard
               key={customer.id}
