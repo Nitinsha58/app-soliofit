@@ -65,3 +65,4 @@ ADRs are written incrementally as each slice requires a documented decision. No 
 | [ADR-0001](./adr/ADR-0001-backend-framework.md) | Backend Framework — Django + DRF | Accepted | VS-00 |
 | [ADR-0002](./adr/ADR-0002-auth-strategy.md) | Auth Strategy — Cookie-based JWT | Accepted | VS-01 |
 | [ADR-0003](./adr/ADR-0003-database-orm.md) | Database — PostgreSQL + Django ORM | Accepted | VS-00 |
+| [ADR-0004](./adr/ADR-0004-frontend-framework.md) | Frontend Framework — Next.js 14 App Router + shadcn/ui | Accepted | VS-00 |
