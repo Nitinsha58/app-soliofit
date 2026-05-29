@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 from decouple import config, Csv
 
@@ -14,8 +15,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Third-party
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
+    # Local apps
+    'apps.users',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +54,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+AUTH_USER_MODEL = 'users.User'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -78,11 +85,25 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'apps.users.authentication.CookieJWTAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': False,
+    'AUTH_COOKIE': 'access_token',
+    'AUTH_COOKIE_REFRESH': 'refresh_token',
+    'AUTH_COOKIE_HTTP_ONLY': True,
+    'AUTH_COOKIE_SECURE': True,
+    'AUTH_COOKIE_SAMESITE': 'Lax',
 }
 
 CORS_ALLOWED_ORIGINS = config('FRONTEND_URL', default='http://localhost:3000').split(',')

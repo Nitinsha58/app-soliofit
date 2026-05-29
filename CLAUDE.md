@@ -42,6 +42,24 @@ All product-related documentation for Soliofit is maintained in a single Obsidia
 
 ---
 
+<!-- docker-dev-rules -->
+## Docker Development Rules
+
+The `node_modules` and Python packages live inside Docker volumes — not on the host. Restarting a container does **not** re-run `npm install` or `pip install`.
+
+**Install new packages into the running container whenever its dependency file changes:**
+
+| File changed | Quick install (preferred) | Full rebuild (if quick fails) |
+|---|---|---|
+| `frontend/package.json` | `docker compose -f docker-compose.dev.yml exec frontend npm install` | `docker compose -f docker-compose.dev.yml rm -f frontend && docker compose -f docker-compose.dev.yml up -d --build frontend` |
+| `backend/requirements.txt` | `docker compose -f docker-compose.dev.yml exec backend pip install -r requirements.txt` | `docker compose -f docker-compose.dev.yml rm -f backend && docker compose -f docker-compose.dev.yml up -d --build backend` |
+
+`--build` alone is not reliable — the anonymous `node_modules` volume may be reused from the old container. Always use `exec … install` first; fall back to `rm -f` + rebuild if the container is not running.
+
+Hot-reload (file edits, new source files) works without any of this. Only dependency changes need it.
+
+---
+
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 
