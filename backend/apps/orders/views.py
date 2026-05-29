@@ -39,6 +39,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         qs = (
             self.get_queryset()
             .filter(delivery_date__gte=from_date, delivery_date__lte=to_date)
+            .order_by()
             .values('delivery_date')
             .annotate(count=Count('id'))
         )
