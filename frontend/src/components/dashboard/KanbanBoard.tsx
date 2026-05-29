@@ -5,12 +5,12 @@ import { listOrders, type Order } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
 import KanbanColumn from './KanbanColumn'
 
-const COLUMNS: { status: Order['status']; label: string; dotColor: string }[] = [
-  { status: 'Booked',           label: 'Booked',           dotColor: 'bg-blue-400' },
-  { status: 'Started',          label: 'Started',          dotColor: 'bg-violet-400' },
-  { status: 'Ready',            label: 'Ready',            dotColor: 'bg-emerald-400' },
-  { status: 'Partial Delivery', label: 'Partial Delivery', dotColor: 'bg-amber-400' },
-  { status: 'Delivered',        label: 'Delivered',        dotColor: 'bg-gray-400' },
+const COLUMNS: { status: Order['status']; label: string; accent: string }[] = [
+  { status: 'Booked',           label: 'Booked',           accent: '#60A5FA' },
+  { status: 'Started',          label: 'Started',          accent: '#A78BFA' },
+  { status: 'Ready',            label: 'Ready',            accent: '#34D399' },
+  { status: 'Partial Delivery', label: 'Partial Delivery', accent: '#FBBF24' },
+  { status: 'Delivered',        label: 'Delivered',        accent: '#9CA3AF' },
 ]
 
 export default function KanbanBoard() {
@@ -52,11 +52,11 @@ export default function KanbanBoard() {
       )}
       <div className="overflow-x-auto pb-4 -mx-6 px-6">
         <div className="flex gap-4 min-w-max">
-          {COLUMNS.map(({ status, label, dotColor }) => (
+          {COLUMNS.map(({ status, label, accent }) => (
             <KanbanColumn
               key={status}
               title={label}
-              dotColor={dotColor}
+              accent={accent}
               orders={orders.filter((o) => o.status === status)}
             />
           ))}

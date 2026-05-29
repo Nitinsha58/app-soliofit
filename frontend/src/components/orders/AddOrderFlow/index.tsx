@@ -87,7 +87,9 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E5E2] flex-shrink-0">
           <div>
             <h2 className="text-base font-semibold text-[#1A1A18]">New Order</h2>
-            <p className="text-xs text-[#A0A09C] mt-0.5">{STEP_LABELS[step - 1]}</p>
+            <p className="text-xs text-[#A0A09C] mt-0.5">
+              Step {step} of {STEP_LABELS.length} · {STEP_LABELS[step - 1]}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -97,20 +99,14 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
           </button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-1.5 py-3 flex-shrink-0">
-          {STEP_LABELS.map((_, i) => (
+        {/* Progress bar */}
+        <div className="px-6 pt-3 pb-1 flex-shrink-0">
+          <div className="h-1 bg-[#E5E5E2] rounded-full overflow-hidden">
             <div
-              key={i}
-              className={`rounded-full transition-all duration-200 ${
-                i + 1 === step
-                  ? 'w-5 h-1.5 bg-[#C8952A]'
-                  : i + 1 < step
-                  ? 'w-1.5 h-1.5 bg-[#C8952A]/50'
-                  : 'w-1.5 h-1.5 bg-[#E5E5E2]'
-              }`}
+              className="h-full bg-[#C8952A] rounded-full transition-all duration-300"
+              style={{ width: `${(step / STEP_LABELS.length) * 100}%` }}
             />
-          ))}
+          </div>
         </div>
 
         {/* Step content */}

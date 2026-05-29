@@ -19,40 +19,46 @@ export default function OrderCard({ order }: Props) {
 
   return (
     <div
-      className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-4 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow cursor-pointer ${
-        order.priority ? 'border-l-2 border-l-[#C8952A] border-t-[#E5E5E2] border-r-[#E5E5E2] border-b-[#E5E5E2]' : 'border-[#E5E5E2]'
+      className={`bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 ${
+        order.priority
+          ? 'border-l-[3px] border-l-[#C8952A] border-t border-t-[#E5E5E2] border-r border-r-[#E5E5E2] border-b border-b-[#E5E5E2]'
+          : 'border border-[#E5E5E2]'
       }`}
     >
-      {order.priority && (
-        <div className="flex items-center gap-1 mb-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#C8952A]" />
-          <span className="text-[10px] font-semibold text-[#C8952A] uppercase tracking-wide">Priority</span>
-        </div>
-      )}
-
-      <div className="flex items-start justify-between gap-2 mb-3">
+      {/* Customer + date */}
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#1A1A18] truncate">{order.customer_name}</p>
-          <p className="text-[11px] text-[#A0A09C] mt-0.5 tabular-nums">
-            #{String(order.order_number).padStart(4, '0')}
-          </p>
+          <p className="text-[13px] font-semibold text-[#1A1A18] truncate leading-snug">{order.customer_name}</p>
+          {order.customer_phone && (
+            <p className="text-[11px] text-[#A0A09C] mt-0.5 truncate">{order.customer_phone}</p>
+          )}
         </div>
         <span
-          className={`flex-shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+          className={`flex-shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap mt-0.5 ${
             isOverdue
-              ? 'bg-red-50 text-red-700'
+              ? 'bg-red-50 text-red-600'
               : isToday
-              ? 'bg-amber-50 text-amber-700'
-              : 'bg-[#F5F5F3] text-[#6B6B67]'
+              ? 'bg-amber-50 text-amber-600'
+              : 'bg-[#F0F0EE] text-[#6B6B67]'
           }`}
         >
-          {isOverdue && '⚠ '}{formatDate(order.delivery_date)}
+          {isOverdue ? '⚠ ' : ''}{formatDate(order.delivery_date)}
         </span>
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-[#E5E5E2]">
-        <span className="text-xs text-[#A0A09C]">Total</span>
-        <span className="text-sm font-semibold text-[#1A1A18] tabular-nums">
+      {/* Order number + priority + amount */}
+      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#EBEBEA]">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-[#B0B0AC] tabular-nums font-medium">
+            #{String(order.order_number).padStart(4, '0')}
+          </span>
+          {order.priority && (
+            <span className="text-[9px] font-bold text-[#C8952A] uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded">
+              Priority
+            </span>
+          )}
+        </div>
+        <span className="text-[15px] font-bold text-[#1A1A18] tabular-nums leading-none">
           ₹{Number(order.total_amount).toLocaleString('en-IN')}
         </span>
       </div>

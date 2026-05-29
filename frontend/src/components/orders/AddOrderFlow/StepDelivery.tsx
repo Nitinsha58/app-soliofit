@@ -40,7 +40,14 @@ function toDateStr(year: number, month: number, day: number): string {
   return `${year}-${pad(month + 1)}-${pad(day)}`
 }
 
-function loadColor(count: number): string {
+function cellBg(count: number): string {
+  if (count === 0) return ''
+  if (count <= 5) return 'bg-emerald-50'
+  if (count <= 12) return 'bg-amber-50'
+  return 'bg-red-50'
+}
+
+function countColor(count: number): string {
   if (count <= 5) return 'text-emerald-600'
   if (count <= 12) return 'text-amber-600'
   return 'text-red-600'
@@ -139,16 +146,16 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
               onClick={() => !isPast && onChange(dateStr)}
               disabled={isPast}
               className={`
-                relative flex flex-col items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-colors
+                relative flex flex-col items-center justify-center rounded-lg py-2 text-xs font-medium transition-all
                 ${isSelected ? 'bg-[#C8952A] text-white' : ''}
-                ${!isSelected && !isPast ? 'hover:bg-gray-100 text-[#1A1A18] cursor-pointer' : ''}
+                ${!isSelected && !isPast ? `cursor-pointer hover:brightness-95 text-[#1A1A18] ${cellBg(count)}` : ''}
                 ${isPast ? 'text-[#C8C8C4] cursor-not-allowed' : ''}
                 ${isToday && !isSelected ? 'ring-1 ring-[#C8952A] ring-inset' : ''}
               `}
             >
-              <span>{day}</span>
+              <span className="leading-none">{day}</span>
               {count > 0 && !isSelected && !isPast && (
-                <span className={`text-[8px] font-semibold leading-none mt-0.5 ${loadColor(count)}`}>
+                <span className={`text-[9px] font-bold leading-none mt-0.5 ${countColor(count)}`}>
                   {count}
                 </span>
               )}

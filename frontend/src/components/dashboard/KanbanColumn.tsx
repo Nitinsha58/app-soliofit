@@ -3,24 +3,33 @@ import OrderCard from './OrderCard'
 
 interface Props {
   title: string
-  dotColor: string
+  accent: string
   orders: Order[]
 }
 
-export default function KanbanColumn({ title, dotColor, orders }: Props) {
+export default function KanbanColumn({ title, accent, orders }: Props) {
   return (
-    <div className="flex flex-col w-72 flex-shrink-0">
-      <div className="flex items-center gap-2 px-1 mb-3">
-        <span className={`w-2 h-2 rounded-full ${dotColor} flex-shrink-0`} />
-        <span className="text-sm font-semibold text-[#1A1A18]">{title}</span>
-        <span className="ml-auto text-xs font-medium text-[#A0A09C] bg-[#F5F5F3] px-2 py-0.5 rounded-full">
-          {orders.length}
-        </span>
+    <div
+      className="flex flex-col w-72 flex-shrink-0 rounded-xl bg-[#F7F7F5] pt-0 overflow-hidden"
+      style={{ boxShadow: 'inset 0 0 0 1px #E5E5E2' }}
+    >
+      {/* Colored top strip + header */}
+      <div style={{ borderTop: `3px solid ${accent}` }} className="px-3 pt-3 pb-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-[#1A1A18] tracking-tight">{title}</span>
+          <span
+            className="text-[11px] font-bold px-2 py-0.5 rounded-full tabular-nums"
+            style={{ backgroundColor: `${accent}28`, color: accent }}
+          >
+            {orders.length}
+          </span>
+        </div>
       </div>
 
-      <div className="space-y-3 min-h-[80px]">
+      {/* Cards */}
+      <div className="px-2.5 pb-3 space-y-2.5 min-h-[80px]">
         {orders.length === 0 ? (
-          <div className="flex items-center justify-center py-8 rounded-xl border border-dashed border-[#E5E5E2]">
+          <div className="flex items-center justify-center py-7 rounded-lg border border-dashed border-[#DCDCD8]">
             <p className="text-xs text-[#C8C8C4]">Empty</p>
           </div>
         ) : (
