@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { Order } from '@/lib/api/orders'
 import { createOrder } from '@/lib/api/orders'
@@ -46,6 +46,14 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     priority: false,
     remarks: '',
   })
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   function next() { setStep((s) => Math.min(s + 1, 6)) }
   function back() { setStep((s) => Math.max(s - 1, 1)) }
