@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useUIStore } from '@/stores/useUIStore'
 
 function HomeIcon() {
   return (
@@ -52,6 +53,7 @@ const tabs = [
 
 export default function MobileNav() {
   const pathname = usePathname()
+  const openAddOrder = useUIStore((s) => s.openAddOrder)
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-[#E5E5E2] h-14 flex items-center" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
@@ -73,8 +75,9 @@ export default function MobileNav() {
           )
         })}
 
-        {/* Center FAB — wired up in VS-04 */}
+        {/* Center FAB */}
         <button
+          onClick={openAddOrder}
           className="w-12 h-12 rounded-full bg-[#C8952A] flex items-center justify-center shadow-lg -mt-4 flex-shrink-0"
           aria-label="Add order"
         >

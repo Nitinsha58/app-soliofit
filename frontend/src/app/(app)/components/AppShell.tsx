@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { getMe } from '@/lib/api/auth'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { useUIStore } from '@/stores/useUIStore'
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
+import AddOrderFlow from '@/components/orders/AddOrderFlow'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, login } = useAuthStore()
   const [checking, setChecking] = useState(!isAuthenticated)
   const hasChecked = useRef(false)
+  const { showAddOrder, closeAddOrder, triggerOrdersRefresh } = useUIStore()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -47,6 +50,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <MobileNav />
+      {showAddOrder && (
+        <AddOrderFlow
+          onClose={closeAddOrder}
+          onCreated={() => {
+            closeAddOrder()
+            triggerOrdersRefresh()
+          }}
+        />
+      )}
     </div>
   )
 }
