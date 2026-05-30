@@ -6,6 +6,7 @@ export interface Order {
   customer: string
   customer_name: string
   customer_phone: string
+  customer_address: string
   status: 'Booked' | 'Started' | 'Ready' | 'Partial Delivery' | 'Delivered'
   delivery_date: string
   total_amount: string
@@ -14,6 +15,10 @@ export interface Order {
   created_at: string
   updated_at: string
 }
+
+export const ORDER_STATUSES: Order['status'][] = [
+  'Booked', 'Started', 'Ready', 'Partial Delivery', 'Delivered',
+]
 
 export async function listOrders(): Promise<Order[]> {
   return apiRequest<Order[]>('/api/orders/')
@@ -28,6 +33,20 @@ export async function createOrder(data: {
 }): Promise<Order> {
   return apiRequest<Order>('/api/orders/', {
     method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function getOrder(id: string): Promise<Order> {
+  return apiRequest<Order>(`/api/orders/${id}/`)
+}
+
+export async function updateOrder(
+  id: string,
+  data: Partial<Pick<Order, 'delivery_date' | 'total_amount' | 'priority' | 'remarks' | 'status'>>
+): Promise<Order> {
+  return apiRequest<Order>(`/api/orders/${id}/`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   })
 }

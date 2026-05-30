@@ -4,6 +4,7 @@ import type { Order } from '@/lib/api/orders'
 
 interface Props {
   order: Order
+  onClick?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -11,7 +12,7 @@ function formatDate(dateStr: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export default function OrderCard({ order }: Props) {
+export default function OrderCard({ order, onClick }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isOverdue = order.delivery_date < todayStr && order.status !== 'Delivered'
@@ -19,6 +20,7 @@ export default function OrderCard({ order }: Props) {
 
   return (
     <div
+      onClick={onClick}
       className={`bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 ${
         order.priority
           ? 'border-l-[3px] border-l-[#C8952A] border-t border-t-[#E5E5E2] border-r border-r-[#E5E5E2] border-b border-b-[#E5E5E2]'

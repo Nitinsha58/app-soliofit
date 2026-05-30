@@ -6,6 +6,9 @@ interface UIStore {
   closeAddOrder: () => void
   ordersRefreshKey: number
   triggerOrdersRefresh: () => void
+  selectedOrderId: string | null
+  openOrderDetail: (id: string) => void
+  closeOrderDetail: () => void
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -14,4 +17,7 @@ export const useUIStore = create<UIStore>((set) => ({
   closeAddOrder: () => set({ showAddOrder: false }),
   ordersRefreshKey: 0,
   triggerOrdersRefresh: () => set((s) => ({ ordersRefreshKey: s.ordersRefreshKey + 1 })),
+  selectedOrderId: null,
+  openOrderDetail: (id) => set({ selectedOrderId: id }),
+  closeOrderDetail: () => set({ selectedOrderId: null }),
 }))

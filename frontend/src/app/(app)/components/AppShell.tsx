@@ -9,13 +9,18 @@ import { useUIStore } from '@/stores/useUIStore'
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
 import AddOrderFlow from '@/components/orders/AddOrderFlow'
+import OrderDetailDrawer from '@/components/orders/OrderDetailDrawer'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, login } = useAuthStore()
   const [checking, setChecking] = useState(!isAuthenticated)
   const hasChecked = useRef(false)
-  const { showAddOrder, closeAddOrder, triggerOrdersRefresh } = useUIStore()
+  const {
+    showAddOrder, closeAddOrder,
+    triggerOrdersRefresh,
+    selectedOrderId, closeOrderDetail,
+  } = useUIStore()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -57,6 +62,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
             closeAddOrder()
             triggerOrdersRefresh()
           }}
+        />
+      )}
+      {selectedOrderId && (
+        <OrderDetailDrawer
+          orderId={selectedOrderId}
+          onClose={closeOrderDetail}
+          onUpdated={triggerOrdersRefresh}
         />
       )}
     </div>
