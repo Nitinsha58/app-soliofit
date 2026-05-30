@@ -41,9 +41,9 @@ services:
       - /app/node_modules
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    command: npm run dev
+    env_file:
+      - ./frontend/.env.local
+    command: npm run dev -- --hostname 0.0.0.0
 
 volumes:
   pgdata:

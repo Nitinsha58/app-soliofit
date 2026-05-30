@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Order } from '@/lib/api/orders'
 import { updateOrder } from '@/lib/api/orders'
 
@@ -58,16 +58,26 @@ function PaymentIcon() {
 export default function QuickActions({ order, onOrderChange, onUpdated }: Props) {
   const [confirming, setConfirming] = useState(false)
   const [delivering, setDelivering] = useState(false)
+  const [deliveryError, setDeliveryError] = useState(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   async function handleMarkDelivered() {
-    setDelivering(true)
+    if (mountedRef.current) { setDelivering(true); setDeliveryError(false) }
     try {
       await updateOrder(order.id, { status: 'Delivered' })
-      onOrderChange({ status: 'Delivered' })
       onUpdated()
-    } finally {
-      setDelivering(false)
+      if (!mountedRef.current) return
+      onOrderChange({ status: 'Delivered' })
       setConfirming(false)
+    } catch {
+      if (mountedRef.current) setDeliveryError(true)
+    } finally {
+      if (mountedRef.current) setDelivering(false)
     }
   }
 
@@ -122,10 +132,12 @@ export default function QuickActions({ order, onOrderChange, onUpdated }: Props)
 
       {/* Mark Delivered confirm dialog */}
       {confirming && (
-        <div className="mt-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
-          <p className="text-xs font-medium text-emerald-800 flex-1">Mark this order as Delivered?</p>
+        <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2.5 border ${deliveryError ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+          <p className={`text-xs font-medium flex-1 ${deliveryError ? 'text-red-700' : 'text-emerald-800'}`}>
+            {deliveryError ? 'Failed to update — try again?' : 'Mark this order as Delivered?'}
+          </p>
           <button
-            onClick={() => setConfirming(false)}
+            onClick={() => { setConfirming(false); setDeliveryError(false) }}
             className="text-xs text-[#6B6B67] hover:text-[#1A1A18] transition-colors"
           >
             Cancel

@@ -27,6 +27,23 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const pendingFormRef = useRef<FormState | null>(null)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      // Flush any pending debounced save on unmount
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+        if (pendingFormRef.current) doSave(pendingFormRef.current)
+      }
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     setForm({
@@ -39,28 +56,41 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
   function scheduleAutosave(updates: Partial<FormState>) {
     const next = { ...form, ...updates }
     setForm(next)
+    pendingFormRef.current = next
     onOrderChange({
       delivery_date: next.delivery_date,
       total_amount: next.total_amount,
       remarks: next.remarks,
     })
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => doSave(next), 800)
+    timerRef.current = setTimeout(() => {
+      pendingFormRef.current = null
+      doSave(next)
+    }, 800)
   }
 
   async function doSave(data: FormState) {
-    setSaveState('saving')
+    // Abort any in-flight save — prevents older PATCH from landing after a newer one
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    if (mountedRef.current) setSaveState('saving')
     try {
       await updateOrder(order.id, {
         delivery_date: data.delivery_date,
         total_amount: data.total_amount,
         remarks: data.remarks,
-      })
-      setSaveState('saved')
+      }, controller.signal)
+      abortControllerRef.current = null
       onUpdated()
+      if (!mountedRef.current) return
+      setSaveState('saved')
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
       savedTimerRef.current = setTimeout(() => setSaveState('idle'), 2000)
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+      if (!mountedRef.current) return
       setSaveState('error')
     }
   }
@@ -75,7 +105,7 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
         {saveState === 'saving' && (
           <span className="text-[11px] text-[#A0A09C] flex items-center gap-1">
             <span className="w-2.5 h-2.5 border border-[#A0A09C] border-t-transparent rounded-full animate-spin inline-block" />
-            Saving
+            Saving…
           </span>
         )}
         {saveState === 'saved' && (

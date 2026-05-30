@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Order } from '@/lib/api/orders'
 import { ORDER_STATUSES, updateOrder } from '@/lib/api/orders'
 
@@ -36,23 +36,51 @@ function StarIcon({ filled }: { filled: boolean }) {
 
 export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) {
   const [statusChanging, setStatusChanging] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    }
+  }, [])
+
+  function showError(msg: string) {
+    if (!mountedRef.current) return
+    setSaveError(msg)
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setSaveError(null)
+    }, 3000)
+  }
 
   async function handleStatusChange(newStatus: Order['status']) {
-    setStatusChanging(true)
+    if (mountedRef.current) setStatusChanging(true)
     try {
       await updateOrder(order.id, { status: newStatus })
-      onOrderChange({ status: newStatus })
       onUpdated()
+      if (!mountedRef.current) return
+      onOrderChange({ status: newStatus })
+    } catch {
+      showError('Status update failed')
     } finally {
-      setStatusChanging(false)
+      if (mountedRef.current) setStatusChanging(false)
     }
   }
 
   async function handlePriorityToggle() {
     const newPriority = !order.priority
-    await updateOrder(order.id, { priority: newPriority })
-    onOrderChange({ priority: newPriority })
-    onUpdated()
+    try {
+      await updateOrder(order.id, { priority: newPriority })
+      onUpdated()
+      if (!mountedRef.current) return
+      onOrderChange({ priority: newPriority })
+    } catch {
+      showError('Priority update failed')
+    }
   }
 
   return (
@@ -77,6 +105,9 @@ export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) 
       )}
 
       {/* Status + Priority row */}
+      {saveError && (
+        <p className="text-[11px] text-red-500 mt-2">{saveError}</p>
+      )}
       <div className="flex items-center gap-2 mt-3">
         <select
           value={order.status}

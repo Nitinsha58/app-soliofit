@@ -43,11 +43,13 @@ export async function getOrder(id: string): Promise<Order> {
 
 export async function updateOrder(
   id: string,
-  data: Partial<Pick<Order, 'delivery_date' | 'total_amount' | 'priority' | 'remarks' | 'status'>>
+  data: Partial<Pick<Order, 'delivery_date' | 'total_amount' | 'priority' | 'remarks' | 'status'>>,
+  signal?: AbortSignal
 ): Promise<Order> {
   return apiRequest<Order>(`/api/orders/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify(data),
+    signal,
   })
 }
 
