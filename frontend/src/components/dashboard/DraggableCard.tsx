@@ -7,11 +7,13 @@ import OrderCard from './OrderCard'
 
 interface Props {
   order: Order
+  disabled?: boolean
 }
 
-export default function DraggableCard({ order }: Props) {
+export default function DraggableCard({ order, disabled = false }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
+    disabled,
   })
 
   const style = transform
@@ -24,7 +26,7 @@ export default function DraggableCard({ order }: Props) {
       style={style}
       {...listeners}
       {...attributes}
-      className={isDragging ? 'opacity-0' : 'touch-none'}
+      className={`touch-none ${isDragging ? 'opacity-0' : ''} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
     >
       <OrderCard order={order} />
     </div>

@@ -28,6 +28,8 @@ export default function KanbanBoard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set())
+  const [showDelivered, setShowDelivered] = useState(false)
   const ordersRefreshKey = useUIStore((s) => s.ordersRefreshKey)
 
   const sensors = useSensors(
@@ -56,18 +58,30 @@ export default function KanbanBoard() {
     if (!order || order.status === newStatus) return
 
     const prevStatus = order.status
+
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
     )
+    setMutatingIds((prev) => new Set(Array.from(prev).concat(orderId)))
 
-    updateOrderStatus(orderId, newStatus).catch(() => {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: prevStatus } : o)),
-      )
-    })
+    updateOrderStatus(orderId, newStatus)
+      .catch(() => {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status: prevStatus } : o)),
+        )
+      })
+      .finally(() => {
+        setMutatingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(orderId)
+          return next
+        })
+      })
   }
 
   const activeOrder = activeId ? orders.find((o) => o.id === activeId) : null
+
+  const deliveredCount = orders.filter((o) => o.status === 'Delivered').length
 
   if (loading) {
     return (
@@ -96,15 +110,54 @@ export default function KanbanBoard() {
 
       <div className="overflow-x-auto pb-4 -mx-6 px-6">
         <div className="flex gap-4 min-w-max">
-          {COLUMNS.map(({ status, label, accent }) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              title={label}
-              accent={accent}
-              orders={orders.filter((o) => o.status === status)}
-            />
-          ))}
+          {COLUMNS.map(({ status, label, accent }) => {
+            const isDeliveredCol = status === 'Delivered'
+            if (isDeliveredCol && !showDelivered) {
+              return (
+                <div
+                  key={status}
+                  className="flex flex-col w-72 flex-shrink-0 rounded-xl bg-[#F7F7F5] overflow-hidden"
+                  style={{ boxShadow: 'inset 0 0 0 1px #E5E5E2' }}
+                >
+                  <div style={{ borderTop: '3px solid #9CA3AF' }} className="px-3 pt-3 pb-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[#A0A09C] tracking-tight">{label}</span>
+                      <button
+                        onClick={() => setShowDelivered(true)}
+                        className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] bg-[#9CA3AF28] px-2 py-0.5 rounded-full transition-colors"
+                      >
+                        Show {deliveredCount > 0 ? `(${deliveredCount})` : ''}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="px-2.5 pb-3">
+                    <div className="flex items-center justify-center py-7 rounded-lg border border-dashed border-[#DCDCD8]">
+                      <p className="text-xs text-[#C8C8C4]">Hidden</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <KanbanColumn
+                key={status}
+                status={status}
+                title={label}
+                accent={accent}
+                orders={orders.filter((o) => o.status === status)}
+                mutatingIds={mutatingIds}
+                headerAction={isDeliveredCol ? (
+                  <button
+                    onClick={() => setShowDelivered(false)}
+                    className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] transition-colors"
+                  >
+                    Hide
+                  </button>
+                ) : undefined}
+              />
+            )
+          })}
         </div>
       </div>
 
