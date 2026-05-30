@@ -10,12 +10,12 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 | # | Slice | Observable Outcome | Status |
 |---|-------|--------------------|--------|
-| VS-00 | Foundation shell | `docker compose up` → Django `/api/health/` + Next.js `/` both respond | Pending |
-| VS-01 | Authentication | Login with email/password → JWT cookie set. Logout → cookie cleared | Pending |
-| VS-02 | App shell | Protected layout + sidebar + nav. Unauthenticated → redirect to login | Pending |
-| VS-03 | Customer management | Create, search, list customers | Pending |
-| VS-04 | Order creation | Create an order in < 30 seconds, appears in Kanban as Booked | Pending |
-| VS-05 | Kanban board | All 5 columns render, drag-and-drop changes order status | Pending |
+| VS-00 | Foundation shell | `docker compose up` → Django `/api/health/` + Next.js `/` both respond | Done |
+| VS-01 | Authentication | Login with email/password → JWT cookie set. Logout → cookie cleared | Done |
+| VS-02 | App shell | Protected layout + sidebar + nav. Unauthenticated → redirect to login | Done |
+| VS-03 | Customer management | Create, search, list customers | Done |
+| VS-04 | Order creation | Create an order in < 30 seconds, appears in Kanban as Booked | Done |
+| VS-05 | Kanban board | All 5 columns render, drag-and-drop changes order status | Done |
 | VS-06 | Order details | Open an order, view all fields, autosave edits | Pending |
 | VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Pending |
 | VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Pending |
