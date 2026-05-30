@@ -16,7 +16,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-03 | Customer management | Create, search, list customers | Done |
 | VS-04 | Order creation | Create an order in < 30 seconds, appears in Kanban as Booked | Done |
 | VS-05 | Kanban board | All 5 columns render, drag-and-drop changes order status | Done |
-| VS-06 | Order details | Open an order, view all fields, autosave edits | Pending |
+| VS-06 | Order details | Open an order, view all fields, autosave edits | Done |
 | VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Pending |
 | VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Pending |
 | VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Pending |
