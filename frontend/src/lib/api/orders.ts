@@ -32,6 +32,16 @@ export async function createOrder(data: {
   })
 }
 
+export async function updateOrderStatus(
+  id: string,
+  status: Order['status']
+): Promise<Order> {
+  return apiRequest<Order>(`/api/orders/${id}/status/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
 export async function getDeliveryLoad(from: string, to: string): Promise<Record<string, number>> {
   return apiRequest<Record<string, number>>(
     `/api/orders/delivery-load/?from=${from}&to=${to}`

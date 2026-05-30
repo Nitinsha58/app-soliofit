@@ -27,6 +27,19 @@ class OrderViewSet(viewsets.ModelViewSet):
         instance.deleted_at = timezone.now()
         instance.save(update_fields=['deleted_at'])
 
+    @action(detail=True, methods=['patch'], url_path='status')
+    def update_status(self, request, pk=None):
+        order = self.get_object()
+        new_status = request.data.get('status')
+        if new_status not in Order.Status.values:
+            return Response(
+                {'detail': f'Invalid status. Choices: {", ".join(Order.Status.values)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        order.status = new_status
+        order.save(update_fields=['status', 'updated_at'])
+        return Response(OrderSerializer(order, context={'request': request}).data)
+
     @action(detail=False, methods=['get'], url_path='delivery-load')
     def delivery_load(self, request):
         from_date = request.query_params.get('from')
