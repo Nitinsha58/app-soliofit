@@ -40,7 +40,7 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-05 | Kanban board | Complete |
 | VS-06 | Order details | Complete |
 | VS-07 | Photo upload | Complete |
-| VS-08 | Voice notes | Active |
+| VS-08 | Voice notes | Complete |
 | VS-09 | Installments | Not started |
 | VS-10 | Dashboard intelligence | Not started |
 | VS-11 | Payments dashboard | Not started |

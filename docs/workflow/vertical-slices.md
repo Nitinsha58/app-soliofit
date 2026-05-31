@@ -36,8 +36,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 | # | Slice | Status |
 |---|-------|--------|
-| VS-08 | Voice notes | **Active** |
-| VS-09 | Installments | Next |
+| VS-08 | Voice notes | Done |
+| VS-09 | Installments | **Active** |
 | VS-10 | Dashboard intelligence | Queued |
 | VS-11 | Payments dashboard | Queued |
 
@@ -252,7 +252,9 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 ---
 
-### VS-08 — Voice Notes
+### VS-08 — Voice Notes ✓
+
+**Completion record:** Commit `4c86775` · Deferred: none. VoiceRecorder logic duplicated inline in StepAdditional (not extracted to shared hook) — acceptable for MVP, revisit in VS-17 mobile polish if needed.
 
 **What:** Hold-to-record voice notes, upload to S3, playback with seek and speed.
 
