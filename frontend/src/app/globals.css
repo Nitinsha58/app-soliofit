@@ -7,3 +7,8 @@
     background-color: #FAFAF8;
   }
 }
+
+@keyframes voiceBar {
+  from { transform: scaleY(0.25); }
+  to   { transform: scaleY(1); }
+}

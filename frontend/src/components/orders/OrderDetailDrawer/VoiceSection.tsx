@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { VoiceNote } from '@/lib/api/media'
 import { listVoiceNotes, deleteVoiceNote } from '@/lib/api/media'
+import MicButton from './MicButton'
 
 interface Props {
   orderId: string
@@ -224,7 +225,7 @@ export default function VoiceSection({ orderId }: Props) {
     <div className="mx-5 mb-4">
       <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">Voice Notes</p>
 
-      {/* MicButton wired in Unit 3 — receives orderId + onNoteAdded={handleNoteAdded} */}
+      <MicButton orderId={orderId} onNoteAdded={handleNoteAdded} />
 
       {notes.length === 0 ? (
         <p className="text-xs text-[#A0A09C] text-center py-3">No voice notes yet</p>
