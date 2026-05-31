@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { Order } from '@/lib/api/orders'
 import { createOrder } from '@/lib/api/orders'
+import { uploadPhoto } from '@/lib/api/media'
 import StepCustomer from './StepCustomer'
 import StepPhotos from './StepPhotos'
 import StepDelivery from './StepDelivery'
@@ -19,6 +20,7 @@ interface Draft {
   totalAmount: string
   priority: boolean
   remarks: string
+  pendingPhotos: File[]
 }
 
 interface Props {
@@ -45,6 +47,7 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     totalAmount: '',
     priority: false,
     remarks: '',
+    pendingPhotos: [],
   })
 
   useEffect(() => {
@@ -73,6 +76,12 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
         priority: draft.priority,
         remarks: draft.remarks,
       })
+      // Upload staged photos in background — fire and forget
+      if (draft.pendingPhotos.length > 0) {
+        Promise.allSettled(
+          draft.pendingPhotos.map((f) => uploadPhoto(order.id, f, 'garment'))
+        ).catch(() => {})
+      }
       onCreated(order)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create order')
@@ -117,7 +126,14 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
               onSelect={(c) => { patch({ customer: c }); next() }}
             />
           )}
-          {step === 2 && <StepPhotos onNext={next} onBack={back} />}
+          {step === 2 && (
+            <StepPhotos
+              files={draft.pendingPhotos}
+              onFilesChange={(f) => patch({ pendingPhotos: f })}
+              onNext={next}
+              onBack={back}
+            />
+          )}
           {step === 3 && (
             <StepDelivery
               value={draft.deliveryDate}

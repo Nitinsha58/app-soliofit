@@ -5,3 +5,4 @@ django-cors-headers==4.*
 psycopg2-binary==2.9.*
 python-decouple==3.*
 gunicorn==22.*
+boto3==1.34.*

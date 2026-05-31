@@ -12,6 +12,7 @@ build/
 dist/
 *.egg-info/
 staticfiles/
+mediafiles/
 db.sqlite3
 
 # Environment files (never commit real values)

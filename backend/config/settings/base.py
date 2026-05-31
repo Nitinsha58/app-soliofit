@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.customers',
     'apps.orders',
+    'apps.media',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
+# S3 — leave empty to use dev stub storage
+S3_BUCKET_NAME       = config('S3_BUCKET_NAME', default='')
+AWS_REGION           = config('AWS_REGION', default='ap-south-1')
+AWS_ACCESS_KEY_ID    = config('AWS_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

@@ -17,7 +17,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-04 | Order creation | Create an order in < 30 seconds, appears in Kanban as Booked | Done |
 | VS-05 | Kanban board | All 5 columns render, drag-and-drop changes order status | Done |
 | VS-06 | Order details | Open an order, view all fields, autosave edits | Done |
-| VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Pending |
+| VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Done |
 | VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Pending |
 | VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Pending |
 | VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Pending |
@@ -213,11 +213,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 - Notes photos: 2-column grid in Order Details
 - Upload flow: skeleton → presign → PUT to S3 → save record → show thumbnail
 - Lightbox viewer (swipe navigation)
-- Delete: long press or swipe
+- Delete: × badge on hover (desktop) + long-press (touch)
 - Retry button on upload failure
 - Wire photo upload into Add Order Step 2
 
-**ADR:** Write ADR-0004 (S3 presigned URL strategy) here.
+**ADR:** ADR-0005 (S3 presigned URL strategy with local stub mode).
 
 **Review checkpoint:** Upload a garment photo → appears in strip. Tap → lightbox opens. Delete → removed from strip and S3. Retry works on simulated failure.
 
