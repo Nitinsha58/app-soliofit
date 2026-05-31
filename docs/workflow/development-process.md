@@ -93,3 +93,145 @@ After every commit:
 Development follows a vertical slice approach. Each slice delivers an observable, end-to-end feature increment.
 
 See [vertical-slices.md](./vertical-slices.md) for the full slice map and specifications.
+
+---
+
+## ADR Lifecycle
+
+### When to write an ADR
+
+Write an ADR when all three are true:
+1. You are choosing between approaches that are **costly to reverse** (more than a few hours to undo)
+2. The decision is **architecturally load-bearing** — other slices or systems depend on it
+3. The reasoning would not be obvious to someone reading the code six months later
+
+Note the decision in the **commit message body** instead when:
+- It is a library or package version choice within an already-decided framework
+- It is a component-level or styling choice
+- It could be changed with a small, isolated refactor
+
+**The trigger question:** "If someone reads this commit in 6 months, will they wonder why we made this choice?" If yes → ADR. If no → commit body.
+
+### Accepted ADRs are immutable
+
+Once an ADR reaches `Accepted` status, its body is frozen. Do not silently edit the rationale, consequences, or alternatives. The record must reflect the thinking at the time the decision was made.
+
+### Superseding an ADR
+
+If a later slice changes a decision that was previously documented:
+
+1. Write a new ADR (next sequential ID) with `Accepted` status
+2. At the top of the **original ADR**, add a warning line and update its status field:
+
+```markdown
+> ⚠️ Superseded by [ADR-XXXX — Title](./ADR-XXXX-title.md)
+
+| Field | Value |
+|-------|-------|
+| **Status** | Superseded by ADR-XXXX |
+...
+```
+
+3. Add both ADRs to the index in `adr/README.md` and `docs/README.md`
+4. Never delete an ADR — superseded records are part of the project history
+
+### ADR format (required fields)
+
+Every ADR must contain:
+- Metadata table: Status / Date / Deciders / **Slice**
+- Context
+- Decision
+- Alternatives Considered
+- Consequences
+- References (links to vault docs or other ADRs)
+
+---
+
+## Vertical Slice Management
+
+### The slice map is the MVP contract
+
+All slices in `vertical-slices.md` represent the full MVP scope. Do not delete or renumber existing slices — stable IDs are referenced in commit messages and completion records.
+
+### Adding a new slice
+
+When scope changes require a new slice:
+1. Assign the next sequential number (e.g. VS-19)
+2. Add a row to the Slice Overview table with status `Backlog`
+3. Write the full spec (What / Backend / Frontend / ADR / Review checkpoint) only when it enters the Active Window — not before
+4. Update `docs/README.md` status table to include the new row
+
+### Splitting a slice
+
+If a slice grows too large to complete in one focused session:
+1. Create VS-08a and VS-08b (or VS-08 and VS-19 if the split is major)
+2. In the Slice Overview table, mark the original as `Split → VS-08a + VS-08b`
+3. Write specs for both sub-slices
+4. Do not renumber any other slices
+
+### Merging slices
+
+If two pending slices turn out to be trivially small:
+1. Absorb the smaller one into the larger
+2. Mark the absorbed slice in the table as `Merged into VS-XX`
+3. Add a note in the absorbing slice's spec: "Includes work originally scoped in VS-XX"
+
+### Completion record (required for every finished slice)
+
+Before moving to the next slice, add one line immediately after the slice heading:
+
+```markdown
+### VS-08 — Voice Notes ✓
+
+**Completion record:** Commit `abc1234` · Deferred: [anything not done] · Follow-up: [any known issues].
+```
+
+If nothing was deferred and there are no follow-ups: `Commit \`abc1234\` · No deferrals.`
+
+### Window reviews (every 4 slices)
+
+After completing VS-11, VS-15, and VS-18, before starting the next batch:
+1. Read the next 4 slice specs — verify field names, endpoints, and model names match what was actually built
+2. Write any ADRs that were deferred during the completed batch
+3. Update the Active Window table and timestamp
+4. Commit: `docs(workflow): window review after VS-XX`
+
+**Time budget:** 15–30 minutes per review.
+
+---
+
+## Product Vault — Source of Truth
+
+The Obsidian vault at `/Users/nitin/MemoryGraph/Soliofit/Soliofit/` is the single source of truth for:
+- What the product does (screens, features, UX flows)
+- What is in and out of MVP scope
+- The technology stack summary
+
+The ADRs in `docs/adr/` are the single source of truth for:
+- Why each architecture choice was made
+- What alternatives were considered and rejected
+
+**These two sources do not duplicate each other.** The vault's Key Decisions Log in `00-index.md` is a quick-scan summary only — the ADRs are the authoritative record.
+
+### When to update the vault
+
+Update the vault (and commit to its git repo) when:
+- A screen's layout, features, or user actions change from what is specified
+- A feature is added to or removed from MVP scope
+- The tech stack changes (new library, replaced dependency)
+- A UX guideline or component spec changes based on what was built
+
+Do **not** update the vault for:
+- Incremental implementation details (which file a component lives in, exact API path)
+- Changes that are fully captured in an ADR
+- Anything that is implementation-level rather than product-level
+
+### Vault commit format
+
+```
+docs(vault): update <document name> after <reason>
+
+Example: docs(vault): update 01-screen-definitions after VS-07 photo upload implementation
+```
+
+Vault commits are separate from code commits. Make them as a follow-up after the implementation commit, not bundled with it.

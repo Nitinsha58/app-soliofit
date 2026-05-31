@@ -18,6 +18,7 @@ ADRs capture significant technical choices: what was decided, why, what alternat
 | [ADR-0002](./ADR-0002-auth-strategy.md) | Auth Strategy — Cookie-based JWT | Accepted | VS-01 |
 | [ADR-0003](./ADR-0003-database-orm.md) | Database — PostgreSQL + Django ORM | Accepted | VS-00 |
 | [ADR-0004](./ADR-0004-frontend-framework.md) | Frontend Framework — Next.js 14 App Router + shadcn/ui | Accepted | VS-00 |
+| [ADR-0005](./ADR-0005-s3-presigned-url-strategy.md) | S3 Presigned URL Strategy with Local Stub Mode | Accepted | VS-07 |
 
 _Future ADRs will be added as each slice requires a documented decision._
 

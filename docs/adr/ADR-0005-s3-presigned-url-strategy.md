@@ -1,7 +1,13 @@
 # ADR-0005 — S3 Presigned URL Strategy with Local Stub Mode
 
-## Status
-Accepted
+| Field | Value |
+|-------|-------|
+| **Status** | Accepted |
+| **Date** | 2026-05-29 |
+| **Deciders** | Nitin |
+| **Slice** | VS-07 |
+
+---
 
 ## Context
 VS-07 (Photo Upload) requires photos to be uploaded from the browser directly to storage. Routing binary payloads through Django would add unnecessary latency and memory pressure for every upload.
@@ -23,3 +29,17 @@ The frontend upload code is **identical for both paths** — it PUTs to whicheve
 - Production S3 bucket requires: a CORS policy allowing `PUT` from the app origin, a bucket policy restricting public access to presigned keys only, and an IAM user with `s3:PutObject` and `s3:DeleteObject` on the bucket.
 - Presigned PUT URLs expire in 5 minutes — sufficient for the upload flow.
 - boto3 is a lazy import: it is only imported inside the view when `S3_BUCKET_NAME` is set, so the dev stub path has no boto3 dependency at runtime.
+
+## Alternatives Considered
+
+| Option | Reason Rejected |
+|--------|----------------|
+| Route uploads through Django | Adds latency and memory pressure on every binary upload; Django becomes a bottleneck |
+| Store files on EC2 disk (MEDIA_ROOT in production) | No CDN, no horizontal scale, disk fills over time |
+| Third-party service (Cloudinary, Uploadcare) | Extra vendor dependency and cost; S3 is already in the stack |
+| Presigned POST (multipart) instead of presigned PUT | PUT is simpler for single-file uploads; multipart POST adds encoding overhead with no benefit |
+
+## References
+
+- `03-technical-architecture.md` — S3 media flow and upload sequence
+- `08-devops-deployment.md` — S3 bucket policy and IAM requirements

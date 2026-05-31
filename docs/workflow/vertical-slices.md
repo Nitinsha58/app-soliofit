@@ -32,11 +32,26 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
+## Active Window
+
+| # | Slice | Status |
+|---|-------|--------|
+| VS-08 | Voice notes | **Active** |
+| VS-09 | Installments | Next |
+| VS-10 | Dashboard intelligence | Queued |
+| VS-11 | Payments dashboard | Queued |
+
+_Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
+
+---
+
 ## Slice Specifications
 
 ---
 
-### VS-00 — Foundation Shell
+### VS-00 — Foundation Shell ✓
+
+**Completion record:** Commit `854f4b1` · No deferrals.
 
 **What:** Minimum infrastructure to run both services locally. No product features yet.
 
@@ -62,7 +77,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-01 — Authentication
+### VS-01 — Authentication ✓
+
+**Completion record:** Commit `c152bd1` · No deferrals.
 
 **What:** Email + password login. JWT stored in HTTP-only cookie. Logout clears cookie.
 
@@ -86,7 +103,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-02 — App Shell
+### VS-02 — App Shell ✓
+
+**Completion record:** Commit `0b8b18e` · No deferrals.
 
 **What:** Protected layout with sidebar and navigation. Unauthenticated requests redirected to login.
 
@@ -105,7 +124,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-03 — Customer Management
+### VS-03 — Customer Management ✓
+
+**Completion record:** Commit `775d74a` · No deferrals.
 
 **What:** Create, search, and list customers.
 
@@ -127,7 +148,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-04 — Order Creation
+### VS-04 — Order Creation ✓
+
+**Completion record:** Commit `9d79411` · Deferred: garment photo upload in Step 2 (skip button used; wired in VS-07). Voice note in Step 5 (skip button used; wired in VS-08). Installment plan skeleton in Step 4 (wired in VS-09).
 
 **What:** Multi-step Add Order flow. New order appears in Kanban as Booked.
 
@@ -154,7 +177,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-05 — Kanban Board
+### VS-05 — Kanban Board ✓
+
+**Completion record:** Commit `f417ae0` · No deferrals. Summary strip counts only (full intelligence in VS-10 as planned).
 
 **What:** Full Kanban board with 5 columns. Drag-and-drop changes order status.
 
@@ -175,7 +200,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-06 — Order Details
+### VS-06 — Order Details ✓
+
+**Completion record:** Commit `9d334a0` · Placeholder sections for photos, voice, installments, activity log present. Each wired in dedicated slice.
 
 **What:** Right-side drawer with full order view. Autosave on field change.
 
@@ -196,7 +223,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 
 ---
 
-### VS-07 — Photo Upload
+### VS-07 — Photo Upload ✓
+
+**Completion record:** Commit `4fc46ca` · Deferred: photo reorder drag (planned for VS-17). ADR-0005 written and accepted.
 
 **What:** Garment photos and notes photos upload via S3 presigned URL, view in lightbox.
 
@@ -459,7 +488,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 - `nginx/nginx.conf`: `/` → Next.js (3000), `/api/` → Django (8000)
 - `.github/workflows/deploy.yml`: build both images on push to `main`, SSH into EC2, pull + restart
 
-**ADR:** Write ADR-0005 (deployment strategy) here.
+**ADR:** Write ADR-0006 (deployment strategy) here.
 
 **Note:** Requires EC2 provisioned and SSH key configured as a GitHub secret. Flag before starting this slice.
 
