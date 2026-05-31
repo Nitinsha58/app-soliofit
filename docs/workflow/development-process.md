@@ -164,8 +164,8 @@ When scope changes require a new slice:
 ### Splitting a slice
 
 If a slice grows too large to complete in one focused session:
-1. Create VS-08a and VS-08b (or VS-08 and VS-19 if the split is major)
-2. In the Slice Overview table, mark the original as `Split → VS-08a + VS-08b`
+1. Create VS-XXa and VS-XXb (or VS-XX and VS-YY if the split is major)
+2. In the Slice Overview table, mark the original as `Split → VS-XXa + VS-XXb`
 3. Write specs for both sub-slices
 4. Do not renumber any other slices
 
@@ -181,7 +181,7 @@ If two pending slices turn out to be trivially small:
 Before moving to the next slice, add one line immediately after the slice heading:
 
 ```markdown
-### VS-08 — Voice Notes ✓
+### VS-XX — Slice Name ✓
 
 **Completion record:** Commit `abc1234` · Deferred: [anything not done] · Follow-up: [any known issues].
 ```
