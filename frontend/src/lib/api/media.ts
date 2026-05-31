@@ -1,5 +1,33 @@
 import { apiRequest } from './client'
 
+export interface VoiceNote {
+  id: string
+  s3_key: string
+  public_url: string
+  duration_seconds: number
+  created_at: string
+}
+
+export async function listVoiceNotes(orderId: string): Promise<VoiceNote[]> {
+  return apiRequest(`/api/orders/${orderId}/voice-notes/`)
+}
+
+export async function saveVoiceNote(
+  orderId: string,
+  s3Key: string,
+  publicUrl: string,
+  durationSeconds: number,
+): Promise<VoiceNote> {
+  return apiRequest(`/api/orders/${orderId}/voice-notes/`, {
+    method: 'POST',
+    body: JSON.stringify({ s3_key: s3Key, public_url: publicUrl, duration_seconds: durationSeconds }),
+  })
+}
+
+export async function deleteVoiceNote(orderId: string, noteId: string): Promise<void> {
+  return apiRequest(`/api/orders/${orderId}/voice-notes/${noteId}/`, { method: 'DELETE' })
+}
+
 export interface OrderPhoto {
   id: string
   s3_key: string

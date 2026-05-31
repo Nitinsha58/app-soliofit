@@ -7,6 +7,7 @@ import OrderHeader from './OrderHeader'
 import QuickActions from './QuickActions'
 import OrderInfoSection from './OrderInfoSection'
 import PhotoSection from './PhotoSection'
+import VoiceSection from './VoiceSection'
 
 interface Props {
   orderId: string
@@ -120,7 +121,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
             {/* Deferred sections */}
             <div className="pt-1 pb-6">
               <PhotoSection orderId={order.id} />
-              <PlaceholderSection title="Voice Notes" subtitle="Hold-to-record voice notes — coming in VS-08" />
+              <VoiceSection orderId={order.id} />
               <PlaceholderSection title="Installments" subtitle="Payment installments — coming in VS-09" />
               <PlaceholderSection title="Activity" subtitle="Order event log — coming in VS-12" />
             </div>
