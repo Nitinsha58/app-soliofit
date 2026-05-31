@@ -258,8 +258,8 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 **Backend:**
 - `VoiceNote` model (UUID pk, order FK, s3_key, public_url, duration_seconds)
-- Add to `media` migration
-- `POST /api/upload/presign/` already handles audio (folder: `voice-notes`)
+- New migration in `apps/media/`
+- `POST /api/upload/presign/` is folder- and content-type-agnostic — pass `folder: "voice-notes"`, `content_type: "audio/webm"` (no backend change needed)
 - `POST /api/orders/{id}/voice-notes/` — saves voice note record
 - `DELETE /api/orders/{id}/voice-notes/{id}/` — deletes record + S3 object
 

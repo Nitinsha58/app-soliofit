@@ -24,6 +24,7 @@ node_modules/
 .next/
 out/
 npm-debug.log*
+frontend/tsconfig.tsbuildinfo
 
 # OS
 .DS_Store
@@ -39,3 +40,4 @@ Thumbs.db
 .codex/
 .openclaw/
 .mcp.json
+.agents/
