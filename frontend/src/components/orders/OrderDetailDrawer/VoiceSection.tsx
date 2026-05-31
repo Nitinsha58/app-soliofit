@@ -116,6 +116,7 @@ function VoiceNoteCard({ note, onDelete }: { note: VoiceNote; onDelete: (id: str
       <div className="flex items-center gap-2.5">
         <button
           onClick={togglePlay}
+          aria-label={playing ? 'Pause voice note' : 'Play voice note'}
           className="flex-shrink-0 w-8 h-8 rounded-full bg-[#C8952A] flex items-center justify-center text-white hover:bg-[#A87820] transition-colors pl-0.5"
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
@@ -146,6 +147,7 @@ function VoiceNoteCard({ note, onDelete }: { note: VoiceNote; onDelete: (id: str
 
         <button
           onClick={cycleSpeed}
+          aria-label={`Playback speed: ${speed}×`}
           className="flex-shrink-0 w-7 text-center text-[11px] font-semibold text-[#6B6B67] hover:text-[#C8952A] transition-colors"
         >
           {speed}×
@@ -153,6 +155,7 @@ function VoiceNoteCard({ note, onDelete }: { note: VoiceNote; onDelete: (id: str
 
         <button
           onClick={() => setConfirmDelete(true)}
+          aria-label="Delete voice note"
           className="flex-shrink-0 text-[#A0A09C] hover:text-red-500 transition-colors p-0.5"
         >
           <TrashIcon />

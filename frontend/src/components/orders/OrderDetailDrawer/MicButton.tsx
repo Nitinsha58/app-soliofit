@@ -31,13 +31,14 @@ export default function MicButton({ orderId, onNoteAdded }: Props) {
   const [isUploading, setIsUploading] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
 
-  const recorderRef    = useRef<MediaRecorder | null>(null)
-  const chunksRef      = useRef<Blob[]>([])
-  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null)
-  const maxTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const hintTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const durationRef    = useRef(0)
-  const mountedRef     = useRef(true)
+  const recorderRef      = useRef<MediaRecorder | null>(null)
+  const chunksRef        = useRef<Blob[]>([])
+  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null)
+  const maxTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hintTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const durationRef      = useRef(0)
+  const mountedRef       = useRef(true)
+  const pendingStopRef   = useRef(false)  // true if pointerup fired before recorder was ready
 
   useEffect(() => {
     mountedRef.current = true
@@ -95,6 +96,9 @@ export default function MicButton({ orderId, onNoteAdded }: Props) {
       recorderRef.current = recorder
       if (mountedRef.current) { setIsRecording(true); setDuration(0) }
 
+      // Pointer was released while getUserMedia was still pending — stop immediately
+      if (pendingStopRef.current) { recorder.stop(); return }
+
       timerRef.current = setInterval(() => {
         durationRef.current += 1
         if (mountedRef.current) setDuration((d) => d + 1)
@@ -133,9 +137,12 @@ export default function MicButton({ orderId, onNoteAdded }: Props) {
 
   function handlePointerDown(e: React.PointerEvent) {
     e.preventDefault()
+    pendingStopRef.current = false
     startRecording()
-    // Stop on pointer release anywhere on the page
-    window.addEventListener('pointerup', stopRecording, { once: true })
+    window.addEventListener('pointerup', () => {
+      pendingStopRef.current = true
+      stopRecording()
+    }, { once: true })
   }
 
   return (
@@ -143,6 +150,7 @@ export default function MicButton({ orderId, onNoteAdded }: Props) {
       <button
         onPointerDown={handlePointerDown}
         disabled={isUploading}
+        aria-label={isRecording ? 'Stop recording' : 'Record voice note'}
         className={[
           'relative w-14 h-14 rounded-full flex items-center justify-center select-none touch-none transition-all duration-150',
           isRecording
