@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/customers/', include('apps.customers.urls')),
     path('api/orders/', include('apps.orders.urls')),
     path('api/orders/<uuid:order_id>/photos/', include('apps.media.photo_urls')),
+    path('api/orders/<uuid:order_id>/voice-notes/', include('apps.media.voice_note_urls')),
     path('api/upload/', include('apps.media.upload_urls')),
     path('admin/', admin.site.urls),
 ]

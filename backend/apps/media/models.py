@@ -2,6 +2,22 @@ import uuid
 from django.db import models
 
 
+class VoiceNote(models.Model):
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order            = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='voice_notes')
+    s3_key           = models.CharField(max_length=500, unique=True)
+    public_url       = models.URLField(max_length=1000)
+    duration_seconds = models.PositiveIntegerField(default=0)
+    created_at       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'voice_notes'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'Voice note for order {self.order_id}'
+
+
 class OrderPhoto(models.Model):
     class PhotoType(models.TextChoices):
         GARMENT = 'garment', 'Garment'

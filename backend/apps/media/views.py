@@ -9,8 +9,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.orders.models import Order
-from .models import OrderPhoto
-from .serializers import OrderPhotoSerializer
+from .models import OrderPhoto, VoiceNote
+from .serializers import OrderPhotoSerializer, VoiceNoteSerializer
 
 
 def _use_stub():
@@ -129,4 +129,69 @@ class OrderPhotoDetailView(APIView):
                 pass  # don't block deletion if S3 call fails
 
         photo.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class VoiceNoteListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_order(self, request, order_id):
+        try:
+            return Order.objects.get(id=order_id, user=request.user, deleted_at__isnull=True)
+        except Order.DoesNotExist:
+            return None
+
+    def get(self, request, order_id):
+        order = self._get_order(request, order_id)
+        if not order:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        notes = VoiceNote.objects.filter(order=order)
+        return Response(VoiceNoteSerializer(notes, many=True).data)
+
+    def post(self, request, order_id):
+        order = self._get_order(request, order_id)
+        if not order:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = VoiceNoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(order=order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class VoiceNoteDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_note(self, request, order_id, note_id):
+        try:
+            return VoiceNote.objects.get(
+                id=note_id,
+                order__id=order_id,
+                order__user=request.user,
+                order__deleted_at__isnull=True,
+            )
+        except VoiceNote.DoesNotExist:
+            return None
+
+    def delete(self, request, order_id, note_id):
+        note = self._get_note(request, order_id, note_id)
+        if not note:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if _use_stub():
+            stub_file = Path(settings.MEDIA_ROOT) / 'stub' / note.s3_key
+            stub_file.unlink(missing_ok=True)
+        else:
+            try:
+                import boto3  # noqa: PLC0415
+                s3 = boto3.client(
+                    's3',
+                    region_name=settings.AWS_REGION,
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                )
+                s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=note.s3_key)
+            except Exception:
+                pass
+
+        note.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
