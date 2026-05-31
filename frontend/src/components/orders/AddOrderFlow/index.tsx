@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { Order } from '@/lib/api/orders'
 import { createOrder } from '@/lib/api/orders'
-import { uploadPhoto } from '@/lib/api/media'
+import { uploadPhoto, presignUpload, uploadToStorage, saveVoiceNote } from '@/lib/api/media'
 import StepCustomer from './StepCustomer'
 import StepPhotos from './StepPhotos'
 import StepDelivery from './StepDelivery'
@@ -21,6 +21,7 @@ interface Draft {
   priority: boolean
   remarks: string
   pendingPhotos: File[]
+  pendingVoice: { blob: Blob; duration: number } | null
 }
 
 interface Props {
@@ -48,6 +49,7 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     priority: false,
     remarks: '',
     pendingPhotos: [],
+    pendingVoice: null,
   })
 
   useEffect(() => {
@@ -81,6 +83,17 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
         Promise.allSettled(
           draft.pendingPhotos.map((f) => uploadPhoto(order.id, f, 'garment'))
         ).catch(() => {})
+      }
+      // Upload staged voice note in background — fire and forget
+      if (draft.pendingVoice) {
+        const { blob, duration } = draft.pendingVoice
+        const ext = blob.type.includes('ogg') ? '.ogg' : '.webm'
+        presignUpload('voice-notes', `recording${ext}`, blob.type || 'audio/webm')
+          .then(({ upload_url, public_url, s3_key }) =>
+            uploadToStorage(upload_url, new File([blob], `recording${ext}`, { type: blob.type }))
+              .then(() => saveVoiceNote(order.id, s3_key, public_url, Math.round(duration)))
+          )
+          .catch(() => {})
       }
       onCreated(order)
     } catch (e: unknown) {
@@ -154,8 +167,11 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
             <StepAdditional
               remarks={draft.remarks}
               priority={draft.priority}
+              pendingVoice={draft.pendingVoice}
               onRemarksChange={(r) => patch({ remarks: r })}
               onPriorityChange={(p) => patch({ priority: p })}
+              onVoiceRecorded={(blob, duration) => patch({ pendingVoice: { blob, duration } })}
+              onVoiceClear={() => patch({ pendingVoice: null })}
               onNext={next}
               onBack={back}
             />
