@@ -8,6 +8,7 @@ import QuickActions from './QuickActions'
 import OrderInfoSection from './OrderInfoSection'
 import PhotoSection from './PhotoSection'
 import VoiceSection from './VoiceSection'
+import InstallmentSection from './InstallmentSection'
 
 interface Props {
   orderId: string
@@ -122,7 +123,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
             <div className="pt-1 pb-6">
               <PhotoSection orderId={order.id} />
               <VoiceSection orderId={order.id} />
-              <PlaceholderSection title="Installments" subtitle="Payment installments — coming in VS-09" />
+              <InstallmentSection orderId={order.id} />
               <PlaceholderSection title="Activity" subtitle="Order event log — coming in VS-12" />
             </div>
           </div>
