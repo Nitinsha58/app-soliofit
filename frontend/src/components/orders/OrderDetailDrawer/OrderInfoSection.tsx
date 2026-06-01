@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Order } from '@/lib/api/orders'
 import { updateOrder } from '@/lib/api/orders'
+import PaymentSchedule from './PaymentSchedule'
 
 interface Props {
   order: Order
@@ -143,6 +144,12 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
             />
           </div>
         </div>
+
+        {/* Payment schedule — reactive to bill amount typed above */}
+        <PaymentSchedule
+          orderId={order.id}
+          billAmount={parseFloat(form.total_amount) || 0}
+        />
 
         {/* Customer address (read-only) */}
         {order.customer_address && (

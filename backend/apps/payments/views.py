@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.db.models import Sum
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,6 +16,17 @@ def _get_order(request, order_id):
         return Order.objects.get(id=order_id, user=request.user, deleted_at__isnull=True)
     except Order.DoesNotExist:
         return None
+
+
+def _bill_exceeded(order, new_amount, exclude_id=None):
+    """Return excess amount if adding/updating would push scheduled total above bill, else None."""
+    qs = order.installments.all()
+    if exclude_id:
+        qs = qs.exclude(id=exclude_id)
+    existing = qs.aggregate(total=Sum('amount'))['total'] or 0
+    if existing + new_amount > order.total_amount:
+        return existing + new_amount - order.total_amount
+    return None
 
 
 class InstallmentListCreateView(APIView):
@@ -33,6 +45,12 @@ class InstallmentListCreateView(APIView):
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         serializer = InstallmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        excess = _bill_exceeded(order, serializer.validated_data['amount'])
+        if excess is not None:
+            return Response(
+                {'detail': f'Total installments exceed bill amount by ₹{excess:.2f}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer.save(order=order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -42,7 +60,7 @@ class InstallmentDetailView(APIView):
 
     def _get_installment(self, request, order_id, installment_id):
         try:
-            return Installment.objects.get(
+            return Installment.objects.select_related('order').get(
                 id=installment_id,
                 order__id=order_id,
                 order__user=request.user,
@@ -59,6 +77,17 @@ class InstallmentDetailView(APIView):
             return Response({'detail': 'Cannot edit a paid installment'}, status=status.HTTP_400_BAD_REQUEST)
         serializer = InstallmentSerializer(installment, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if 'amount' in serializer.validated_data:
+            excess = _bill_exceeded(
+                installment.order,
+                serializer.validated_data['amount'],
+                exclude_id=installment.id,
+            )
+            if excess is not None:
+                return Response(
+                    {'detail': f'Total installments exceed bill amount by ₹{excess:.2f}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         serializer.save()
         return Response(serializer.data)
 
