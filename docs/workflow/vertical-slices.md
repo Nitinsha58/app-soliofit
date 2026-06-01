@@ -225,7 +225,7 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 ### VS-07 — Photo Upload ✓
 
-**Completion record:** Commit `4fc46ca` · Deferred: photo reorder drag (planned for VS-17). ADR-0005 written and accepted.
+**Completion record:** Commits `4fc46ca`, `<camera-commit>` · Deferred: photo reorder drag (planned for VS-17). ADR-0005 written and accepted. Camera-first flow added as VS-07 patch: Add button opens action sheet (Take Photo / Choose from Gallery); CameraCapture component handles getUserMedia, retake, and permission/unsupported fallbacks.
 
 **What:** Garment photos and notes photos upload via S3 presigned URL, view in lightbox.
 
