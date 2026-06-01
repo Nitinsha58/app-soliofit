@@ -89,7 +89,12 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
 
   useEffect(() => {
     mountedRef.current = true
-    if (!navigator.mediaDevices?.getUserMedia) {
+    // getUserMedia is only available on secure contexts (HTTPS or localhost).
+    // isSecureContext is false on plain HTTP over a LAN IP, which is the common dev scenario.
+    if (!window.isSecureContext) {
+      setDenialReason('insecure')
+      setPhase('denied')
+    } else if (!navigator.mediaDevices?.getUserMedia) {
       setPhase('unsupported')
     } else {
       startStream()
