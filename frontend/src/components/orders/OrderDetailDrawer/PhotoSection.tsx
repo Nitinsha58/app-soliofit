@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { OrderPhoto } from '@/lib/api/media'
 import { listPhotos, deletePhoto, uploadPhoto } from '@/lib/api/media'
 import PhotoLightbox from './PhotoLightbox'
+import CameraCapture from './CameraCapture'
 
 interface Props {
   orderId: string
@@ -53,6 +54,8 @@ export default function PhotoSection({ orderId }: Props) {
   const [loading, setLoading] = useState(true)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<{ type: 'garment' | 'notes'; idx: number } | null>(null)
+  const [actionSheet, setActionSheet] = useState<'garment' | 'notes' | null>(null)
+  const [cameraPhoto, setCameraPhoto] = useState<'garment' | 'notes' | null>(null)
   const garmentInputRef = useRef<HTMLInputElement>(null)
   const notesInputRef = useRef<HTMLInputElement>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -67,9 +70,8 @@ export default function PhotoSection({ orderId }: Props) {
     return () => { mountedRef.current = false }
   }, [orderId])
 
-  async function handleFileSelect(files: FileList | null, photoType: 'garment' | 'notes') {
-    if (!files) return
-    for (const file of Array.from(files)) {
+  async function processFiles(files: File[], photoType: 'garment' | 'notes') {
+    for (const file of files) {
       const tempId = crypto.randomUUID()
       const localUrl = URL.createObjectURL(file)
       const item: PendingUpload = { tempId, localUrl, photoType, error: false, file }
@@ -84,6 +86,11 @@ export default function PhotoSection({ orderId }: Props) {
         if (mountedRef.current) setPending((p) => p.map((x) => x.tempId === tempId ? { ...x, error: true } : x))
       }
     }
+  }
+
+  function handleFileSelect(files: FileList | null, photoType: 'garment' | 'notes') {
+    if (!files) return
+    processFiles(Array.from(files), photoType)
   }
 
   async function handleRetry(item: PendingUpload) {
@@ -205,7 +212,7 @@ export default function PhotoSection({ orderId }: Props) {
 
             {/* Add button */}
             <button
-              onClick={() => garmentInputRef.current?.click()}
+              onClick={() => setActionSheet('garment')}
               className="flex-shrink-0 w-20 h-20 rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex flex-col items-center justify-center gap-1 text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
             >
               <PlusIcon />
@@ -278,7 +285,7 @@ export default function PhotoSection({ orderId }: Props) {
 
             {/* Add button */}
             <button
-              onClick={() => notesInputRef.current?.click()}
+              onClick={() => setActionSheet('notes')}
               className="aspect-square rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex flex-col items-center justify-center gap-1 text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
             >
               <PlusIcon />
@@ -315,6 +322,70 @@ export default function PhotoSection({ orderId }: Props) {
           index={lightboxIndex.idx}
           onIndexChange={(i) => setLightboxIndex({ type: lightboxIndex.type, idx: i })}
           onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
+      {/* Action sheet — Take Photo / Choose from Gallery */}
+      {actionSheet !== null && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/40"
+            onClick={() => setActionSheet(null)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl shadow-2xl px-4 pt-4 pb-8 lg:left-auto lg:right-0 lg:w-[460px]">
+            <div className="w-10 h-1 rounded-full bg-[#E5E5E2] mx-auto mb-5" />
+            <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3 px-1">
+              Add {actionSheet === 'garment' ? 'Garment' : 'Notes'} Photo
+            </p>
+            <button
+              onClick={() => {
+                const type = actionSheet
+                setActionSheet(null)
+                setCameraPhoto(type)
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#F5F5F3] transition-colors text-left"
+            >
+              <span className="w-9 h-9 rounded-full bg-[#F5F5F3] flex items-center justify-center text-[#1A1A18]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[#1A1A18]">Take Photo</p>
+                <p className="text-xs text-[#A0A09C]">Open camera</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                const type = actionSheet
+                setActionSheet(null)
+                if (type === 'garment') garmentInputRef.current?.click()
+                else notesInputRef.current?.click()
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#F5F5F3] transition-colors text-left"
+            >
+              <span className="w-9 h-9 rounded-full bg-[#F5F5F3] flex items-center justify-center text-[#1A1A18]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[#1A1A18]">Choose from Gallery</p>
+                <p className="text-xs text-[#A0A09C]">Select existing photo</p>
+              </div>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* In-app camera */}
+      {cameraPhoto !== null && (
+        <CameraCapture
+          onCapture={(file) => processFiles([file], cameraPhoto)}
+          onClose={() => setCameraPhoto(null)}
         />
       )}
     </>
