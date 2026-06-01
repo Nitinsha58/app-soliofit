@@ -18,8 +18,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-05 | Kanban board | All 5 columns render, drag-and-drop changes order status | Done |
 | VS-06 | Order details | Open an order, view all fields, autosave edits | Done |
 | VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Done |
-| VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Pending |
-| VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Pending |
+| VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Done |
+| VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Done |
 | VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Pending |
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Pending |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Pending |
@@ -37,8 +37,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | # | Slice | Status |
 |---|-------|--------|
 | VS-08 | Voice notes | Done |
-| VS-09 | Installments | **Active** |
-| VS-10 | Dashboard intelligence | Queued |
+| VS-09 | Installments | Done |
+| VS-10 | Dashboard intelligence | **Active** |
 | VS-11 | Payments dashboard | Queued |
 
 _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
@@ -278,7 +278,9 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 ---
 
-### VS-09 — Installments
+### VS-09 — Installments ✓
+
+**Completion record:** Commits `0fc713a`, `3ca5f8d`, `bb8912e` · Deferred: Add Order Step 4 installment wiring (Unit 3 — next session). "Split remaining" plan generator discussed and deferred (post-MVP or VS-19 if scoped). `InstallmentSection.tsx` superseded by `PaymentSchedule.tsx` and is dead code. Note: installments were placed directly inside `OrderInfoSection` (after bill amount) rather than in the deferred-sections area — better reflects the product model (money structure lives with bill amount).
 
 **What:** Create installments on an order. Mark paid. Computed overdue status.
 

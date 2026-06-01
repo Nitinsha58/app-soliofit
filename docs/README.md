@@ -41,8 +41,8 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-06 | Order details | Complete |
 | VS-07 | Photo upload | Complete |
 | VS-08 | Voice notes | Complete |
-| VS-09 | Installments | Not started |
-| VS-10 | Dashboard intelligence | Not started |
+| VS-09 | Installments | Complete |
+| VS-10 | Dashboard intelligence | Active |
 | VS-11 | Payments dashboard | Not started |
 | VS-12 | Activity log | Not started |
 | VS-13 | Customer profile | Not started |
