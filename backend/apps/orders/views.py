@@ -1,4 +1,6 @@
-from django.db.models import Count, Max
+from decimal import Decimal, InvalidOperation
+
+from django.db.models import Count, Max, Sum
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -22,6 +24,23 @@ class OrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0
         serializer.save(user=self.request.user, order_number=max_num + 1)
+
+    def partial_update(self, request, *args, **kwargs):
+        if 'total_amount' in request.data:
+            order = self.get_object()
+            try:
+                new_total = Decimal(str(request.data['total_amount']))
+            except (ValueError, InvalidOperation):
+                pass  # serializer validation will reject non-numeric values
+            else:
+                scheduled = order.installments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                if new_total < scheduled:
+                    excess = scheduled - new_total
+                    return Response(
+                        {'detail': f'Bill cannot be less than scheduled installments (exceeds by ₹{excess:.2f}).'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()

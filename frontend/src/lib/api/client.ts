@@ -1,5 +1,12 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
+export class ApiError extends Error {
+  constructor(public readonly httpStatus: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
@@ -23,7 +30,7 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}))
-    throw new Error((error as { detail?: string }).detail ?? 'API error')
+    throw new ApiError(res.status, (error as { detail?: string }).detail ?? 'API error')
   }
 
   if (res.status === 204) return undefined as T

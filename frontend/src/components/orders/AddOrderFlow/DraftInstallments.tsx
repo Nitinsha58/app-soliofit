@@ -213,10 +213,14 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
           {billAmount > 0 && (
             <>
               <span className="text-[#D5D5D2]">·</span>
-              <span className="text-[#6B6B67]">
-                Remaining{' '}
-                <span className="font-semibold text-[#1A1A18]">{fmt(Math.max(0, remaining))}</span>
-              </span>
+              {overBill ? (
+                <span className="font-semibold text-red-500">Exceeds by {fmt(scheduled - billAmount)}</span>
+              ) : (
+                <span className="text-[#6B6B67]">
+                  Remaining{' '}
+                  <span className="font-semibold text-[#1A1A18]">{fmt(remaining)}</span>
+                </span>
+              )}
             </>
           )}
         </div>
