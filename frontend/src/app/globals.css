@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  /* Fill the viewport exactly — the app shell scrolls internally, not the document. */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   body {
     background-color: #FAFAF8;
   }

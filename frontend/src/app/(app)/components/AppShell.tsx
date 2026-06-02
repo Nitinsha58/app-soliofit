@@ -49,9 +49,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
+    <div className="h-dvh flex flex-col bg-[#FAFAF8] overflow-hidden">
       <Sidebar />
-      <div className="lg:pl-60 min-h-screen pb-14 lg:pb-0">
+      {/* flex-1 + overflow-y-auto: content scrolls inside the shell, not the document.
+          overscroll-contain allows natural rubber-band within this div on iOS,
+          but prevents scroll chaining up to the (non-scrolling) body. */}
+      <div className="flex-1 overflow-y-auto overscroll-contain lg:pl-60">
         {children}
       </div>
       <MobileNav />

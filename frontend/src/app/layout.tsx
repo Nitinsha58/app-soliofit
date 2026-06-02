@@ -9,11 +9,13 @@ export const metadata: Metadata = {
   description: 'Professional Tailoring & Boutique Order Management',
 }
 
-// viewport-fit=cover is required for env(safe-area-inset-*) to return non-zero
-// values on iPhone/iPad — needed by CameraCapture and any full-bleed overlays.
+// viewport-fit=cover activates env(safe-area-inset-*) on iPhone/iPad.
+// maximumScale=1 / userScalable=false disables pinch-to-zoom for app-like feel.
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
 }
 

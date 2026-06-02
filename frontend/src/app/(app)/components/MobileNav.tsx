@@ -56,8 +56,12 @@ export default function MobileNav() {
   const openAddOrder = useUIStore((s) => s.openAddOrder)
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-[#E5E5E2] h-14 flex items-center" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="flex items-center justify-around w-full px-2">
+    // Not fixed — sits at the bottom of the AppShell flex column so iOS URL-bar
+    // changes don't affect its position. Safe-area padding grows the nav below
+    // the 56px icon row without squishing it (padding is outside the h-14 div).
+    <nav className="lg:hidden flex-shrink-0 bg-white border-t border-[#E5E5E2]"
+         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="h-14 flex items-center justify-around w-full px-2">
         {/* First 2 tabs */}
         {tabs.slice(0, 2).map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
