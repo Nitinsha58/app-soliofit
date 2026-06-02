@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { getMe } from '@/lib/api/auth'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useUIStore } from '@/stores/useUIStore'
@@ -19,8 +20,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const {
     showAddOrder, closeAddOrder,
     triggerOrdersRefresh,
+    ordersRefreshKey,
     selectedOrderId, closeOrderDetail,
   } = useUIStore()
+
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (ordersRefreshKey === 0) return
+    queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+    queryClient.invalidateQueries({ queryKey: ['notification-counts'] })
+  }, [ordersRefreshKey])
 
   useEffect(() => {
     if (isAuthenticated) {

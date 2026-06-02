@@ -72,7 +72,7 @@ export default function SummaryStrip({ activeFilter, onFilterChange }: Props) {
   ]
 
   return (
-    <div className="grid grid-cols-5 gap-2.5 mb-6">
+    <div className="flex gap-2.5 overflow-x-auto pb-1 mb-6 lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0">
       {cards.map(({ label, value, filterKey, urgent, urgentColor }) => {
         const isSelected = filterKey !== null && activeFilter === filterKey
         const clickable = filterKey !== null
@@ -84,7 +84,7 @@ export default function SummaryStrip({ activeFilter, onFilterChange }: Props) {
               if (!clickable) return
               onFilterChange(isSelected ? null : filterKey)
             }}
-            className={`text-left rounded-xl border px-3.5 py-3 transition-all ${
+            className={`flex-shrink-0 min-w-[130px] lg:min-w-0 text-left rounded-xl border px-3.5 py-3 transition-all ${
               clickable
                 ? 'cursor-pointer hover:border-[#C8952A]/50 hover:shadow-sm'
                 : 'cursor-default'
