@@ -37,7 +37,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 if new_total < scheduled:
                     excess = scheduled - new_total
                     return Response(
-                        {'detail': f'Bill cannot be less than scheduled installments (exceeds by ₹{excess:.2f}).'},
+                        {'detail': f'Bill cannot be less than scheduled installments (exceeds by ₹{excess:,.2f}).'},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
         return super().partial_update(request, *args, **kwargs)
