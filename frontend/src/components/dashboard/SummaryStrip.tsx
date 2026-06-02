@@ -1,48 +1,119 @@
-import type { Order } from '@/lib/api/orders'
+'use client'
+
+import { useQuery } from '@tanstack/react-query'
+import { fetchDashboardSummary } from '@/lib/api/dashboard'
+
+export type ActiveFilter = 'today' | 'upcoming' | 'delayed' | null
 
 interface Props {
-  orders: Order[]
+  activeFilter: ActiveFilter
+  onFilterChange: (f: ActiveFilter) => void
 }
 
-function pad(n: number) { return String(n).padStart(2, '0') }
-
-function localDateStr(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+function fmtCount(n: number) {
+  return n.toLocaleString('en-IN')
 }
 
-export default function SummaryStrip({ orders }: Props) {
-  const today = new Date()
-  const todayStr = localDateStr(today)
-  const plus7 = new Date(today)
-  plus7.setDate(today.getDate() + 7)
-  const plus7Str = localDateStr(plus7)
+function fmtAmount(s: string) {
+  const n = parseFloat(s) || 0
+  if (n >= 100_000) return '₹' + (n / 100_000).toFixed(1) + 'L'
+  if (n >= 1_000) return '₹' + (n / 1_000).toFixed(1) + 'K'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
+}
 
-  const dueToday  = orders.filter(o => o.delivery_date === todayStr && o.status !== 'Delivered').length
-  const upcoming  = orders.filter(o => o.delivery_date > todayStr && o.delivery_date <= plus7Str && o.status !== 'Delivered').length
-  const delayed   = orders.filter(o => o.delivery_date < todayStr && o.status !== 'Delivered').length
+export default function SummaryStrip({ activeFilter, onFilterChange }: Props) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: fetchDashboardSummary,
+  })
 
-  const cards = [
-    { label: 'Orders Due Today',    value: String(dueToday),  urgent: dueToday > 0,  urgentColor: 'text-amber-600' },
-    { label: 'Upcoming Orders',     value: String(upcoming),  urgent: false,         urgentColor: '' },
-    { label: 'Delayed Orders',      value: String(delayed),   urgent: delayed > 0,   urgentColor: 'text-red-600' },
-    { label: 'Pending Payments',    value: '—',               urgent: false,         urgentColor: '' },
-    { label: 'Overdue Installments',value: '—',               urgent: false,         urgentColor: '' },
+  const cards: {
+    label: string
+    value: string
+    filterKey: ActiveFilter
+    urgent: boolean
+    urgentColor: string
+  }[] = [
+    {
+      label: 'Orders Due Today',
+      value: isLoading ? '–' : fmtCount(data?.orders_due_today ?? 0),
+      filterKey: 'today',
+      urgent: (data?.orders_due_today ?? 0) > 0,
+      urgentColor: 'text-amber-600',
+    },
+    {
+      label: 'Upcoming Orders',
+      value: isLoading ? '–' : fmtCount(data?.upcoming_orders ?? 0),
+      filterKey: 'upcoming',
+      urgent: false,
+      urgentColor: '',
+    },
+    {
+      label: 'Delayed Orders',
+      value: isLoading ? '–' : fmtCount(data?.delayed_orders ?? 0),
+      filterKey: 'delayed',
+      urgent: (data?.delayed_orders ?? 0) > 0,
+      urgentColor: 'text-red-600',
+    },
+    {
+      label: 'Pending Payments',
+      value: isLoading ? '–' : fmtAmount(data?.pending_payments_total ?? '0'),
+      filterKey: null,
+      urgent: parseFloat(data?.pending_payments_total ?? '0') > 0,
+      urgentColor: 'text-amber-600',
+    },
+    {
+      label: 'Overdue Installments',
+      value: isLoading ? '–' : fmtCount(data?.overdue_installments ?? 0),
+      filterKey: null,
+      urgent: (data?.overdue_installments ?? 0) > 0,
+      urgentColor: 'text-red-600',
+    },
   ]
 
   return (
     <div className="grid grid-cols-5 gap-2.5 mb-6">
-      {cards.map(({ label, value, urgent, urgentColor }) => (
-        <div key={label} className="bg-white rounded-xl border border-[#E5E5E2] px-3.5 py-3">
-          <p className="text-[10px] text-[#A0A09C] font-medium uppercase tracking-wide leading-snug">
-            {label}
-          </p>
-          <p className={`text-xl font-bold tabular-nums mt-1.5 leading-none ${
-            urgent ? urgentColor : value === '—' ? 'text-[#C8C8C4]' : 'text-[#1A1A18]'
-          }`}>
-            {value}
-          </p>
-        </div>
-      ))}
+      {cards.map(({ label, value, filterKey, urgent, urgentColor }) => {
+        const isSelected = filterKey !== null && activeFilter === filterKey
+        const clickable = filterKey !== null
+        return (
+          <button
+            key={label}
+            type="button"
+            onClick={() => {
+              if (!clickable) return
+              onFilterChange(isSelected ? null : filterKey)
+            }}
+            className={`text-left rounded-xl border px-3.5 py-3 transition-all ${
+              clickable
+                ? 'cursor-pointer hover:border-[#C8952A]/50 hover:shadow-sm'
+                : 'cursor-default'
+            } ${
+              isSelected
+                ? 'border-[#C8952A] bg-[#FBF3E3]'
+                : 'bg-white border-[#E5E5E2]'
+            }`}
+          >
+            <p className="text-[10px] text-[#A0A09C] font-medium uppercase tracking-wide leading-snug flex items-center gap-1">
+              {label}
+              {isSelected && <span className="text-[#C8952A] font-bold">×</span>}
+            </p>
+            <p
+              className={`text-xl font-bold tabular-nums mt-1.5 leading-none ${
+                isSelected
+                  ? 'text-[#C8952A]'
+                  : urgent
+                  ? urgentColor
+                  : isLoading
+                  ? 'text-[#C8C8C4]'
+                  : 'text-[#1A1A18]'
+              }`}
+            >
+              {value}
+            </p>
+          </button>
+        )
+      })}
     </div>
   )
 }

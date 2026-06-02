@@ -1,6 +1,7 @@
 'use client'
 
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
+import NotificationBell from '@/components/dashboard/NotificationBell'
 import { useUIStore } from '@/stores/useUIStore'
 
 function PlusIcon() {
@@ -19,13 +20,19 @@ export default function DashboardPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-[#1A1A18]">Orders</h1>
-        <button
-          onClick={openAddOrder}
-          className="hidden lg:flex items-center gap-2 px-4 py-2 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] transition-colors"
-        >
-          <PlusIcon />
-          Add Order
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bell visible on mobile only (sidebar handles desktop) */}
+          <div className="lg:hidden">
+            <NotificationBell dropdownSide="right" />
+          </div>
+          <button
+            onClick={openAddOrder}
+            className="hidden lg:flex items-center gap-2 px-4 py-2 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] transition-colors"
+          >
+            <PlusIcon />
+            Add Order
+          </button>
+        </div>
       </div>
       <KanbanBoard />
     </div>

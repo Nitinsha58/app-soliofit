@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { logout as logoutApi } from '@/lib/api/auth'
 import { useAuthStore } from '@/stores/useAuthStore'
+import NotificationBell from '@/components/dashboard/NotificationBell'
 
 function DashboardIcon() {
   return (
@@ -124,11 +125,14 @@ export default function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 w-60 h-screen hidden lg:flex flex-col bg-white border-r border-[#E5E5E2]">
-      <div className="px-5 py-5 border-b border-[#E5E5E2]">
-        <span className="text-lg font-semibold text-[#1A1A18] tracking-tight">Soliofit</span>
-        {user?.business_name && (
-          <p className="text-xs text-[#6B6B67] mt-0.5 truncate">{user.business_name}</p>
-        )}
+      <div className="px-5 py-5 border-b border-[#E5E5E2] flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-lg font-semibold text-[#1A1A18] tracking-tight">Soliofit</span>
+          {user?.business_name && (
+            <p className="text-xs text-[#6B6B67] mt-0.5 truncate">{user.business_name}</p>
+          )}
+        </div>
+        <NotificationBell dropdownSide="left" />
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

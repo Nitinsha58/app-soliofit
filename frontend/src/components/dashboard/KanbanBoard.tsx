@@ -14,7 +14,7 @@ import { listOrders, updateOrderStatus, type Order } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
 import KanbanColumn from './KanbanColumn'
 import OrderCard from './OrderCard'
-import SummaryStrip from './SummaryStrip'
+import SummaryStrip, { type ActiveFilter } from './SummaryStrip'
 
 const COLUMNS: { status: Order['status']; label: string; accent: string }[] = [
   { status: 'Booked',           label: 'Booked',           accent: '#60A5FA' },
@@ -30,6 +30,7 @@ export default function KanbanBoard() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set())
   const [showDelivered, setShowDelivered] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null)
   const ordersRefreshKey = useUIStore((s) => s.ordersRefreshKey)
 
   const sensors = useSensors(
@@ -80,8 +81,27 @@ export default function KanbanBoard() {
   }
 
   const activeOrder = activeId ? orders.find((o) => o.id === activeId) : null
-
   const deliveredCount = orders.filter((o) => o.status === 'Delivered').length
+
+  function filterOrders(all: Order[]): Order[] {
+    if (!activeFilter) return all
+    const today = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    const plus7 = new Date(today)
+    plus7.setDate(today.getDate() + 7)
+    const plus7Str = `${plus7.getFullYear()}-${pad(plus7.getMonth() + 1)}-${pad(plus7.getDate())}`
+    switch (activeFilter) {
+      case 'today':
+        return all.filter((o) => o.delivery_date === todayStr && o.status !== 'Delivered')
+      case 'upcoming':
+        return all.filter((o) => o.delivery_date > todayStr && o.delivery_date <= plus7Str && o.status !== 'Delivered')
+      case 'delayed':
+        return all.filter((o) => o.delivery_date < todayStr && o.status !== 'Delivered')
+    }
+  }
+
+  const displayOrders = filterOrders(orders)
 
   if (loading) {
     return (
@@ -93,9 +113,9 @@ export default function KanbanBoard() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <SummaryStrip orders={orders} />
+      <SummaryStrip activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
-      {orders.length === 0 && (
+      {orders.length === 0 && !activeFilter && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <svg className="text-[#C8C8C4] mb-3" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -145,7 +165,7 @@ export default function KanbanBoard() {
                 status={status}
                 title={label}
                 accent={accent}
-                orders={orders.filter((o) => o.status === status)}
+                orders={displayOrders.filter((o) => o.status === status)}
                 mutatingIds={mutatingIds}
                 headerAction={isDeliveredCol ? (
                   <button
