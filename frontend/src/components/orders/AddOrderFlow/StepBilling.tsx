@@ -22,7 +22,9 @@ export default function StepBilling({
   onBack,
 }: Props) {
   const billAmount = parseFloat(totalAmount) || 0
-  const isValid = totalAmount.trim() !== '' && billAmount > 0
+  const scheduled = installments.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0)
+  const overBill = billAmount > 0 && scheduled > billAmount
+  const isValid = totalAmount.trim() !== '' && billAmount > 0 && !overBill
 
   return (
     <div>

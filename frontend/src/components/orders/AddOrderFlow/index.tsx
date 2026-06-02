@@ -83,8 +83,10 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
         remarks: draft.remarks,
       })
       // Create installments before surfacing the order — money data, block until settled.
+      // allSettled (not all) so every create runs to completion even if one fails.
+      // Inspect results and surface a blocking error rather than silently discarding failures.
       if (draft.pendingInstallments.length > 0) {
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           draft.pendingInstallments.map((inst) =>
             createInstallment(order.id, {
               amount: inst.amount,
@@ -93,6 +95,15 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
             })
           )
         )
+        const failed = results.filter((r) => r.status === 'rejected').length
+        if (failed > 0) {
+          setError(
+            `Order created, but ${failed} installment${failed > 1 ? 's' : ''} could not be saved. ` +
+            'Close this dialog and add them from the order details.'
+          )
+          setSubmitting(false)
+          return
+        }
       }
       // Upload staged photos in background — fire and forget
       if (draft.pendingPhotos.length > 0) {
