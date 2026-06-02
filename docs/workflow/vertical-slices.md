@@ -280,7 +280,7 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 ### VS-09 — Installments ✓
 
-**Completion record:** Commits `0fc713a`, `3ca5f8d`, `bb8912e` · Deferred: Add Order Step 4 installment wiring (Unit 3 — next session). "Split remaining" plan generator discussed and deferred (post-MVP or VS-19 if scoped). `InstallmentSection.tsx` superseded by `PaymentSchedule.tsx` and is dead code. Note: installments were placed directly inside `OrderInfoSection` (after bill amount) rather than in the deferred-sections area — better reflects the product model (money structure lives with bill amount).
+**Completion record:** Commits `0fc713a`, `3ca5f8d`, `bb8912e`, `0edeb27` · Unit 3 complete: `DraftInstallments.tsx` wired into Add Order Step 4 — add/edit/delete with bill-limit validation, reactive remaining, delivery date as default due_date. Installments created via `await Promise.allSettled()` after `createOrder()` (blocking, not fire-and-forget — money data). StepReview shows installment count + total. "Split remaining" plan generator deferred (post-MVP). `InstallmentSection.tsx` is dead code (superseded by `PaymentSchedule.tsx`).
 
 **What:** Create installments on an order. Mark paid. Computed overdue status.
 
