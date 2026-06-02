@@ -1,23 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import DraftInstallments, { type DraftInstallment } from './DraftInstallments'
 
 interface Props {
   totalAmount: string
   onAmountChange: (v: string) => void
+  deliveryDate: string
+  installments: DraftInstallment[]
+  onInstallmentsChange: (list: DraftInstallment[]) => void
   onNext: () => void
   onBack: () => void
 }
 
-export default function StepBilling({ totalAmount, onAmountChange, onNext, onBack }: Props) {
-  const [showInstallments, setShowInstallments] = useState(false)
-  const isValid = totalAmount.trim() !== '' && parseFloat(totalAmount) > 0
+export default function StepBilling({
+  totalAmount,
+  onAmountChange,
+  deliveryDate,
+  installments,
+  onInstallmentsChange,
+  onNext,
+  onBack,
+}: Props) {
+  const billAmount = parseFloat(totalAmount) || 0
+  const isValid = totalAmount.trim() !== '' && billAmount > 0
 
   return (
     <div>
       <p className="text-xs text-[#6B6B67] mb-4">Enter the total bill amount</p>
 
-      <div className="relative mb-5">
+      <div className="relative mb-2">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#6B6B67] pointer-events-none">₹</span>
         <input
           type="number"
@@ -32,27 +43,12 @@ export default function StepBilling({ totalAmount, onAmountChange, onNext, onBac
         />
       </div>
 
-      <div className="border border-[#E5E5E2] rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-[#1A1A18]">Add Installment Plan</p>
-            <p className="text-xs text-[#A0A09C] mt-0.5">Split payment into multiple due dates</p>
-          </div>
-          <button
-            onClick={() => setShowInstallments((v) => !v)}
-            className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${showInstallments ? 'bg-[#C8952A]' : 'bg-[#E5E5E2]'}`}
-            role="switch"
-            aria-checked={showInstallments}
-          >
-            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${showInstallments ? 'left-5' : 'left-0.5'}`} />
-          </button>
-        </div>
-        {showInstallments && (
-          <p className="mt-3 text-xs text-[#6B6B67] bg-[#FAFAF8] rounded-lg p-3 leading-relaxed">
-            Installment scheduling is available from the order details page after creating the order.
-          </p>
-        )}
-      </div>
+      <DraftInstallments
+        billAmount={billAmount}
+        deliveryDate={deliveryDate}
+        installments={installments}
+        onChange={onInstallmentsChange}
+      />
 
       <div className="flex gap-2 mt-6">
         <button

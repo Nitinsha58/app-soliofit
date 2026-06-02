@@ -1,4 +1,5 @@
 import type { Customer } from '@/lib/api/customers'
+import type { DraftInstallment } from './DraftInstallments'
 
 interface Draft {
   customer: Customer | null
@@ -6,6 +7,7 @@ interface Draft {
   totalAmount: string
   priority: boolean
   remarks: string
+  pendingInstallments: DraftInstallment[]
 }
 
 interface Props {
@@ -27,6 +29,10 @@ function formatDate(dateStr: string): string {
 }
 
 export default function StepReview({ draft, submitting, error, onCreate, onBack }: Props) {
+  const scheduledTotal = draft.pendingInstallments.reduce(
+    (sum, i) => sum + (parseFloat(i.amount) || 0), 0
+  )
+
   return (
     <div>
       <p className="text-xs text-[#6B6B67] mb-4">Review your order before creating</p>
@@ -63,6 +69,16 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
             </p>
           </div>
         </div>
+
+        {draft.pendingInstallments.length > 0 && (
+          <div className="pt-3 border-t border-[#E5E5E2]">
+            <p className="text-[10px] font-medium text-[#A0A09C] uppercase tracking-wide mb-1">Installments</p>
+            <p className="text-sm font-medium text-[#1A1A18]">
+              {draft.pendingInstallments.length} installment{draft.pendingInstallments.length > 1 ? 's' : ''}{' '}
+              · ₹{scheduledTotal.toLocaleString('en-IN')} scheduled
+            </p>
+          </div>
+        )}
 
         {draft.remarks && (
           <div className="pt-3 border-t border-[#E5E5E2]">

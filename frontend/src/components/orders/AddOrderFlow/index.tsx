@@ -5,12 +5,14 @@ import type { Customer } from '@/lib/api/customers'
 import type { Order } from '@/lib/api/orders'
 import { createOrder } from '@/lib/api/orders'
 import { uploadPhoto, presignUpload, uploadToStorage, saveVoiceNote } from '@/lib/api/media'
+import { createInstallment } from '@/lib/api/installments'
 import StepCustomer from './StepCustomer'
 import StepPhotos from './StepPhotos'
 import StepDelivery from './StepDelivery'
 import StepBilling from './StepBilling'
 import StepAdditional from './StepAdditional'
 import StepReview from './StepReview'
+import type { DraftInstallment } from './DraftInstallments'
 
 const STEP_LABELS = ['Customer', 'Photos', 'Delivery', 'Billing', 'Notes', 'Review']
 
@@ -22,6 +24,7 @@ interface Draft {
   remarks: string
   pendingPhotos: File[]
   pendingVoice: { blob: Blob; duration: number } | null
+  pendingInstallments: DraftInstallment[]
 }
 
 interface Props {
@@ -50,6 +53,7 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     remarks: '',
     pendingPhotos: [],
     pendingVoice: null,
+    pendingInstallments: [],
   })
 
   useEffect(() => {
@@ -78,6 +82,18 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
         priority: draft.priority,
         remarks: draft.remarks,
       })
+      // Create installments before surfacing the order — money data, block until settled.
+      if (draft.pendingInstallments.length > 0) {
+        await Promise.allSettled(
+          draft.pendingInstallments.map((inst) =>
+            createInstallment(order.id, {
+              amount: inst.amount,
+              due_date: inst.due_date,
+              ...(inst.remarks ? { remarks: inst.remarks } : {}),
+            })
+          )
+        )
+      }
       // Upload staged photos in background — fire and forget
       if (draft.pendingPhotos.length > 0) {
         Promise.allSettled(
@@ -159,6 +175,9 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
             <StepBilling
               totalAmount={draft.totalAmount}
               onAmountChange={(a) => patch({ totalAmount: a })}
+              deliveryDate={draft.deliveryDate}
+              installments={draft.pendingInstallments}
+              onInstallmentsChange={(list) => patch({ pendingInstallments: list })}
               onNext={next}
               onBack={back}
             />
