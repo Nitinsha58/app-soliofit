@@ -22,7 +22,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Done |
 | VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Done |
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Done |
-| VS-12 | Activity log | State changes auto-logged, visible in Order Details | Pending |
+| VS-12 | Activity log | State changes auto-logged, visible in Order Details | Done |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Pending |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Pending |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
@@ -40,10 +40,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-09 | Installments | Done |
 | VS-10 | Dashboard intelligence | Done |
 | VS-11 | Payments dashboard | Done |
-| VS-12 | Activity log | **Active** |
-| VS-13 | Customer profile | Queued |
+| VS-12 | Activity log | Done |
+| VS-13 | Customer profile | **Active** |
+| VS-14 | Global search | Queued |
 
-_Window reviewed: 2026-06-03 (after VS-11 completion). Next review after VS-13._
+_Window reviewed: 2026-06-03 (after VS-12 completion). Next review after VS-14._
 
 ---
 
@@ -353,7 +354,9 @@ _Window reviewed: 2026-06-03 (after VS-11 completion). Next review after VS-13._
 
 ---
 
-### VS-12 — Activity Log
+### VS-12 — Activity Log ✓
+
+**Completion record:** Commit `762782e` · No deferrals. `OrderActivity` model in `apps/orders` with 7 types. `create_order_activity()` helper in `services.py` shared by both `orders/views.py` and `payments/views.py`. All mutation paths wrapped in `transaction.atomic()` so activity rows and data changes commit together. `ActivityFeed.tsx` renders a connector-line timeline with per-type SVG icons. `['activities']` invalidated from AppShell `ordersRefreshKey` effect alongside all other query keys.
 
 **What:** Auto-logged order events. Visible in Order Details.
 
