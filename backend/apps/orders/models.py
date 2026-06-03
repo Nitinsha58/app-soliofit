@@ -33,3 +33,27 @@ class Order(models.Model):
 
     def __str__(self):
         return f'#{self.order_number} — {self.customer.name}'
+
+
+class OrderActivity(models.Model):
+    class Type(models.TextChoices):
+        ORDER_CREATED       = 'order_created',       'Order Created'
+        STATUS_CHANGED      = 'status_changed',      'Status Changed'
+        DELIVERY_MARKED     = 'delivery_marked',     'Delivery Marked'
+        PARTIAL_DELIVERY    = 'partial_delivery',    'Partial Delivery'
+        INSTALLMENT_CREATED = 'installment_created', 'Installment Created'
+        INSTALLMENT_PAID    = 'installment_paid',    'Installment Paid'
+        PAYMENT_UPDATED     = 'payment_updated',     'Payment Updated'
+
+    id            = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order         = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='activities')
+    activity_type = models.CharField(max_length=30, choices=Type.choices)
+    metadata      = models.JSONField(default=dict)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'order_activities'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.activity_type} on {self.order}'

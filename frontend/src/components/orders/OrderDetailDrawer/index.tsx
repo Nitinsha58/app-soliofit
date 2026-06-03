@@ -8,6 +8,7 @@ import QuickActions from './QuickActions'
 import OrderInfoSection from './OrderInfoSection'
 import PhotoSection from './PhotoSection'
 import VoiceSection from './VoiceSection'
+import ActivityFeed from './ActivityFeed'
 
 interface Props {
   orderId: string
@@ -24,14 +25,6 @@ function XIcon() {
   )
 }
 
-function PlaceholderSection({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="mx-5 mb-4 rounded-xl border border-dashed border-[#E5E5E2] px-4 py-4">
-      <p className="text-[12px] font-semibold text-[#C8C8C4]">{title}</p>
-      <p className="text-[11px] text-[#C8C8C4] mt-0.5">{subtitle}</p>
-    </div>
-  )
-}
 
 export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props) {
   const [order, setOrder] = useState<Order | null>(null)
@@ -122,7 +115,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
             <div className="pt-1 pb-6">
               <PhotoSection orderId={order.id} />
               <VoiceSection orderId={order.id} />
-              <PlaceholderSection title="Activity" subtitle="Order event log — coming in VS-12" />
+              <ActivityFeed orderId={order.id} />
             </div>
           </div>
         )}

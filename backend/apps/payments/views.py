@@ -8,7 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderActivity
+from apps.orders.services import create_order_activity
 from .models import Installment
 from .serializers import InstallmentSerializer
 
@@ -158,6 +159,10 @@ class InstallmentListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         serializer.save(order=order)
+        create_order_activity(order, OrderActivity.Type.INSTALLMENT_CREATED, {
+            'amount': str(serializer.data['amount']),
+            'due_date': str(serializer.data['due_date']),
+        })
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -195,6 +200,10 @@ class InstallmentDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         serializer.save()
+        create_order_activity(installment.order, OrderActivity.Type.PAYMENT_UPDATED, {
+            'amount': str(serializer.data['amount']),
+            'due_date': str(serializer.data['due_date']),
+        })
         return Response(serializer.data)
 
     def delete(self, request, order_id, installment_id):
@@ -224,4 +233,7 @@ class InstallmentMarkPaidView(APIView):
             return Response({'detail': 'Already marked as paid'}, status=status.HTTP_400_BAD_REQUEST)
         installment.paid_date = date.today()
         installment.save(update_fields=['paid_date'])
+        create_order_activity(installment.order, OrderActivity.Type.INSTALLMENT_PAID, {
+            'amount': str(installment.amount),
+        })
         return Response(InstallmentSerializer(installment).data)

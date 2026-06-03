@@ -1,13 +1,15 @@
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.db.models import Count, Max, Sum
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Order
+from .models import Order, OrderActivity
 from .serializers import OrderSerializer
+from .services import create_order_activity
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -23,7 +25,9 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0
-        serializer.save(user=self.request.user, order_number=max_num + 1)
+        with transaction.atomic():
+            order = serializer.save(user=self.request.user, order_number=max_num + 1)
+            create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         if 'total_amount' in request.data:
@@ -55,9 +59,29 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'detail': f'Invalid status. Choices: {", ".join(Order.Status.values)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        order.status = new_status
-        order.save(update_fields=['status', 'updated_at'])
+        old_status = order.status
+        with transaction.atomic():
+            order.status = new_status
+            order.save(update_fields=['status', 'updated_at'])
+            if new_status == Order.Status.DELIVERED:
+                activity_type = OrderActivity.Type.DELIVERY_MARKED
+            elif new_status == Order.Status.PARTIAL_DELIVERY:
+                activity_type = OrderActivity.Type.PARTIAL_DELIVERY
+            else:
+                activity_type = OrderActivity.Type.STATUS_CHANGED
+            create_order_activity(order, activity_type, {'from': old_status, 'to': new_status})
         return Response(OrderSerializer(order, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'], url_path='activities')
+    def activities(self, request, pk=None):
+        order = self.get_object()
+        acts = order.activities.order_by('-created_at')
+        return Response([{
+            'id': str(a.id),
+            'activity_type': a.activity_type,
+            'metadata': a.metadata,
+            'created_at': a.created_at.isoformat(),
+        } for a in acts])
 
     @action(detail=False, methods=['get'], url_path='delivery-load')
     def delivery_load(self, request):
