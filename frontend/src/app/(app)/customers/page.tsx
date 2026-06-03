@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { listCustomers, deleteCustomer, type Customer } from '@/lib/api/customers'
+import { listCustomers, type Customer } from '@/lib/api/customers'
 import CustomerCard from '@/components/customers/CustomerCard'
 import CreateCustomerModal from '@/components/customers/CreateCustomerModal'
 
@@ -52,8 +52,7 @@ export default function CustomersPage() {
     debounceRef.current = setTimeout(() => fetchCustomers(value), 300)
   }
 
-  async function handleDelete(id: string) {
-    await deleteCustomer(id)
+  function handleDeleted(id: string) {
     setCustomers((prev) => prev.filter((c) => c.id !== id))
     setTotal((prev) => prev - 1)
   }
@@ -132,7 +131,7 @@ export default function CustomersPage() {
             <CustomerCard
               key={customer.id}
               customer={customer}
-              onDelete={handleDelete}
+              onDeleted={handleDeleted}
             />
           ))}
         </div>

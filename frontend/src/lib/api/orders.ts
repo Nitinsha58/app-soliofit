@@ -20,8 +20,9 @@ export const ORDER_STATUSES: Order['status'][] = [
   'Booked', 'Started', 'Ready', 'Partial Delivery', 'Delivered',
 ]
 
-export async function listOrders(): Promise<Order[]> {
-  return apiRequest<Order[]>('/api/orders/')
+export async function listOrders(customerId?: string): Promise<Order[]> {
+  const params = customerId ? `?customer=${encodeURIComponent(customerId)}` : ''
+  return apiRequest<Order[]>(`/api/orders/${params}`)
 }
 
 export async function createOrder(data: {

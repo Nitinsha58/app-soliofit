@@ -17,11 +17,15 @@ class OrderViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return (
+        qs = (
             Order.objects.filter(user=self.request.user, deleted_at__isnull=True)
             .select_related('customer')
             .order_by('delivery_date', 'created_at')
         )
+        customer_id = self.request.query_params.get('customer')
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+        return qs
 
     def perform_create(self, serializer):
         max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0

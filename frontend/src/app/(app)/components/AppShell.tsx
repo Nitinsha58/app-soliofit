@@ -33,6 +33,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: ['payments-summary'] })
     void queryClient.invalidateQueries({ queryKey: ['payment-orders'] })
     void queryClient.invalidateQueries({ queryKey: ['activities'] })
+    void queryClient.invalidateQueries({ queryKey: ['customer'] })
   }, [ordersRefreshKey])
 
   useEffect(() => {

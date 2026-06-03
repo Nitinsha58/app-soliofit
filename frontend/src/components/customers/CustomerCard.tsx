@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Customer } from '@/lib/api/customers'
+import { deleteCustomer } from '@/lib/api/customers'
+import { ApiError } from '@/lib/api/client'
 
 interface Props {
   customer: Customer
-  onDelete: (id: string) => void
+  onDeleted: (id: string) => void
 }
 
 function TrashIcon() {
@@ -27,8 +30,10 @@ function WhatsAppIcon() {
   )
 }
 
-export default function CustomerCard({ customer, onDelete }: Props) {
+export default function CustomerCard({ customer, onDeleted }: Props) {
+  const router = useRouter()
   const [confirming, setConfirming] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const initials = customer.name
     .split(' ')
@@ -39,6 +44,16 @@ export default function CustomerCard({ customer, onDelete }: Props) {
     .toUpperCase()
 
   const whatsappHref = `https://wa.me/${customer.phone.replace(/\D/g, '')}`
+
+  async function handleConfirmDelete() {
+    try {
+      await deleteCustomer(customer.id)
+      onDeleted(customer.id)
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Cannot delete customer')
+      setConfirming(false)
+    }
+  }
 
   if (confirming) {
     return (
@@ -53,7 +68,7 @@ export default function CustomerCard({ customer, onDelete }: Props) {
             Cancel
           </button>
           <button
-            onClick={() => onDelete(customer.id)}
+            onClick={handleConfirmDelete}
             className="flex-1 py-2 text-xs font-medium text-white bg-[#B91C1C] rounded-lg hover:bg-red-700 transition-colors"
           >
             Delete
@@ -64,7 +79,17 @@ export default function CustomerCard({ customer, onDelete }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-[#E5E5E2] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/customers/${customer.id}`)}
+      onKeyDown={(e) => e.key === 'Enter' && router.push(`/customers/${customer.id}`)}
+      className="bg-white rounded-xl border border-[#E5E5E2] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow cursor-pointer"
+    >
+      {deleteError && (
+        <p className="text-xs text-red-600 mb-3">{deleteError}</p>
+      )}
+
       <div className="flex items-start gap-3.5">
         <div className="w-10 h-10 rounded-full bg-[#FBF3E3] flex items-center justify-center flex-shrink-0">
           <span className="text-sm font-bold text-[#C8952A]">{initials}</span>
@@ -78,6 +103,7 @@ export default function CustomerCard({ customer, onDelete }: Props) {
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className="text-[#2D7A4F] hover:text-[#25613F] transition-colors flex-shrink-0"
               aria-label="Open WhatsApp"
             >
@@ -87,7 +113,7 @@ export default function CustomerCard({ customer, onDelete }: Props) {
         </div>
 
         <button
-          onClick={() => setConfirming(true)}
+          onClick={(e) => { e.stopPropagation(); setConfirming(true) }}
           className="text-[#C8C8C4] hover:text-[#B91C1C] transition-colors p-1 -mr-1 flex-shrink-0 mt-0.5"
           aria-label="Delete customer"
         >

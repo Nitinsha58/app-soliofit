@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import type { Order } from '@/lib/api/orders'
 import { ORDER_STATUSES, updateOrder } from '@/lib/api/orders'
 
@@ -91,7 +92,12 @@ export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) 
       </p>
 
       {/* Customer name */}
-      <h2 className="text-lg font-bold text-[#1A1A18] leading-tight">{order.customer_name}</h2>
+      <Link
+        href={`/customers/${order.customer}`}
+        className="text-lg font-bold text-[#1A1A18] leading-tight hover:text-[#C8952A] transition-colors"
+      >
+        {order.customer_name}
+      </Link>
 
       {/* Phone */}
       {order.customer_phone && (
