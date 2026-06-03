@@ -55,6 +55,7 @@ function VoiceNoteCard({ note }: { note: CustomerVoiceNote }) {
       <button
         type="button"
         onClick={toggle}
+        aria-label={playing ? 'Pause voice note' : 'Play voice note'}
         className="w-8 h-8 rounded-full bg-[#FBF3E3] flex items-center justify-center text-[#C8952A] hover:bg-[#F5E8CC] transition-colors flex-shrink-0"
       >
         <PlayIcon playing={playing} />

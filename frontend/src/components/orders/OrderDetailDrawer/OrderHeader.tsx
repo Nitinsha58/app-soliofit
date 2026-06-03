@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Order } from '@/lib/api/orders'
-import { ORDER_STATUSES, updateOrder } from '@/lib/api/orders'
+import { ORDER_STATUSES, updateOrder, updateOrderStatus } from '@/lib/api/orders'
+import { useUIStore } from '@/stores/useUIStore'
 
 interface Props {
   order: Order
@@ -36,6 +37,8 @@ function StarIcon({ filled }: { filled: boolean }) {
 }
 
 export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) {
+  const router = useRouter()
+  const closeOrderDetail = useUIStore((s) => s.closeOrderDetail)
   const [statusChanging, setStatusChanging] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const mountedRef = useRef(true)
@@ -61,7 +64,7 @@ export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) 
   async function handleStatusChange(newStatus: Order['status']) {
     if (mountedRef.current) setStatusChanging(true)
     try {
-      await updateOrder(order.id, { status: newStatus })
+      await updateOrderStatus(order.id, newStatus)
       onUpdated()
       if (!mountedRef.current) return
       onOrderChange({ status: newStatus })
@@ -92,12 +95,13 @@ export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) 
       </p>
 
       {/* Customer name */}
-      <Link
-        href={`/customers/${order.customer}`}
-        className="text-lg font-bold text-[#1A1A18] leading-tight hover:text-[#C8952A] transition-colors"
+      <button
+        type="button"
+        onClick={() => { closeOrderDetail(); router.push(`/customers/${order.customer}`) }}
+        className="text-lg font-bold text-[#1A1A18] leading-tight hover:text-[#C8952A] transition-colors text-left"
       >
         {order.customer_name}
-      </Link>
+      </button>
 
       {/* Phone */}
       {order.customer_phone && (
