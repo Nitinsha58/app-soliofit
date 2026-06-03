@@ -20,7 +20,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-07 | Photo upload | Garment + notes photos upload via S3, view in lightbox | Done |
 | VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Done |
 | VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Done |
-| VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Pending |
+| VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Done |
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Pending |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Pending |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Pending |
@@ -38,10 +38,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 |---|-------|--------|
 | VS-08 | Voice notes | Done |
 | VS-09 | Installments | Done |
-| VS-10 | Dashboard intelligence | **Active** |
-| VS-11 | Payments dashboard | Queued |
+| VS-10 | Dashboard intelligence | Done |
+| VS-11 | Payments dashboard | **Active** |
+| VS-12 | Activity log | Queued |
 
-_Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
+_Window reviewed: 2026-06-03 (after VS-10 completion). Next review after VS-12._
 
 ---
 
@@ -305,7 +306,9 @@ _Window reviewed: 2026-05-31 (after VS-07 completion). Next review after VS-11._
 
 ---
 
-### VS-10 — Dashboard Intelligence
+### VS-10 — Dashboard Intelligence ✓
+
+**Completion record:** Commits `9ba5852`, `78d30e4`, `06a9ec4` · No deferrals. TanStack Query v5 installed. `refetchOnWindowFocus` active; all mutation paths (order create, status drag, installment add/edit/delete/mark-paid, bill amount change) call `triggerOrdersRefresh` which triggers immediate `refetchQueries` for dashboard-summary and notification-counts in AppShell. Mobile strip uses horizontal scroll (min-w-[130px]) at <lg breakpoint.
 
 **What:** Summary strip with live counts. Notification bell with 4 alert types.
 
