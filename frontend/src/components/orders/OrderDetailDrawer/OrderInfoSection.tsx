@@ -171,6 +171,7 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
         <PaymentSchedule
           orderId={order.id}
           billAmount={parseFloat(form.total_amount) || 0}
+          onUpdated={onUpdated}
         />
 
         {/* Customer address (read-only) */}

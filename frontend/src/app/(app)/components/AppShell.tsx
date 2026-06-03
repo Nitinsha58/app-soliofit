@@ -27,8 +27,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   useEffect(() => {
     if (ordersRefreshKey === 0) return
-    queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
-    queryClient.invalidateQueries({ queryKey: ['notification-counts'] })
+    void queryClient.refetchQueries({ queryKey: ['dashboard-summary'] })
+    void queryClient.refetchQueries({ queryKey: ['notification-counts'] })
+    void queryClient.invalidateQueries({ queryKey: ['notifications'] })
   }, [ordersRefreshKey])
 
   useEffect(() => {

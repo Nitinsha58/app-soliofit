@@ -13,6 +13,7 @@ import {
 interface Props {
   orderId: string
   billAmount: number
+  onUpdated: () => void
 }
 
 function fmt(n: number): string {
@@ -285,7 +286,7 @@ function InstallmentRow({
   )
 }
 
-export default function PaymentSchedule({ orderId, billAmount }: Props) {
+export default function PaymentSchedule({ orderId, billAmount, onUpdated }: Props) {
   const [installments, setInstallments] = useState<Installment[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -309,16 +310,19 @@ export default function PaymentSchedule({ orderId, billAmount }: Props) {
         setInstallments((prev) => [...prev, created])
         setAdding(false)
       }
+      onUpdated()
     } catch { }
     finally { if (mountedRef.current) setSavingNew(false) }
   }
 
-  function handleUpdated(updated: Installment) {
+  function handleInstallmentUpdated(updated: Installment) {
     setInstallments((prev) => prev.map((i) => i.id === updated.id ? updated : i))
+    onUpdated()
   }
 
   function handleDeleted(id: string) {
     setInstallments((prev) => prev.filter((i) => i.id !== id))
+    onUpdated()
   }
 
   const scheduled = installments.reduce((s, i) => s + parseFloat(i.amount), 0)
@@ -411,7 +415,7 @@ export default function PaymentSchedule({ orderId, billAmount }: Props) {
                   orderId={orderId}
                   billAmount={billAmount}
                   otherScheduled={scheduled - parseFloat(i.amount)}
-                  onUpdated={handleUpdated}
+                  onUpdated={handleInstallmentUpdated}
                   onDeleted={handleDeleted}
                 />
               ))}

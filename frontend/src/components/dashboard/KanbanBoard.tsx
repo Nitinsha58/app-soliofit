@@ -32,6 +32,7 @@ export default function KanbanBoard() {
   const [showDelivered, setShowDelivered] = useState(false)
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null)
   const ordersRefreshKey = useUIStore((s) => s.ordersRefreshKey)
+  const triggerOrdersRefresh = useUIStore((s) => s.triggerOrdersRefresh)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -66,6 +67,9 @@ export default function KanbanBoard() {
     setMutatingIds((prev) => new Set(Array.from(prev).concat(orderId)))
 
     updateOrderStatus(orderId, newStatus)
+      .then(() => {
+        triggerOrdersRefresh()
+      })
       .catch(() => {
         setOrders((prev) =>
           prev.map((o) => (o.id === orderId ? { ...o, status: prevStatus } : o)),
