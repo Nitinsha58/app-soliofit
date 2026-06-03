@@ -30,6 +30,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     void queryClient.refetchQueries({ queryKey: ['dashboard-summary'] })
     void queryClient.refetchQueries({ queryKey: ['notification-counts'] })
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    void queryClient.invalidateQueries({ queryKey: ['payments-summary'] })
+    void queryClient.invalidateQueries({ queryKey: ['payment-orders'] })
   }, [ordersRefreshKey])
 
   useEffect(() => {

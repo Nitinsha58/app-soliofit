@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/orders/<uuid:order_id>/voice-notes/', include('apps.media.voice_note_urls')),
     path('api/orders/<uuid:order_id>/installments/', include('apps.payments.urls')),
     path('api/upload/', include('apps.media.upload_urls')),
+    path('api/payments/', include('apps.payments.payment_dashboard_urls')),
     path('api/dashboard/', include('apps.dashboard.urls')),
     path('api/notifications/', include('apps.dashboard.notification_urls')),
     path('admin/', admin.site.urls),

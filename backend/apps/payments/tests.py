@@ -214,3 +214,66 @@ class IsolationTests(_OrderFixture):
     def test_mark_paid_returns_404_for_other_user(self):
         res = self.other.post(self._mark_paid(self.inst.id))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+# ── Payment Dashboard endpoints ───────────────────────────────────────────────
+
+class PaymentSummaryTests(_OrderFixture):
+    """GET /api/payments/summary/"""
+
+    def setUp(self):
+        super().setUp()
+        past = str(date.today() - timedelta(days=1))
+        self.inst1 = Installment.objects.create(order=self.order, amount=Decimal('4000'), due_date=_future())
+        self.inst2 = Installment.objects.create(order=self.order, amount=Decimal('6000'), due_date=past)
+
+    def test_returns_correct_keys(self):
+        res = self.client.get('/api/payments/summary/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in ('total_receivable', 'received_today', 'pending_count', 'overdue_count'):
+            self.assertIn(key, res.data)
+
+    def test_overdue_count_correct(self):
+        # inst2 is past due and unpaid → 1 overdue order
+        res = self.client.get('/api/payments/summary/')
+        self.assertEqual(res.data['overdue_count'], 1)
+
+    def test_total_receivable_equals_total_amount_when_nothing_paid(self):
+        res = self.client.get('/api/payments/summary/')
+        self.assertEqual(Decimal(res.data['total_receivable']), Decimal('10000.00'))
+
+    def test_unauthenticated_returns_401(self):
+        self.client.logout()
+        res = self.client.get('/api/payments/summary/')
+        self.assertIn(res.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+
+class PaymentOrdersTests(_OrderFixture):
+    """GET /api/payments/orders/"""
+
+    def setUp(self):
+        super().setUp()
+        past = str(date.today() - timedelta(days=1))
+        Installment.objects.create(order=self.order, amount=Decimal('5000'), due_date=past)
+        Installment.objects.create(order=self.order, amount=Decimal('5000'), due_date=_future())
+
+    def test_returns_all_states_in_response(self):
+        res = self.client.get('/api/payments/orders/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in ('pending', 'partial', 'overdue', 'completed'):
+            self.assertIn(key, res.data)
+
+    def test_order_classified_as_overdue(self):
+        res = self.client.get('/api/payments/orders/')
+        ids = [o['id'] for o in res.data['overdue']]
+        self.assertIn(str(self.order.id), ids)
+
+    def test_today_range_excludes_future_order(self):
+        res = self.client.get('/api/payments/orders/?range=today')
+        total = sum(len(res.data[s]) for s in ('pending', 'partial', 'overdue', 'completed'))
+        self.assertEqual(total, 0)
+
+    def test_all_time_includes_order(self):
+        res = self.client.get('/api/payments/orders/?range=all_time')
+        total = sum(len(res.data[s]) for s in ('pending', 'partial', 'overdue', 'completed'))
+        self.assertGreaterEqual(total, 1)
