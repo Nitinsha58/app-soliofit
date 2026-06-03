@@ -23,7 +23,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Done |
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Done |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Done |
-| VS-13 | Customer profile | All 3 tabs: orders, payments, media | Pending |
+| VS-13 | Customer profile | All 3 tabs: orders, payments, media | Done |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Pending |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
@@ -41,10 +41,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-10 | Dashboard intelligence | Done |
 | VS-11 | Payments dashboard | Done |
 | VS-12 | Activity log | Done |
-| VS-13 | Customer profile | **Active** |
-| VS-14 | Global search | Queued |
+| VS-13 | Customer profile | Done |
+| VS-14 | Global search | **Active** |
+| VS-15 | Calendar | Queued |
 
-_Window reviewed: 2026-06-03 (after VS-12 completion). Next review after VS-14._
+_Window reviewed: 2026-06-03 (after VS-13 completion). Next review after VS-15._
 
 ---
 
@@ -377,7 +378,9 @@ _Window reviewed: 2026-06-03 (after VS-12 completion). Next review after VS-14._
 
 ---
 
-### VS-13 — Customer Profile
+### VS-13 — Customer Profile ✓
+
+**Completion record:** Commits `b2fbb57`, `cf912d6` · No deferrals. Customer list `list()` overridden to batch-compute `total_orders` + `outstanding_balance` with 2 aggregate queries (no N+1). `CustomerViewSet` uses `@action` detail=True for `payments` and `media` — `self.get_object()` enforces ownership. `destroy()` override blocks deletion if active (non-Delivered) orders exist. Status changes from drawer header now use `updateOrderStatus` (hits activity log endpoint). Customer name in Order Details closes drawer then navigates. `['customer-orders']`, `['customer-payments']`, `['customer-media']` all invalidated from AppShell on ordersRefreshKey.
 
 **What:** Full customer history screen with 3 tabs.
 
