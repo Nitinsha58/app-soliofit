@@ -21,7 +21,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-08 | Voice notes | Hold-to-record, upload, playback with seek and speed control | Done |
 | VS-09 | Installments | Add installments, mark paid, computed overdue status shows | Done |
 | VS-10 | Dashboard intelligence | Summary strip counts + notification bell with counts | Done |
-| VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Pending |
+| VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Done |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Pending |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Pending |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Pending |
@@ -39,10 +39,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-08 | Voice notes | Done |
 | VS-09 | Installments | Done |
 | VS-10 | Dashboard intelligence | Done |
-| VS-11 | Payments dashboard | **Active** |
-| VS-12 | Activity log | Queued |
+| VS-11 | Payments dashboard | Done |
+| VS-12 | Activity log | **Active** |
+| VS-13 | Customer profile | Queued |
 
-_Window reviewed: 2026-06-03 (after VS-10 completion). Next review after VS-12._
+_Window reviewed: 2026-06-03 (after VS-11 completion). Next review after VS-13._
 
 ---
 
@@ -328,7 +329,9 @@ _Window reviewed: 2026-06-03 (after VS-10 completion). Next review after VS-12._
 
 ---
 
-### VS-11 — Payments Dashboard
+### VS-11 — Payments Dashboard ✓
+
+**Completion record:** Commit `c2f2040` · No deferrals. Payment state classification: completed (paid ≥ total), overdue (unpaid with due_date < today), partial (paid > 0), pending (paid = 0). TanStack Query key `['payment-orders', range]` — range param drives backend filter. AppShell invalidates `payments-summary` and `payment-orders` on `ordersRefreshKey` change. Column max-height `max-h-[600px]` with `overflow-y-auto`. Payment card click opens Order Details drawer.
 
 **What:** Payments Dashboard screen with Kanban by payment state and summary strip.
 
