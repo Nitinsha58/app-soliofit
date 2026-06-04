@@ -1,18 +1,31 @@
 'use client'
 
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { listOrders, type Order } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
 
-// ── Date helpers ─────────────────────────────────────────────────────────────
+// ── Layout constants ──────────────────────────────────────────────────────────
+
+const COLUMN_WIDTH  = 200
+const COLUMN_GAP    = 10
+const COLUMN_STEP   = COLUMN_WIDTH + COLUMN_GAP   // 210
+const MAX_WEEKS     = 9
+const INIT_PREV_WEEKS = 1                          // weeks preloaded to the left on init
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function toDateStr(d: Date): string {
   const y   = d.getFullYear()
   const m   = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+function strToDate(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 function getWeekStart(d: Date): Date {
@@ -33,6 +46,15 @@ const DAY_ABBR   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function dayHeaderLabel(d: Date): string {
   return `${String(d.getDate()).padStart(2, '0')} ${MONTH_ABBR[d.getMonth()]} · ${DAY_ABBR[d.getDay()]}`
+}
+
+function initLoadedWeeks(): string[] {
+  const curr = getWeekStart(new Date())
+  return [
+    toDateStr(addDays(curr, -7 * INIT_PREV_WEEKS)),
+    toDateStr(curr),
+    toDateStr(addDays(curr, 7)),
+  ]
 }
 
 // ── Priority sort ─────────────────────────────────────────────────────────────
@@ -72,12 +94,12 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
   const sorted  = sortByPriority(orders, dateStr, todayStr)
 
   return (
-    <div className="flex-shrink-0 flex flex-col" style={{ width: '200px' }}>
+    <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
       {/* Header — fixed height, uniform across all columns */}
       <div className={`flex items-center h-8 px-2.5 rounded-sm text-[11px] font-bold tracking-[0.01em] mb-2 flex-shrink-0 ${
         isToday
-          ? 'bg-[#C8952A] text-white'
-          : 'bg-[#D6DAE6] border border-[#BCC2D0] text-[#1E293B]'
+          ? 'bg-[#FDF3E3] border-l-2 border-l-[#C8952A] border-t border-t-[#F0D9A8] border-r border-r-[#F0D9A8] border-b border-b-[#F0D9A8] text-[#C8952A]'
+          : 'bg-[#E8EAF0] border border-[#CDD2E0] text-[#1E293B]'
       }`}>
         {dayHeaderLabel(date)}
       </div>
@@ -107,74 +129,178 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
 
 export default function OrdersSchedulePage() {
   const openOrderDetail = useUIStore((s) => s.openOrderDetail)
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
 
-  const weekEnd  = addDays(weekStart, 6)
-  const fromStr  = toDateStr(weekStart)
-  const toStr    = toDateStr(weekEnd)
-  const todayStr = toDateStr(new Date())
-
-  const { data: orders = [], isFetching } = useQuery({
-    queryKey: ['orders-schedule', fromStr, toStr],
-    queryFn: () => listOrders({ deliveryDateFrom: fromStr, deliveryDateTo: toStr }),
-    staleTime: 30_000,
+  const [loadedWeeks, setLoadedWeeks] = useState<string[]>(initLoadedWeeks)
+  const [scrollLabel, setScrollLabel] = useState(() => {
+    const curr = getWeekStart(new Date())
+    return `${MONTH_ABBR[curr.getMonth()]} ${curr.getFullYear()}`
   })
 
-  // Group by delivery_date
+  const boardRef              = useRef<HTMLDivElement>(null)
+  const leftSentinelRef       = useRef<HTMLDivElement>(null)
+  const rightSentinelRef      = useRef<HTMLDivElement>(null)
+  const observerActiveRef     = useRef(false)
+  const prevFirstDayRef       = useRef<string | null>(null)
+  const pendingScrollTodayRef = useRef(false)
+  const scrollRafRef          = useRef<number | null>(null)
+
+  const todayStr = toDateStr(new Date())
+
+  // One query per loaded week
+  const weekQueries = useQueries({
+    queries: loadedWeeks.map(weekStart => ({
+      queryKey: ['orders-schedule', weekStart] as const,
+      queryFn:  () => listOrders({
+        deliveryDateFrom: weekStart,
+        deliveryDateTo:   toDateStr(addDays(strToDate(weekStart), 6)),
+      }),
+      staleTime: 30_000,
+    })),
+  })
+
+  const isFetching  = weekQueries.some(q => q.isFetching)
+  const totalOrders = weekQueries.reduce((sum, q) => sum + (q.data?.length ?? 0), 0)
+
+  // Flatten all loaded weeks into sorted day list (weeks are non-overlapping)
+  const days = loadedWeeks.flatMap(ws =>
+    Array.from({ length: 7 }, (_, i) => addDays(strToDate(ws), i))
+  )
+
+  // Build date → orders map from all successful query results
   const byDate = new Map<string, Order[]>()
-  for (const order of orders) {
-    const bucket = byDate.get(order.delivery_date) ?? []
-    bucket.push(order)
-    byDate.set(order.delivery_date, bucket)
+  for (const result of weekQueries) {
+    if (result.data) {
+      for (const order of result.data) {
+        const bucket = byDate.get(order.delivery_date) ?? []
+        bucket.push(order)
+        byDate.set(order.delivery_date, bucket)
+      }
+    }
   }
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  // ── Initial scroll: show current week, preloaded prev week is offscreen left ─
 
-  const weekLabel = (() => {
-    const s = `${weekStart.getDate()} ${MONTH_ABBR[weekStart.getMonth()]}`
-    const e = `${weekEnd.getDate()} ${MONTH_ABBR[weekEnd.getMonth()]} ${weekEnd.getFullYear()}`
-    return `${s} – ${e}`
-  })()
+  useEffect(() => {
+    if (!boardRef.current) return
+    boardRef.current.scrollLeft = INIT_PREV_WEEKS * 7 * COLUMN_STEP
+    // Activate IO sentinels after the initial scroll settles
+    requestAnimationFrame(() => {
+      observerActiveRef.current = true
+    })
+  }, [])
+
+  // ── Scroll-position fix after DOM mutations (prepend / trim-left / today reset) ─
+
+  useLayoutEffect(() => {
+    if (!boardRef.current) return
+    const firstDay = days.length > 0 ? toDateStr(days[0]) : null
+
+    if (pendingScrollTodayRef.current) {
+      boardRef.current.scrollLeft = INIT_PREV_WEEKS * 7 * COLUMN_STEP
+      pendingScrollTodayRef.current = false
+      prevFirstDayRef.current = firstDay
+      return
+    }
+
+    if (prevFirstDayRef.current && firstDay && firstDay !== prevFirstDayRef.current) {
+      const prevMs = strToDate(prevFirstDayRef.current).getTime()
+      const currMs = strToDate(firstDay).getTime()
+      // Positive diff → days prepended (earlier start) → increase scrollLeft to stay in place
+      // Negative diff → days trimmed from left (later start) → decrease scrollLeft
+      const daysDiff = Math.round((prevMs - currMs) / 86_400_000)
+      boardRef.current.scrollLeft += daysDiff * COLUMN_STEP
+    }
+
+    prevFirstDayRef.current = firstDay
+  })
+
+  // ── IntersectionObserver: load adjacent weeks as user scrolls ─────────────
+
+  useEffect(() => {
+    const board = boardRef.current
+    const left  = leftSentinelRef.current
+    const right = rightSentinelRef.current
+    if (!board || !left || !right) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!observerActiveRef.current) return
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          if (entry.target === left) {
+            setLoadedWeeks(prev => {
+              const newWeek = toDateStr(addDays(strToDate(prev[0]), -7))
+              if (prev.includes(newWeek)) return prev
+              const next = [newWeek, ...prev]
+              // At cap: trim from right (user is scrolling left — future weeks are off-screen)
+              return next.length > MAX_WEEKS ? next.slice(0, MAX_WEEKS) : next
+            })
+          } else if (entry.target === right) {
+            setLoadedWeeks(prev => {
+              const newWeek = toDateStr(addDays(strToDate(prev[prev.length - 1]), 7))
+              if (prev.includes(newWeek)) return prev
+              const next = [...prev, newWeek]
+              // At cap: trim from left — scroll correction is handled by useLayoutEffect
+              return next.length > MAX_WEEKS ? next.slice(next.length - MAX_WEEKS) : next
+            })
+          }
+        }
+      },
+      { root: board, rootMargin: '0px 300px 0px 300px', threshold: 0 },
+    )
+
+    observer.observe(left)
+    observer.observe(right)
+    return () => observer.disconnect()
+  }, [])
+
+  // ── Scroll label: month/year of the center-visible column ────────────────
+
+  const handleScroll = useCallback(() => {
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+    scrollRafRef.current = requestAnimationFrame(() => {
+      if (!boardRef.current) return
+      const centerX  = boardRef.current.scrollLeft + boardRef.current.clientWidth / 2
+      const colIndex = Math.min(Math.max(Math.floor(centerX / COLUMN_STEP), 0), days.length - 1)
+      const center   = days[colIndex]
+      if (center) {
+        setScrollLabel(`${MONTH_ABBR[center.getMonth()]} ${center.getFullYear()}`)
+      }
+    })
+  }, [days])
+
+  // ── Today button ──────────────────────────────────────────────────────────
+
+  const scrollToToday = useCallback(() => {
+    const colIndex = days.findIndex(d => toDateStr(d) === todayStr)
+    if (colIndex >= 0 && boardRef.current) {
+      boardRef.current.scrollLeft = colIndex * COLUMN_STEP
+    } else {
+      // Today has scrolled out of the loaded range; reset to initial state
+      setLoadedWeeks(initLoadedWeeks())
+      pendingScrollTodayRef.current = true
+    }
+  }, [days, todayStr])
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    // Board shell: full viewport height minus MobileNav on mobile, full height on desktop
     <div
-      className="flex flex-col bg-[#EAEBEE] lg:h-dvh"
+      className="flex flex-col bg-[#F0F1F4] lg:h-dvh"
       style={{ height: 'calc(100dvh - 56px)' }}
     >
-      {/* ── Toolbar ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#D4D8E4] flex-shrink-0 flex-wrap">
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#D4D8E4] flex-shrink-0">
 
-        {/* Week nav */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button
-            type="button"
-            aria-label="Previous week"
-            onClick={() => setWeekStart(d => addDays(d, -7))}
-            className="w-[26px] h-[26px] flex items-center justify-center border border-[#BCC2D0] rounded bg-white text-[#2D3748] hover:bg-[#F0F0EE] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
+        <span className="text-[13px] font-semibold text-[#0A0F1E] flex-shrink-0 min-w-[72px]">
+          {scrollLabel}
+        </span>
 
-          <span className="text-[13px] font-semibold text-[#0A0F1E] whitespace-nowrap" style={{ minWidth: '126px', textAlign: 'center' }}>
-            {weekLabel}
-          </span>
-
-          <button
-            type="button"
-            aria-label="Next week"
-            onClick={() => setWeekStart(d => addDays(d, 7))}
-            className="w-[26px] h-[26px] flex items-center justify-center border border-[#BCC2D0] rounded bg-white text-[#2D3748] hover:bg-[#F0F0EE] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-
-        <div className="w-px h-[22px] bg-[#D4D8E4] flex-shrink-0" />
+        <div className="flex-1" />
 
         <button
           type="button"
-          onClick={() => setWeekStart(getWeekStart(new Date()))}
+          onClick={scrollToToday}
           className="flex items-center px-2.5 py-1 border border-[#BCC2D0] rounded bg-[#F0F0EE] text-[12px] font-semibold text-[#2D3748] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
         >
           Today
@@ -184,25 +310,40 @@ export default function OrdersSchedulePage() {
           <div className="w-3.5 h-3.5 border-2 border-[#C8952A] border-t-transparent rounded-full animate-spin flex-shrink-0" />
         )}
 
-        {/* Count badge */}
-        <div className="ml-auto flex items-center gap-1.5 bg-[rgba(200,149,42,0.10)] border border-[rgba(200,149,42,0.18)] rounded px-2.5 py-1 flex-shrink-0">
-          <span className="text-[14px] font-extrabold text-[#C8952A] leading-none">{orders.length}</span>
-          <span className="text-[12px] font-bold text-[#6B6B67]">orders</span>
+        <div className="flex items-center gap-1 bg-[rgba(200,149,42,0.10)] border border-[rgba(200,149,42,0.18)] rounded px-2 py-1 flex-shrink-0">
+          <span className="text-[13px] font-extrabold text-[#C8952A] leading-none tabular-nums">{totalOrders}</span>
+          <span className="text-[11px] font-bold text-[#6B6B67] hidden sm:inline"> ord</span>
         </div>
       </div>
 
-      {/* ── Board body ──────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden px-3 py-3">
-        <div className="flex gap-2.5 h-full" style={{ minWidth: 'max-content' }}>
-          {days.map((day) => (
-            <DayColumn
-              key={toDateStr(day)}
-              date={day}
-              orders={byDate.get(toDateStr(day)) ?? []}
-              todayStr={todayStr}
-              onOrderClick={openOrderDetail}
-            />
-          ))}
+      {/* ── Board body ───────────────────────────────────────────────────── */}
+      <div
+        ref={boardRef}
+        className="flex-1 overflow-x-auto overflow-y-hidden px-3 py-3"
+        onScroll={handleScroll}
+      >
+        <div
+          className="flex h-full"
+          style={{ gap: `${COLUMN_GAP}px`, minWidth: 'max-content' }}
+        >
+          {/* Left sentinel — triggers prev-week load when near viewport */}
+          <div ref={leftSentinelRef} className="w-0 flex-shrink-0 self-stretch" />
+
+          {days.map((day) => {
+            const dateStr = toDateStr(day)
+            return (
+              <DayColumn
+                key={dateStr}
+                date={day}
+                orders={byDate.get(dateStr) ?? []}
+                todayStr={todayStr}
+                onOrderClick={openOrderDetail}
+              />
+            )
+          })}
+
+          {/* Right sentinel — triggers next-week load when near viewport */}
+          <div ref={rightSentinelRef} className="w-0 flex-shrink-0 self-stretch" />
         </div>
       </div>
     </div>
