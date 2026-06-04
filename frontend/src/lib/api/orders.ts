@@ -14,15 +14,24 @@ export interface Order {
   remarks: string
   created_at: string
   updated_at: string
+  has_delayed_installment: boolean
 }
 
 export const ORDER_STATUSES: Order['status'][] = [
   'Booked', 'Started', 'Ready', 'Partial Delivery', 'Delivered',
 ]
 
-export async function listOrders(customerId?: string): Promise<Order[]> {
-  const params = customerId ? `?customer=${encodeURIComponent(customerId)}` : ''
-  return apiRequest<Order[]>(`/api/orders/${params}`)
+export async function listOrders(params?: {
+  customerId?: string
+  deliveryDateFrom?: string
+  deliveryDateTo?: string
+}): Promise<Order[]> {
+  const qs = new URLSearchParams()
+  if (params?.customerId) qs.set('customer', params.customerId)
+  if (params?.deliveryDateFrom) qs.set('delivery_date_from', params.deliveryDateFrom)
+  if (params?.deliveryDateTo) qs.set('delivery_date_to', params.deliveryDateTo)
+  const queryString = qs.toString() ? `?${qs.toString()}` : ''
+  return apiRequest<Order[]>(`/api/orders/${queryString}`)
 }
 
 export async function createOrder(data: {

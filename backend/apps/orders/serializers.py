@@ -18,11 +18,14 @@ class OrderSerializer(serializers.ModelSerializer):
                 deleted_at__isnull=True,
             )
 
+    has_delayed_installment = serializers.BooleanField(read_only=True, default=False)
+
     class Meta:
         model  = Order
         fields = [
             'id', 'order_number', 'customer', 'customer_name', 'customer_phone',
             'customer_address', 'status', 'delivery_date', 'total_amount',
             'priority', 'remarks', 'created_at', 'updated_at',
+            'has_delayed_installment',
         ]
         read_only_fields = ['id', 'order_number', 'created_at', 'updated_at']

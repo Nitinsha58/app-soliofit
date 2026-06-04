@@ -124,3 +124,100 @@ class ActivitiesEndpointTests(_Fixture):
         anon = APIClient()
         resp = anon.get(f'/api/orders/{self.order.id}/activities/')
         self.assertEqual(resp.status_code, 401)
+
+
+class OrderDateFilterTests(_Fixture):
+    def setUp(self):
+        super().setUp()
+        self.today = date.today()
+        # Create orders on 3 different dates
+        self.o1 = Order.objects.create(
+            user=self.user, customer=self.customer, order_number=10,
+            delivery_date=self.today - timedelta(days=1), total_amount='100',
+        )
+        self.o2 = Order.objects.create(
+            user=self.user, customer=self.customer, order_number=11,
+            delivery_date=self.today, total_amount='200',
+        )
+        self.o3 = Order.objects.create(
+            user=self.user, customer=self.customer, order_number=12,
+            delivery_date=self.today + timedelta(days=1), total_amount='300',
+        )
+
+    def test_date_range_returns_only_matching_orders(self):
+        from_d = str(self.today)
+        to_d = str(self.today + timedelta(days=1))
+        resp = self.client.get(f'/api/orders/?delivery_date_from={from_d}&delivery_date_to={to_d}')
+        self.assertEqual(resp.status_code, 200)
+        nums = {o['order_number'] for o in resp.data}
+        self.assertIn(11, nums)
+        self.assertIn(12, nums)
+        self.assertNotIn(10, nums)
+
+    def test_invalid_date_from_returns_400(self):
+        resp = self.client.get('/api/orders/?delivery_date_from=not-a-date')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_invalid_date_to_returns_400(self):
+        resp = self.client.get('/api/orders/?delivery_date_to=2026-99-99')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_from_after_to_returns_400(self):
+        resp = self.client.get(
+            f'/api/orders/?delivery_date_from={self.today + timedelta(days=5)}'
+            f'&delivery_date_to={self.today}'
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_list_includes_has_delayed_installment_false(self):
+        resp = self.client.get('/api/orders/')
+        self.assertEqual(resp.status_code, 200)
+        for o in resp.data:
+            self.assertIn('has_delayed_installment', o)
+            self.assertFalse(o['has_delayed_installment'])
+
+    def test_list_has_delayed_installment_true_when_overdue(self):
+        Installment.objects.create(
+            order=self.o2, amount='50',
+            due_date=self.today - timedelta(days=1),  # overdue
+        )
+        resp = self.client.get('/api/orders/')
+        self.assertEqual(resp.status_code, 200)
+        order_map = {o['order_number']: o for o in resp.data}
+        self.assertTrue(order_map[11]['has_delayed_installment'])
+        self.assertFalse(order_map[10]['has_delayed_installment'])
+
+    def test_paid_installment_does_not_set_delayed_true(self):
+        Installment.objects.create(
+            order=self.o2, amount='50',
+            due_date=self.today - timedelta(days=1),
+            paid_date=self.today,  # paid
+        )
+        resp = self.client.get('/api/orders/')
+        order_map = {o['order_number']: o for o in resp.data}
+        self.assertFalse(order_map[11]['has_delayed_installment'])
+
+    def test_retrieve_includes_has_delayed_installment(self):
+        resp = self.client.get(f'/api/orders/{self.o2.id}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('has_delayed_installment', resp.data)
+
+    def test_update_status_response_has_accurate_delayed_flag(self):
+        Installment.objects.create(
+            order=self.o2, amount='50',
+            due_date=self.today - timedelta(days=1),
+        )
+        resp = self.client.patch(f'/api/orders/{self.o2.id}/status/', {'status': 'Started'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['has_delayed_installment'])
+
+    def test_other_user_orders_excluded(self):
+        other = User.objects.create_user(email='other@test.com', password='pass')
+        c2 = Customer.objects.create(user=other, name='Bob', phone='1111111111')
+        Order.objects.create(
+            user=other, customer=c2, order_number=99,
+            delivery_date=self.today, total_amount='999',
+        )
+        resp = self.client.get(f'/api/orders/?delivery_date_from={self.today}&delivery_date_to={self.today}')
+        nums = {o['order_number'] for o in resp.data}
+        self.assertNotIn(99, nums)

@@ -1,12 +1,15 @@
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import Count, Max, Sum
+from django.db.models import Count, Exists, Max, OuterRef, Sum
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.payments.models import Installment
 from .models import Order, OrderActivity
 from .serializers import OrderSerializer
 from .services import create_order_activity
@@ -25,6 +28,42 @@ class OrderViewSet(viewsets.ModelViewSet):
         customer_id = self.request.query_params.get('customer')
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
+
+        date_from_str = self.request.query_params.get('delivery_date_from')
+        date_to_str   = self.request.query_params.get('delivery_date_to')
+
+        date_from = None
+        date_to   = None
+
+        if date_from_str:
+            try:
+                date_from = parse_date(date_from_str)
+            except ValueError:
+                date_from = None
+            if date_from is None:
+                raise ValidationError({'delivery_date_from': 'Invalid date. Use YYYY-MM-DD.'})
+        if date_to_str:
+            try:
+                date_to = parse_date(date_to_str)
+            except ValueError:
+                date_to = None
+            if date_to is None:
+                raise ValidationError({'delivery_date_to': 'Invalid date. Use YYYY-MM-DD.'})
+        if date_from and date_to and date_from > date_to:
+            raise ValidationError({'delivery_date_from': 'delivery_date_from must not be after delivery_date_to.'})
+
+        if date_from:
+            qs = qs.filter(delivery_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(delivery_date__lte=date_to)
+
+        today = timezone.localdate()
+        delayed = Installment.objects.filter(
+            order=OuterRef('pk'),
+            paid_date__isnull=True,
+            due_date__lt=today,
+        )
+        qs = qs.annotate(has_delayed_installment=Exists(delayed))
         return qs
 
     def perform_create(self, serializer):
@@ -74,6 +113,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             else:
                 activity_type = OrderActivity.Type.STATUS_CHANGED
             create_order_activity(order, activity_type, {'from': old_status, 'to': new_status})
+        # Re-fetch through annotated queryset so has_delayed_installment is accurate
+        order = self.get_queryset().get(pk=order.pk)
         return Response(OrderSerializer(order, context={'request': request}).data)
 
     @action(detail=True, methods=['get'], url_path='activities')

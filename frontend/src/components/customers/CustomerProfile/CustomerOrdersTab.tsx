@@ -29,7 +29,7 @@ export default function CustomerOrdersTab({ customerId }: { customerId: string }
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer-orders', customerId],
-    queryFn: () => listOrders(customerId),
+    queryFn: () => listOrders({ customerId }),
   })
 
   if (isLoading) {
