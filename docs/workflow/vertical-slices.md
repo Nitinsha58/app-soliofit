@@ -407,7 +407,11 @@ _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03.
 
 ### VS-15a — Orders Schedule ✓
 
-**Completion record:** Commit `d8801dd` · No deferrals. `delivery_date_from/to` filters in `OrderViewSet.get_queryset()` with `parse_date()` + `ValueError` catch; DRF `ValidationError` for bad inputs. `has_delayed_installment` annotated via `Exists` subquery on every queryset path; `update_status()` re-fetches through annotated queryset before serializing. `ScheduleCard` is a deliberate narrow card (not a reuse of Kanban's `OrderCard`) for ~160px columns. `OrdersSchedulePage` uses stable `[orders-schedule, fromStr, toStr]` query key, `toDateStr()` with `getFullYear/getMonth/getDate`, 8-tier priority sort. 19/19 backend tests pass.
+**Completion record:** Commits `d8801dd` → `ec572c7` → `1de905d` · No deferrals.
+
+Backend: `delivery_date_from/to` filters in `OrderViewSet.get_queryset()` with `parse_date()` + `ValueError` catch; DRF `ValidationError` for bad inputs. `has_delayed_installment` annotated via `Exists` subquery on every queryset path; `update_status()` re-fetches through annotated queryset before serializing. 19/19 backend tests pass.
+
+Frontend (final — `1de905d`): Infinite horizontal scroll replacing week-pagination. `loadedWeeks: string[]` state + `useQueries` (one query per loaded week, key `['orders-schedule', weekStart]`). `IntersectionObserver` sentinels trigger load of adjacent weeks; DOM capped at `MAX_WEEKS=9`. Scroll-position preserved on prepend/left-trim via `useLayoutEffect` + `prevFirstDayRef` date-diff. Observer gated behind `requestAnimationFrame` to suppress IO during initial-scroll mount. Month label derived from center-visible column. `ScheduleCard` is a deliberate narrow card for ~200px columns. `COLUMN_STEP=210` constant used throughout scroll math.
 
 **What:** The `/orders` route. A week-based delivery schedule — order cards grouped into date columns (Mon–Sun), sorted by attention priority within each day. Fixes the broken "Orders" nav link that has existed since VS-02.
 
