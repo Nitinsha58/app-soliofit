@@ -25,7 +25,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Done |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Done |
 | VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Pending |
-| VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Pending |
+| VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Done |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
@@ -43,12 +43,12 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-11 | Payments dashboard | Done |
 | VS-12 | Activity log | Done |
 | VS-13 | Customer profile | Done |
-| VS-14 | Global search | **Active** |
-| VS-15a | Orders Schedule | Queued |
+| VS-14 | Global search | Done |
+| VS-15a | Orders Schedule | **Active** |
 | VS-15 | Calendar | Queued |
 
-_Window reviewed: 2026-06-03 (after VS-13 completion). Next review after VS-15._
-_VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-14 in execution order._
+_Window reviewed: 2026-06-04 (after VS-14 completion). Next review after VS-15._
+_VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
 
@@ -464,7 +464,9 @@ Within the same tier: sort by `created_at` ascending.
 
 ---
 
-### VS-14 — Global Search
+### VS-14 — Global Search ✓
+
+**Completion record:** Commit `e3f3592` · No deferrals. pg_trgm extension + concurrent GIN indexes on customers.name and customers.phone via atomic=False migration. `apps/search` registered in INSTALLED_APPS. Customer search uses name/phone icontains (union, max 5 total). Order search parses `#0042`/`0042` to integer and filters `order_number=<int>` (exact). Frontend `/search` page: URL-backed query state, 300ms debounce, ≥2 chars, Customers + Orders result sections. Search added to Sidebar (desktop) and MobileNav (mobile, 2-FAB-3 layout).
 
 **What:** Fast global search across customers and orders.
 
