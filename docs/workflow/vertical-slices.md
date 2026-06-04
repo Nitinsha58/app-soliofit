@@ -24,6 +24,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Done |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Done |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Done |
+| VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Pending |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Pending |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
@@ -43,9 +44,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-12 | Activity log | Done |
 | VS-13 | Customer profile | Done |
 | VS-14 | Global search | **Active** |
+| VS-15a | Orders Schedule | Queued |
 | VS-15 | Calendar | Queued |
 
 _Window reviewed: 2026-06-03 (after VS-13 completion). Next review after VS-15._
+_VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-14 in execution order._
 
 ---
 
@@ -399,6 +402,65 @@ _Window reviewed: 2026-06-03 (after VS-13 completion). Next review after VS-15._
 **ADR:** None.
 
 **Review checkpoint:** Open customer profile → all 3 tabs load correctly. Edit name inline → saves. Orders tab shows correct orders. Media tab shows photos and voice notes across all orders.
+
+---
+
+### VS-15a — Orders Schedule
+
+**What:** The `/orders` route. A week-based delivery schedule — order cards grouped into date columns (Mon–Sun), sorted by attention priority within each day. Fixes the broken "Orders" nav link that has existed since VS-02.
+
+**Why this is separate from Dashboard and Calendar:**
+- Dashboard (`/dashboard`) answers "what status is everything at?" — groups by workflow status (Booked, Started, Ready…).
+- Orders Schedule (`/orders`) answers "what have I got coming up this week?" — groups by delivery date.
+- Calendar (`/calendar`, VS-15) answers "am I overloaded in June?" — month-level workload heatmap.
+
+**Backend:**
+- `OrderViewSet.get_queryset()`: add `delivery_date_from` and `delivery_date_to` query params
+  ```python
+  # In OrderViewSet.get_queryset():
+  date_from = self.request.query_params.get('delivery_date_from')
+  date_to   = self.request.query_params.get('delivery_date_to')
+  if date_from:
+      queryset = queryset.filter(delivery_date__gte=date_from)
+  if date_to:
+      queryset = queryset.filter(delivery_date__lte=date_to)
+  ```
+- No new endpoints, no migrations. Change is additive — existing callers with no filter params are unaffected.
+
+**Frontend:**
+- Update `listOrders` (or equivalent API client function) to accept `{ deliveryDateFrom?, deliveryDateTo?, customerId? }` — replacing the current `customerId`-only signature.
+- New `/orders` page component: `OrdersSchedulePage`
+- Fetch current week (Mon–Sun) on mount via TanStack Query, keyed by week start date
+- Group orders by `delivery_date` client-side
+- Within each date group, sort by priority tier (see below)
+- Week navigation: ← / → buttons shift the date range by 7 days, trigger refetch. "Today" button resets to current week.
+- Card: reuse existing `OrderCard` component — identical to Kanban card
+- Click card → open existing `OrderDetailsDrawer` (right side panel on desktop, full screen on mobile)
+- Sidebar "Orders" link and mobile bottom nav "Orders" item both resolve to `/orders`
+
+**Priority sort order within each date column (top = most urgent):**
+
+| Tier | Condition |
+|------|-----------|
+| 1 | `delivery_date < today` AND `status != Delivered` — overdue, never delivered |
+| 2 | `delivery_date = today` AND has delayed installment |
+| 3 | `delivery_date = today` — any other status |
+| 4 | `priority = urgent` (priority flag set) |
+| 5 | `status = Started` |
+| 6 | `status = Booked` |
+| 7 | `status = Ready` or `Partial Delivery` |
+| 8 | `status = Delivered` |
+
+Within the same tier: sort by `created_at` ascending.
+
+**Mobile:**
+- Horizontal scroll through date columns
+- One column fully visible with adjacent column peeking (~20px) to indicate scrollability
+- Same priority ordering as desktop
+
+**ADR:** None. No new architectural decisions — additive filter on existing viewset, reuse of existing card and drawer components.
+
+**Review checkpoint:** Navigate to `/orders` — page loads (no 404). Current week's orders appear in correct date columns. Within one column, overdue orders are at the top and delivered orders at the bottom. Click a card — Order Details drawer opens. ← / → navigation changes the week and refetches. Sidebar "Orders" and mobile bottom nav "Orders" both open this page. `GET /api/orders/?delivery_date_from=2026-06-02&delivery_date_to=2026-06-08` returns only orders in that range.
 
 ---
 
