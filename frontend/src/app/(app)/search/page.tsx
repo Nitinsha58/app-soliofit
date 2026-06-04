@@ -32,11 +32,9 @@ function CustomerRow({ customer }: { customer: SearchCustomer }) {
           {customer.phone && (
             <p className="text-xs text-[#A0A09C] truncate">{customer.phone}</p>
           )}
-          {customer.order_count > 0 && (
-            <span className="text-[10px] text-[#A0A09C] flex-shrink-0">
-              {customer.order_count} {customer.order_count === 1 ? 'order' : 'orders'}
-            </span>
-          )}
+          <span className="text-[10px] text-[#A0A09C] flex-shrink-0">
+            {customer.order_count} {customer.order_count === 1 ? 'order' : 'orders'}
+          </span>
         </div>
       </div>
     </button>
