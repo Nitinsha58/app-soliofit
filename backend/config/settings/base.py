@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'apps.media',
     'apps.payments',
     'apps.dashboard',
+    'apps.search',
 ]
 
 MIDDLEWARE = [

@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Sum
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -158,11 +159,12 @@ class InstallmentListCreateView(APIView):
                 {'detail': f'Total installments exceed bill amount by ₹{excess:.2f}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        serializer.save(order=order)
-        create_order_activity(order, OrderActivity.Type.INSTALLMENT_CREATED, {
-            'amount': str(serializer.data['amount']),
-            'due_date': str(serializer.data['due_date']),
-        })
+        with transaction.atomic():
+            serializer.save(order=order)
+            create_order_activity(order, OrderActivity.Type.INSTALLMENT_CREATED, {
+                'amount': str(serializer.data['amount']),
+                'due_date': str(serializer.data['due_date']),
+            })
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -199,11 +201,12 @@ class InstallmentDetailView(APIView):
                     {'detail': f'Total installments exceed bill amount by ₹{excess:.2f}'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        serializer.save()
-        create_order_activity(installment.order, OrderActivity.Type.PAYMENT_UPDATED, {
-            'amount': str(serializer.data['amount']),
-            'due_date': str(serializer.data['due_date']),
-        })
+        with transaction.atomic():
+            serializer.save()
+            create_order_activity(installment.order, OrderActivity.Type.PAYMENT_UPDATED, {
+                'amount': str(serializer.data['amount']),
+                'due_date': str(serializer.data['due_date']),
+            })
         return Response(serializer.data)
 
     def delete(self, request, order_id, installment_id):
@@ -231,9 +234,10 @@ class InstallmentMarkPaidView(APIView):
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         if installment.paid_date:
             return Response({'detail': 'Already marked as paid'}, status=status.HTTP_400_BAD_REQUEST)
-        installment.paid_date = date.today()
-        installment.save(update_fields=['paid_date'])
-        create_order_activity(installment.order, OrderActivity.Type.INSTALLMENT_PAID, {
-            'amount': str(installment.amount),
-        })
+        with transaction.atomic():
+            installment.paid_date = date.today()
+            installment.save(update_fields=['paid_date'])
+            create_order_activity(installment.order, OrderActivity.Type.INSTALLMENT_PAID, {
+                'amount': str(installment.amount),
+            })
         return Response(InstallmentSerializer(installment).data)
