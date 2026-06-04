@@ -24,7 +24,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-11 | Payments dashboard | Payment Kanban screen with summary strip | Done |
 | VS-12 | Activity log | State changes auto-logged, visible in Order Details | Done |
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Done |
-| VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Pending |
+| VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Done |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Done |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
@@ -44,10 +44,10 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-12 | Activity log | Done |
 | VS-13 | Customer profile | Done |
 | VS-14 | Global search | Done |
-| VS-15a | Orders Schedule | **Active** |
-| VS-15 | Calendar | Queued |
+| VS-15a | Orders Schedule | Done |
+| VS-15 | Calendar | **Active** |
 
-_Window reviewed: 2026-06-04 (after VS-14 completion). Next review after VS-15._
+_Window reviewed: 2026-06-04 (after VS-15a completion). Next review after VS-16._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -405,7 +405,9 @@ _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03.
 
 ---
 
-### VS-15a — Orders Schedule
+### VS-15a — Orders Schedule ✓
+
+**Completion record:** Commit `d8801dd` · No deferrals. `delivery_date_from/to` filters in `OrderViewSet.get_queryset()` with `parse_date()` + `ValueError` catch; DRF `ValidationError` for bad inputs. `has_delayed_installment` annotated via `Exists` subquery on every queryset path; `update_status()` re-fetches through annotated queryset before serializing. `ScheduleCard` is a deliberate narrow card (not a reuse of Kanban's `OrderCard`) for ~160px columns. `OrdersSchedulePage` uses stable `[orders-schedule, fromStr, toStr]` query key, `toDateStr()` with `getFullYear/getMonth/getDate`, 8-tier priority sort. 19/19 backend tests pass.
 
 **What:** The `/orders` route. A week-based delivery schedule — order cards grouped into date columns (Mon–Sun), sorted by attention priority within each day. Fixes the broken "Orders" nav link that has existed since VS-02.
 
