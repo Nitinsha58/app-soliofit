@@ -6,20 +6,19 @@ import { listOrders, type Order } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
 
-// ── Date helpers ────────────────────────────────────────────────────────────
+// ── Date helpers ─────────────────────────────────────────────────────────────
 
 function toDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const y   = d.getFullYear()
+  const m   = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
 function getWeekStart(d: Date): Date {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const dow = date.getDay() // 0=Sun … 6=Sat
-  const diff = dow === 0 ? -6 : 1 - dow // shift to Monday
-  date.setDate(date.getDate() + diff)
+  const dow  = date.getDay()
+  date.setDate(date.getDate() + (dow === 0 ? -6 : 1 - dow))
   return date
 }
 
@@ -29,11 +28,14 @@ function addDays(d: Date, n: number): Date {
   return r
 }
 
-function getTodayStr(): string {
-  return toDateStr(new Date())
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DAY_ABBR   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+
+function dayHeaderLabel(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')} ${MONTH_ABBR[d.getMonth()]} · ${DAY_ABBR[d.getDay()]}`
 }
 
-// ── Priority sort ────────────────────────────────────────────────────────────
+// ── Priority sort ─────────────────────────────────────────────────────────────
 
 function priorityTier(order: Order, colDateStr: string, todayStr: string): number {
   if (colDateStr < todayStr && order.status !== 'Delivered') return 1
@@ -43,7 +45,7 @@ function priorityTier(order: Order, colDateStr: string, todayStr: string): numbe
   if (order.status === 'Started') return 5
   if (order.status === 'Booked') return 6
   if (order.status === 'Ready' || order.status === 'Partial Delivery') return 7
-  return 8 // Delivered
+  return 8
 }
 
 function sortByPriority(orders: Order[], colDateStr: string, todayStr: string): Order[] {
@@ -55,9 +57,7 @@ function sortByPriority(orders: Order[], colDateStr: string, todayStr: string): 
   })
 }
 
-// ── Day column ───────────────────────────────────────────────────────────────
-
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+// ── Day column ────────────────────────────────────────────────────────────────
 
 interface DayColumnProps {
   date: Date
@@ -69,64 +69,50 @@ interface DayColumnProps {
 function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
   const dateStr = toDateStr(date)
   const isToday = dateStr === todayStr
-  const isPast = dateStr < todayStr
-  const dayIndex = (date.getDay() + 6) % 7 // Mon=0 … Sun=6
-  const sorted = sortByPriority(orders, dateStr, todayStr)
+  const sorted  = sortByPriority(orders, dateStr, todayStr)
 
   return (
-    <div className="flex flex-col min-w-[160px] w-full">
-      {/* Column header */}
-      <div className={`px-2 py-2 mb-2 rounded-lg text-center ${isToday ? 'bg-[#FBF3E3]' : ''}`}>
-        <p className={`text-[11px] font-semibold uppercase tracking-wide ${
-          isToday ? 'text-[#C8952A]' : isPast ? 'text-[#B0B0AC]' : 'text-[#6B6B67]'
-        }`}>
-          {DAY_NAMES[dayIndex]}
-        </p>
-        <p className={`text-lg font-bold leading-tight ${
-          isToday ? 'text-[#C8952A]' : isPast ? 'text-[#B0B0AC]' : 'text-[#1A1A18]'
-        }`}>
-          {date.getDate()}
-        </p>
-        {isToday && (
-          <span className="text-[9px] font-bold text-[#C8952A] uppercase tracking-widest">Today</span>
-        )}
-        {sorted.length > 0 && (
-          <span className="text-[10px] font-medium text-[#A0A09C] mt-0.5 block">
-            {sorted.length} {sorted.length === 1 ? 'order' : 'orders'}
-          </span>
-        )}
+    <div className="flex-shrink-0 flex flex-col" style={{ width: '200px' }}>
+      {/* Header — fixed height, uniform across all columns */}
+      <div className={`flex items-center h-8 px-2.5 rounded-sm text-[11px] font-bold tracking-[0.01em] mb-2 flex-shrink-0 ${
+        isToday
+          ? 'bg-[#C8952A] text-white'
+          : 'bg-[#D6DAE6] border border-[#BCC2D0] text-[#1E293B]'
+      }`}>
+        {dayHeaderLabel(date)}
       </div>
 
-      {/* Cards */}
-      <div className="flex flex-col gap-2 flex-1">
+      {/* Cards — independently scrollable */}
+      <div
+        className="flex flex-col gap-1.5 overflow-y-auto pb-3"
+        style={{ maxHeight: 'calc(100dvh - 110px)' }}
+      >
         {sorted.length === 0 ? (
-          <div className="flex items-center justify-center py-6">
-            <span className="text-[#E5E5E2] text-lg">—</span>
+          <div className="flex items-center justify-center py-5">
+            <span className="text-[#C8CDD9] text-base select-none">—</span>
           </div>
-        ) : (
-          sorted.map((order) => (
-            <ScheduleCard
-              key={order.id}
-              order={order}
-              onClick={() => onOrderClick(order.id)}
-            />
-          ))
-        )}
+        ) : sorted.map((order) => (
+          <ScheduleCard
+            key={order.id}
+            order={order}
+            onClick={() => onOrderClick(order.id)}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OrdersSchedulePage() {
   const openOrderDetail = useUIStore((s) => s.openOrderDetail)
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
 
-  const weekEnd = addDays(weekStart, 6)
-  const fromStr = toDateStr(weekStart)
-  const toStr   = toDateStr(weekEnd)
-  const todayStr = getTodayStr()
+  const weekEnd  = addDays(weekStart, 6)
+  const fromStr  = toDateStr(weekStart)
+  const toStr    = toDateStr(weekEnd)
+  const todayStr = toDateStr(new Date())
 
   const { data: orders = [], isFetching } = useQuery({
     queryKey: ['orders-schedule', fromStr, toStr],
@@ -134,85 +120,80 @@ export default function OrdersSchedulePage() {
     staleTime: 30_000,
   })
 
-  // Group orders by delivery_date
+  // Group by delivery_date
   const byDate = new Map<string, Order[]>()
   for (const order of orders) {
-    const existing = byDate.get(order.delivery_date) ?? []
-    existing.push(order)
-    byDate.set(order.delivery_date, existing)
+    const bucket = byDate.get(order.delivery_date) ?? []
+    bucket.push(order)
+    byDate.set(order.delivery_date, bucket)
   }
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  // Week label: "2 Jun – 8 Jun 2026"
   const weekLabel = (() => {
-    const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
-    const from = weekStart.toLocaleDateString('en-IN', opts)
-    const to   = weekEnd.toLocaleDateString('en-IN', { ...opts, year: 'numeric' })
-    return `${from} – ${to}`
+    const s = `${weekStart.getDate()} ${MONTH_ABBR[weekStart.getMonth()]}`
+    const e = `${weekEnd.getDate()} ${MONTH_ABBR[weekEnd.getMonth()]} ${weekEnd.getFullYear()}`
+    return `${s} – ${e}`
   })()
 
-  function goToToday() {
-    setWeekStart(getWeekStart(new Date()))
-  }
-
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#FAFAF8] border-b border-[#E5E5E2] px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-[#1A1A18]">Orders</h1>
-            {isFetching && (
-              <div className="w-3.5 h-3.5 border-2 border-[#C8952A] border-t-transparent rounded-full animate-spin" />
-            )}
-          </div>
+    // Board shell: full viewport height minus MobileNav on mobile, full height on desktop
+    <div
+      className="flex flex-col bg-[#EAEBEE] lg:h-dvh"
+      style={{ height: 'calc(100dvh - 56px)' }}
+    >
+      {/* ── Toolbar ────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#D4D8E4] flex-shrink-0 flex-wrap">
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#6B6B67] hidden sm:block">{weekLabel}</span>
+        {/* Week nav */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            type="button"
+            aria-label="Previous week"
+            onClick={() => setWeekStart(d => addDays(d, -7))}
+            className="w-[26px] h-[26px] flex items-center justify-center border border-[#BCC2D0] rounded bg-white text-[#2D3748] hover:bg-[#F0F0EE] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setWeekStart((d) => addDays(d, -7))}
-              className="w-7 h-7 rounded-lg border border-[#E5E5E2] bg-white flex items-center justify-center text-[#6B6B67] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
-              aria-label="Previous week"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
+          <span className="text-[13px] font-semibold text-[#0A0F1E] whitespace-nowrap" style={{ minWidth: '126px', textAlign: 'center' }}>
+            {weekLabel}
+          </span>
 
-            <button
-              type="button"
-              onClick={goToToday}
-              className="px-2.5 py-1 rounded-lg border border-[#E5E5E2] bg-white text-xs font-medium text-[#6B6B67] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
-            >
-              Today
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setWeekStart((d) => addDays(d, 7))}
-              className="w-7 h-7 rounded-lg border border-[#E5E5E2] bg-white flex items-center justify-center text-[#6B6B67] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
-              aria-label="Next week"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="Next week"
+            onClick={() => setWeekStart(d => addDays(d, 7))}
+            className="w-[26px] h-[26px] flex items-center justify-center border border-[#BCC2D0] rounded bg-white text-[#2D3748] hover:bg-[#F0F0EE] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
 
-        {/* Mobile week label */}
-        <p className="text-xs text-[#A0A09C] mt-0.5 sm:hidden text-center">{weekLabel}</p>
+        <div className="w-px h-[22px] bg-[#D4D8E4] flex-shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => setWeekStart(getWeekStart(new Date()))}
+          className="flex items-center px-2.5 py-1 border border-[#BCC2D0] rounded bg-[#F0F0EE] text-[12px] font-semibold text-[#2D3748] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
+        >
+          Today
+        </button>
+
+        {isFetching && (
+          <div className="w-3.5 h-3.5 border-2 border-[#C8952A] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+        )}
+
+        {/* Count badge */}
+        <div className="ml-auto flex items-center gap-1.5 bg-[rgba(200,149,42,0.10)] border border-[rgba(200,149,42,0.18)] rounded px-2.5 py-1 flex-shrink-0">
+          <span className="text-[14px] font-extrabold text-[#C8952A] leading-none">{orders.length}</span>
+          <span className="text-[12px] font-bold text-[#6B6B67]">orders</span>
+        </div>
       </div>
 
-      {/* 7-column grid */}
-      <div className="overflow-x-auto">
-        <div
-          className="flex gap-3 px-4 sm:px-6 py-4 min-w-max sm:min-w-0 sm:grid sm:grid-cols-7"
-          style={{ minWidth: '1120px' }}
-        >
+      {/* ── Board body ──────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden px-3 py-3">
+        <div className="flex gap-2.5 h-full" style={{ minWidth: 'max-content' }}>
           {days.map((day) => (
             <DayColumn
               key={toDateStr(day)}
