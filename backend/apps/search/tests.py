@@ -99,3 +99,20 @@ class SearchViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['customers'], [])
         self.assertEqual(resp.data['orders'], [])
+
+    def test_mixed_string_does_not_match_order(self):
+        """'abc42' must not return order #42 — only pure-digit / #-prefixed queries parse."""
+        c = make_customer(self.user)
+        make_order(self.user, c, order_number=42)
+        resp = self.client.get('/api/search/?q=abc42')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['orders'], [])
+
+    def test_customer_result_includes_order_count(self):
+        c = make_customer(self.user, name='CountMe')
+        make_order(self.user, c, order_number=1)
+        make_order(self.user, c, order_number=2)
+        resp = self.client.get('/api/search/?q=CountMe')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data['customers']), 1)
+        self.assertEqual(resp.data['customers'][0]['order_count'], 2)

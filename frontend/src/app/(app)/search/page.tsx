@@ -28,9 +28,16 @@ function CustomerRow({ customer }: { customer: SearchCustomer }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[#1A1A18] truncate">{customer.name}</p>
-        {customer.phone && (
-          <p className="text-xs text-[#A0A09C] truncate">{customer.phone}</p>
-        )}
+        <div className="flex items-center gap-2 mt-0.5">
+          {customer.phone && (
+            <p className="text-xs text-[#A0A09C] truncate">{customer.phone}</p>
+          )}
+          {customer.order_count > 0 && (
+            <span className="text-[10px] text-[#A0A09C] flex-shrink-0">
+              {customer.order_count} {customer.order_count === 1 ? 'order' : 'orders'}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   )

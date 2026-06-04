@@ -4,6 +4,7 @@ export interface SearchCustomer {
   id: string
   name: string
   phone: string
+  order_count: number
 }
 
 export interface SearchOrder {

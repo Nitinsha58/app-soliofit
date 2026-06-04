@@ -1,5 +1,7 @@
 import re
 
+from django.db.models import Count
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,10 +11,10 @@ from apps.orders.models import Order
 
 
 def _parse_order_number(q: str):
-    """Extract an integer from strings like '#0042', '0042', '42'. Returns None if not parseable."""
-    cleaned = re.sub(r'[^0-9]', '', q)
-    if cleaned:
-        return int(cleaned)
+    """Parse '#0042', '0042', '42' → int. Returns None for anything that isn't purely digits (with optional # prefix)."""
+    m = re.fullmatch(r'#?(\d+)', q.strip())
+    if m:
+        return int(m.group(1))
     return None
 
 
@@ -24,34 +26,46 @@ class SearchView(APIView):
         if len(q) < 2:
             return Response({'customers': [], 'orders': []})
 
-        customers = (
+        name_qs = list(
             Customer.objects.filter(
                 user=request.user,
                 deleted_at__isnull=True,
-            )
-            .filter(
-                name__icontains=q
+                name__icontains=q,
             )
             .values('id', 'name', 'phone')[:5]
         )
-        # Also search phone if name produced fewer than 5 results
-        if customers.count() < 5:
-            phone_qs = (
+        remaining = 5 - len(name_qs)
+        if remaining > 0:
+            phone_qs = list(
                 Customer.objects.filter(
                     user=request.user,
                     deleted_at__isnull=True,
                     phone__icontains=q,
                 )
-                .exclude(id__in=[c['id'] for c in customers])
-                .values('id', 'name', 'phone')[: 5 - len(list(customers))]
+                .exclude(id__in=[c['id'] for c in name_qs])
+                .values('id', 'name', 'phone')[:remaining]
             )
-            customers = list(customers) + list(phone_qs)
+            customers = name_qs + phone_qs
         else:
-            customers = list(customers)
+            customers = name_qs
+
+        # Attach order_count via a single aggregate query
+        if customers:
+            cids = [c['id'] for c in customers]
+            counts = {
+                str(row['customer_id']): row['n']
+                for row in Order.objects.filter(
+                    user=request.user,
+                    customer_id__in=cids,
+                    deleted_at__isnull=True,
+                ).values('customer_id').annotate(n=Count('id'))
+            }
+        else:
+            counts = {}
 
         order_num = _parse_order_number(q)
         if order_num is not None:
-            orders = (
+            orders = list(
                 Order.objects.filter(
                     user=request.user,
                     deleted_at__isnull=True,
@@ -65,7 +79,12 @@ class SearchView(APIView):
 
         return Response({
             'customers': [
-                {'id': str(c['id']), 'name': c['name'], 'phone': c['phone']}
+                {
+                    'id': str(c['id']),
+                    'name': c['name'],
+                    'phone': c['phone'],
+                    'order_count': counts.get(str(c['id']), 0),
+                }
                 for c in customers
             ],
             'orders': [
