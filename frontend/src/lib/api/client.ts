@@ -7,6 +7,21 @@ export class ApiError extends Error {
   }
 }
 
+// DRF returns `{detail: "..."}` for view-level errors but `{field: ["..."]}`
+// for serializer field validation. Prefer detail, then fall back to the first
+// field error string so form-level messages (e.g. wrong password) surface.
+function extractErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>
+    if (typeof obj.detail === 'string') return obj.detail
+    for (const value of Object.values(obj)) {
+      if (typeof value === 'string') return value
+      if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
+    }
+  }
+  return 'API error'
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
@@ -30,7 +45,7 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, (error as { detail?: string }).detail ?? 'API error')
+    throw new ApiError(res.status, extractErrorMessage(error))
   }
 
   if (res.status === 204) return undefined as T

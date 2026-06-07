@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import NotificationBell from '@/components/dashboard/NotificationBell'
+import ProfileMenu from '@/app/(app)/components/ProfileMenu'
 import { useUIStore } from '@/stores/useUIStore'
 
 function PlusIcon() {
@@ -42,6 +43,10 @@ export default function DashboardPage() {
           {/* Bell visible on mobile only (sidebar handles desktop) */}
           <div className="lg:hidden">
             <NotificationBell dropdownSide="right" />
+          </div>
+          {/* Profile/avatar menu — mobile entry to Settings + Logout (desktop uses sidebar) */}
+          <div className="lg:hidden">
+            <ProfileMenu />
           </div>
           <button
             onClick={openAddOrder}

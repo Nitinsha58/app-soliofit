@@ -16,3 +16,59 @@ export async function logout(): Promise<void> {
 export async function getMe(): Promise<AuthUser> {
   return apiRequest<AuthUser>('/api/auth/me/')
 }
+
+export interface ProfileUpdate {
+  business_name?: string
+  owner_name?: string
+  phone?: string
+}
+
+export async function updateProfile(data: ProfileUpdate): Promise<AuthUser> {
+  return apiRequest<AuthUser>('/api/auth/me/', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  await apiRequest('/api/auth/change-password/', {
+    method: 'POST',
+    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+  })
+}
+
+export interface OrderSettings {
+  delivery_buffer_days: number
+  daily_capacity: number
+}
+
+export async function getOrderSettings(): Promise<OrderSettings> {
+  return apiRequest<OrderSettings>('/api/auth/order-settings/')
+}
+
+export async function updateOrderSettings(data: Partial<OrderSettings>): Promise<OrderSettings> {
+  return apiRequest<OrderSettings>('/api/auth/order-settings/', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export interface NotificationPreferences {
+  delivery_reminders: boolean
+  payment_reminders: boolean
+  daily_summary: boolean
+  new_order_confirmations: boolean
+}
+
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  return apiRequest<NotificationPreferences>('/api/auth/notification-preferences/')
+}
+
+export async function updateNotificationPreferences(
+  data: Partial<NotificationPreferences>,
+): Promise<NotificationPreferences> {
+  return apiRequest<NotificationPreferences>('/api/auth/notification-preferences/', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}

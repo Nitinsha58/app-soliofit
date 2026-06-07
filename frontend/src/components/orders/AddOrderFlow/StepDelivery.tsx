@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { getDeliveryLoad } from '@/lib/api/orders'
+import { getOrderSettings } from '@/lib/api/auth'
+
+const HIGH_LOAD = 13 // matches the red cell threshold below — triggers the soft confirm
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = [
@@ -69,11 +72,20 @@ function loadLabel(count: number, dateStr: string): string {
   return `${label} — ${count} orders ⚠ High load`
 }
 
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() + n)
+  return r
+}
+
 export default function StepDelivery({ value, onChange, onNext, onBack }: Props) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [load, setLoad] = useState<Record<string, number>>({})
+  const [capacity, setCapacity] = useState(6)
+  const [bufferDays, setBufferDays] = useState(0)
+  const [suggested, setSuggested] = useState<{ date: string; count: number } | null>(null)
 
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -83,6 +95,46 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
     const to = `${viewYear}-${pad(viewMonth + 1)}-${pad(daysInMonth)}`
     getDeliveryLoad(from, to).then(setLoad).catch(() => {})
   }, [viewYear, viewMonth])
+
+  // O4: recommend the nearest date ≥ today + buffer with spare capacity
+  // (load < daily_capacity). Scans a 6-week forward window from the buffer start.
+  useEffect(() => {
+    let cancelled = false
+    getOrderSettings()
+      .then(({ daily_capacity, delivery_buffer_days }) => {
+        if (cancelled) return
+        setCapacity(daily_capacity)
+        setBufferDays(delivery_buffer_days)
+        const start = addDays(today, delivery_buffer_days)
+        const startStr = toDateStr(start.getFullYear(), start.getMonth(), start.getDate())
+        const end = addDays(start, 42)
+        const endStr = toDateStr(end.getFullYear(), end.getMonth(), end.getDate())
+        getDeliveryLoad(startStr, endStr)
+          .then((window) => {
+            if (cancelled) return
+            for (let i = 0; i <= 42; i++) {
+              const d = addDays(start, i)
+              const ds = toDateStr(d.getFullYear(), d.getMonth(), d.getDate())
+              const count = window[ds] ?? 0
+              if (count < daily_capacity) {
+                setSuggested({ date: ds, count })
+                return
+              }
+            }
+            setSuggested(null)
+          })
+          .catch(() => {})
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  function selectDate(dateStr: string) {
+    const [y, m] = dateStr.split('-').map(Number)
+    setViewYear(y)
+    setViewMonth(m - 1)
+    onChange(dateStr)
+  }
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1) }
@@ -168,6 +220,35 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
         <p className={`mt-3 text-xs text-center font-medium ${loadBgWhenSelected(selectedLoad)}`}>
           {loadLabel(selectedLoad, value)}
         </p>
+      )}
+
+      {/* O4 recommendation — nearest date with spare capacity */}
+      {suggested && suggested.date !== value && (
+        <button
+          type="button"
+          onClick={() => selectDate(suggested.date)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium py-2 hover:bg-emerald-100 transition-colors"
+        >
+          <span>💡</span>
+          Suggested: {new Date(suggested.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+          {' '}— {suggested.count} of {capacity} capacity{bufferDays > 0 ? `, ${bufferDays}+ days out` : ''}
+        </button>
+      )}
+
+      {/* O4 soft confirm — heavy-load day selected (non-blocking) */}
+      {value && selectedLoad !== null && selectedLoad >= HIGH_LOAD && (
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+          <p className="font-medium">This day is heavily loaded ({selectedLoad} orders).</p>
+          {suggested && suggested.date !== value && (
+            <button
+              type="button"
+              onClick={() => selectDate(suggested.date)}
+              className="mt-1 underline font-medium hover:text-amber-900"
+            >
+              Use the suggested date instead
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2 mt-5">
