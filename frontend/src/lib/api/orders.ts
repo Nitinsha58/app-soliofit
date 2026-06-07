@@ -37,6 +37,29 @@ export async function listOrders(params?: {
   return apiRequest<Order[]>(`/api/orders/${queryString}`)
 }
 
+// VS-20 board action (ADR-0006): one status column, keyset-paged. `counts` is the
+// full per-status totals map (same in every column's response), independent of the
+// loaded page. Active columns sort by (delivery_date, created_at, id) asc; Delivered
+// by (delivered_at, id) desc with a recent-window default and an `older` continuation.
+export interface OrderBoardPage {
+  results: Order[]
+  next_cursor: string | null
+  counts: Record<Order['status'], number>
+}
+
+export async function listOrderColumn(params: {
+  status: Order['status']
+  cursor?: string | null
+  limit?: number
+  older?: boolean
+}): Promise<OrderBoardPage> {
+  const qs = new URLSearchParams({ status: params.status })
+  if (params.cursor) qs.set('cursor', params.cursor)
+  if (params.limit) qs.set('limit', String(params.limit))
+  if (params.older) qs.set('older', 'true')
+  return apiRequest<OrderBoardPage>(`/api/orders/board/?${qs.toString()}`)
+}
+
 export async function createOrder(data: {
   customer: string
   delivery_date: string
