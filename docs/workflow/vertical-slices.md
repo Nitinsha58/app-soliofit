@@ -30,6 +30,15 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
+| VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Backlog |
+| VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Backlog |
+| VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Backlog |
+| VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Backlog |
+| VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Backlog |
+| VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
+
+> **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
+> VS-20 and VS-23 each require an ADR at activation. VS-23 (tenant) lands before VS-17/VS-18 so launch is on the final schema. Interim hardening (order_number race-fix, presign validation) ships as `fix` commits ahead of the slices.
 
 ---
 
@@ -521,20 +530,25 @@ Within the same tier: sort by `created_at` ascending.
 
 **Backend:**
 - `NotificationPreference` model (OneToOne to User, 4 boolean toggles)
+- `delivery_buffer_days` (PositiveSmallIntegerField, default 0) — on User or a `UserSettings` 1:1
 - Add to `users` migration
 - `PATCH /api/auth/me/` — update name, business name, phone
 - `POST /api/auth/change-password/` — verify old, set new
 - `GET/PATCH /api/auth/notification-preferences/` — read and update toggles
+- `GET/PATCH /api/auth/order-settings/` — read/update `delivery_buffer_days`
 
 **Frontend:**
 - Settings page (sidebar gear icon)
 - Profile section: business name, owner name, phone, change password form
+- Order Settings section: numeric input for default delivery buffer days
+- **Add-Order recommendation pill (O4)** in `StepDelivery`: "Suggested: <nearest date ≥ today + buffer_days with ≤5 load>" pill below the picker, plus a soft confirm when a high-load (13+) date is selected
 - Notification preferences: 4 toggles
+- Danger Zone: "Delete all data" (typed confirmation phrase) — **deferred for MVP: render as a disabled control with a "coming soon" note**
 - Logout button
 
 **ADR:** None.
 
-**Review checkpoint:** Update business name → persists on reload. Change password → can log in with new password. Toggle notification preference → persists.
+**Review checkpoint:** Update business name → persists on reload. Change password → can log in with new password. Toggle notification preference → persists. Set buffer days = 2 → Add-Order recommendation skips the next 2 days. High-load date → soft confirm appears.
 
 ---
 

@@ -42,15 +42,22 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-07 | Photo upload | Complete |
 | VS-08 | Voice notes | Complete |
 | VS-09 | Installments | Complete |
-| VS-10 | Dashboard intelligence | Active |
-| VS-11 | Payments dashboard | Not started |
-| VS-12 | Activity log | Not started |
-| VS-13 | Customer profile | Not started |
-| VS-14 | Global search | Not started |
-| VS-15 | Calendar | Not started |
+| VS-10 | Dashboard intelligence | Complete |
+| VS-11 | Payments dashboard | Complete |
+| VS-12 | Activity log | Complete |
+| VS-13 | Customer profile | Complete |
+| VS-15a | Orders Schedule | Complete |
+| VS-14 | Global search | Complete |
+| VS-15 | Calendar | Active |
 | VS-16 | Settings | Not started |
 | VS-17 | Mobile layout | Not started |
 | VS-18 | Production deployment | Not started |
+| VS-19 | Order payment summary | Backlog |
+| VS-20 | Orders list scaling | Backlog |
+| VS-21 | Delete order | Backlog |
+| VS-22 | Forgot password | Backlog |
+| VS-23 | Boutique tenant | Backlog |
+| VS-08b | Voice format (webm→mp3) | Backlog — Deferred |
 
 Full specifications: [`/workflow/vertical-slices.md`](./workflow/vertical-slices.md)
 
