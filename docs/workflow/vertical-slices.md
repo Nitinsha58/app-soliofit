@@ -516,7 +516,7 @@ Within the same tier: sort by `created_at` ascending.
 - Calendar page (sidebar nav item)
 - Month grid, clean-minimal cell (per `01`): date (today = filled accent circle) · single workload dot (green 0–2 / amber 3–5 / red 6+) · red "N late" pill · neutral icon+count event chips (🚚 delivery, ₹ payment). Pickup not modelled in MVP.
 - Hairline borders + gaps; out-of-month and empty cells recede; grid fills the viewport height.
-- Slim one-line summary above the grid ("N deliveries due today · ₹X to collect · N overdue"); no KPI trend cards.
+- Three summary cards above the grid: deliveries due today (🚚), amount to collect (₹), overdue orders (⊘); proportionate cell height (not viewport-fill); workload legend below the grid.
 - View switcher: **Month** only (Week/Day deferred — week-zoom served by `/orders`).
 - Colour: red = late/overloaded only; event chips neutral; one workload dot (per `07`).
 - Prev / Today / Next month navigation.
