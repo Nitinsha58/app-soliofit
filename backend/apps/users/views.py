@@ -3,7 +3,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.conf import settings
-from .serializers import UserSerializer
+from django.contrib.auth import update_session_auth_hash
+from .models import UserSettings, NotificationPreference
+from .serializers import (
+    UserSerializer,
+    ChangePasswordSerializer,
+    UserSettingsSerializer,
+    NotificationPreferenceSerializer,
+)
 
 
 class CookieTokenObtainPairView(TokenObtainPairView):
@@ -56,3 +63,53 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save(update_fields=['password', 'updated_at'])
+        # Keep the active session valid after the password hash changes.
+        update_session_auth_hash(request, user)
+        return Response({'detail': 'Password changed.'})
+
+
+class OrderSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        obj, _ = UserSettings.objects.get_or_create(user=request.user)
+        return Response(UserSettingsSerializer(obj).data)
+
+    def patch(self, request):
+        obj, _ = UserSettings.objects.get_or_create(user=request.user)
+        serializer = UserSettingsSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class NotificationPreferenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        obj, _ = NotificationPreference.objects.get_or_create(user=request.user)
+        return Response(NotificationPreferenceSerializer(obj).data)
+
+    def patch(self, request):
+        obj, _ = NotificationPreference.objects.get_or_create(user=request.user)
+        serializer = NotificationPreferenceSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

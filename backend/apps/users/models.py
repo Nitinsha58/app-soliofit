@@ -37,3 +37,28 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         db_table = 'users'
+
+
+class UserSettings(models.Model):
+    """Per-user operational settings. 1:1 with User, auto-created on first access."""
+    user                 = models.OneToOneField(User, on_delete=models.CASCADE, related_name='settings')
+    delivery_buffer_days = models.PositiveSmallIntegerField(default=0)
+    daily_capacity       = models.PositiveSmallIntegerField(default=6)
+    updated_at           = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'user_settings'
+
+
+class NotificationPreference(models.Model):
+    """Per-user notification toggles. Preference-only — not yet wired to any
+    delivery channel; these flags are stored for a future notification pipeline."""
+    user                    = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
+    delivery_reminders      = models.BooleanField(default=True)
+    payment_reminders       = models.BooleanField(default=True)
+    daily_summary           = models.BooleanField(default=True)
+    new_order_confirmations = models.BooleanField(default=True)
+    updated_at              = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'notification_preferences'
