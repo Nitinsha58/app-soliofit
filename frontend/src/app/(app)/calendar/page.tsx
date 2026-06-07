@@ -106,11 +106,13 @@ export default function CalendarPage() {
     staleTime: 30_000,
   })
 
-  // Monday-start 6×7 grid covering the month.
+  // Monday-start grid covering exactly the weeks the month spans (5 or 6 rows).
   const monthStart   = new Date(year, monthIndex, 1)
+  const daysInMonth  = new Date(year, monthIndex + 1, 0).getDate()
   const firstWeekday = (monthStart.getDay() + 6) % 7   // Mon=0 … Sun=6
+  const weeks        = Math.ceil((firstWeekday + daysInMonth) / 7)
   const gridStart    = addDays(monthStart, -firstWeekday)
-  const cells        = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+  const cells        = Array.from({ length: weeks * 7 }, (_, i) => addDays(gridStart, i))
 
   const goPrev  = () => setViewDate(new Date(year, monthIndex - 1, 1))
   const goNext  = () => setViewDate(new Date(year, monthIndex + 1, 1))
@@ -153,16 +155,19 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Grid ───────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 flex flex-col p-3 min-h-0">
         {/* Weekday header */}
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        <div className="grid grid-cols-7 gap-1.5 mb-1.5 flex-shrink-0">
           {WEEKDAYS.map((w) => (
-            <div key={w} className="text-center text-[11px] font-bold text-[#6B6B67] py-1">{w}</div>
+            <div key={w} className="text-center text-[11px] font-bold text-[#6B6B67]">{w}</div>
           ))}
         </div>
 
-        {/* Day cells */}
-        <div className="grid grid-cols-7 gap-1.5">
+        {/* Day cells — fill the available height, like a standard calendar */}
+        <div
+          className="grid grid-cols-7 gap-1.5 flex-1 min-h-0"
+          style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}
+        >
           {cells.map((cell) => {
             const dateStr     = toDateStr(cell)
             const inMonth     = cell.getMonth() === monthIndex
@@ -171,8 +176,13 @@ export default function CalendarPage() {
             const count       = info?.count ?? 0
             const hasOverdue  = info?.has_overdue ?? false
 
+            // Adjacent-month days: shown muted (not blank) for a continuous grid.
             if (!inMonth) {
-              return <div key={dateStr} className="min-h-[72px] rounded-md bg-transparent" />
+              return (
+                <div key={dateStr} className="rounded-md border border-[#ECEEF3] bg-[#F7F8FA] p-1.5">
+                  <span className="text-[12px] font-medium tabular-nums text-[#C2C6D0]">{cell.getDate()}</span>
+                </div>
+              )
             }
 
             return (
@@ -180,7 +190,7 @@ export default function CalendarPage() {
                 key={dateStr}
                 type="button"
                 onClick={() => setSelected(dateStr)}
-                className={`min-h-[72px] rounded-md border p-1.5 flex flex-col text-left transition-colors bg-white hover:border-[#C8952A] ${
+                className={`rounded-md border p-1.5 flex flex-col text-left transition-colors bg-white hover:border-[#C8952A] ${
                   isToday ? 'border-[#C8952A] border-2' : 'border-[#E0E3EB]'
                 }`}
               >
