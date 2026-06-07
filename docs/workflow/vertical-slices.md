@@ -505,22 +505,26 @@ Within the same tier: sort by `created_at` ascending.
 
 ### VS-15 — Calendar
 
-**What:** Month view with workload coloring and date drill-down.
+**What:** Clean-minimal month view — per-day workload overview + date drill-down (per the `01` cell spec).
 
 **Backend:**
-- `GET /api/calendar/?year={y}&month={m}` — order counts per date in the month
-- `GET /api/orders/?delivery_date={date}` — orders for a specific date (reuses existing endpoint)
+- `GET /api/calendar/?year={y}&month={m}` — one row per date in the month:
+  `{ deliveries, payments, payment_amount, late, workload }`, in a single round-trip (aggregated; no N+1). `deliveries` = orders on that `delivery_date`; `payments` = unpaid installments with `due_date` on that date; `payment_amount` = their summed amount; `late` = orders on that date with `status != Delivered` and date `< today`; `workload` = `deliveries + payments` (interim count metric — upgrades to capacity-based in VS-16). (Reworks the v1 count endpoint; keeps the existing `/api/calendar/` path rather than a new `calendar-summary` action.)
+- `GET /api/orders/?delivery_date_from={d}&delivery_date_to={d}` — single date drill-down (reuses existing filter)
 
 **Frontend:**
 - Calendar page (sidebar nav item)
-- Month grid: each date shows order count badge, color-coded (0–5 green, 6–12 amber, 13+ red)
-- Previous/Next month navigation + "Today" button
-- Date tap → right panel (desktop) / bottom sheet (mobile) listing orders for that date
-- Order tap → Order Details drawer
+- Month grid, clean-minimal cell (per `01`): date (today = filled accent circle) · single workload dot (green 0–2 / amber 3–5 / red 6+) · red "N late" pill · neutral icon+count event chips (🚚 delivery, ₹ payment). Pickup not modelled in MVP.
+- Hairline borders + gaps; out-of-month and empty cells recede; grid fills the viewport height.
+- Slim one-line summary above the grid ("N deliveries due today · ₹X to collect · N overdue"); no KPI trend cards.
+- View switcher: **Month** only (Week/Day deferred — week-zoom served by `/orders`).
+- Colour: red = late/overloaded only; event chips neutral; one workload dot (per `07`).
+- Prev / Today / Next month navigation.
+- Date tap → right panel (desktop) / bottom sheet (mobile) reusing the VS-15a `ScheduleCard`; order tap → Order Details drawer.
 
-**ADR:** None.
+**ADR:** None — presentational refinement of an active slice; one additive aggregate field, no contract break.
 
-**Review checkpoint:** Calendar loads for current month. Create orders on different dates → counts appear on correct dates. Colors reflect load levels. Tap a date → order list shows.
+**Review checkpoint:** Calendar loads for current month, grid fills height. Orders on different dates → workload dot reflects deliveries+payments (try 0–2 / 3–5 / 6+). A date with past-due undelivered orders shows the red "N late" pill above its chips. Each day shows at most one workload dot — no capacity bar or "Busy" label. Event chips are neutral (only late/overloaded is red). Out-of-month days recede; today is circled. Tap a date → order list shows; tap an order → drawer opens.
 
 ---
 
@@ -531,6 +535,7 @@ Within the same tier: sort by `created_at` ascending.
 **Backend:**
 - `NotificationPreference` model (OneToOne to User, 4 boolean toggles)
 - `delivery_buffer_days` (PositiveSmallIntegerField, default 0) — on User or a `UserSettings` 1:1
+- `daily_capacity` (PositiveSmallIntegerField, default 6) — garments the shop can finish per day. Drives the calendar workload-dot thresholds once set (Light ≤ ⅓·cap, Overloaded ≥ cap); until set, VS-15 uses the interim count thresholds (0–2 / 3–5 / 6+).
 - Add to `users` migration
 - `PATCH /api/auth/me/` — update name, business name, phone
 - `POST /api/auth/change-password/` — verify old, set new
@@ -541,6 +546,7 @@ Within the same tier: sort by `created_at` ascending.
 - Settings page (sidebar gear icon)
 - Profile section: business name, owner name, phone, change password form
 - Order Settings section: numeric input for default delivery buffer days
+- Order Settings section: numeric input for daily capacity (workload) — feeds the VS-15 calendar dot thresholds
 - **Add-Order recommendation pill (O4)** in `StepDelivery`: "Suggested: <nearest date ≥ today + buffer_days with ≤5 load>" pill below the picker, plus a soft confirm when a high-load (13+) date is selected
 - Notification preferences: 4 toggles
 - Danger Zone: "Delete all data" (typed confirmation phrase) — **deferred for MVP: render as a disabled control with a "coming soon" note**
