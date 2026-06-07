@@ -34,7 +34,7 @@ export default function DraggableCard({ order, disabled = false, highlightColor 
       style={style}
       {...listeners}
       {...attributes}
-      className={`touch-none ${isDragging ? 'opacity-0' : ''} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+      className={`${isDragging ? 'opacity-0' : ''} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
     >
       <OrderCard
         order={order}

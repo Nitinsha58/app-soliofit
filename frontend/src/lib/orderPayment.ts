@@ -24,3 +24,16 @@ export function paymentMeta(state: PaymentState): PaymentMeta | null {
 export function inr(value: string | number): string {
   return Number(value).toLocaleString('en-IN')
 }
+
+/**
+ * Last-changed stamp for a card: 12-hour clock time with AM/PM. Shows just the
+ * time when the change was today (e.g. "3:45 PM"), otherwise prefixes a short
+ * date ("12 Jun, 3:45 PM"). AM/PM forced uppercase via en-US.
+ */
+export function lastChanged(iso: string): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  if (d.toDateString() === new Date().toDateString()) return time
+  const date = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return `${date}, ${time}`
+}

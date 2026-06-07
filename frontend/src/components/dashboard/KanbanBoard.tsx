@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useDroppable,
   useSensor,
@@ -106,10 +106,13 @@ export default function KanbanBoard() {
   }, [ordersRefreshKey, queryClient])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    // Touch: short hold before a drag starts so a scroll gesture on phone/tablet
-    // isn't mistaken for a drag (scroll vs drag intent).
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    // Mouse only — does NOT capture touch, so a touch that starts on a card can still
+    // scroll the board (the card no longer sets touch-action: none).
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    // Touch: require a deliberate ~280ms press-and-hold before a drag begins; if the
+    // finger moves more than `tolerance` first, it's a scroll, not a drag. Makes every
+    // drag intentional and lets vertical/horizontal scrolling work over cards.
+    useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }),
   )
 
   useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current) }, [])

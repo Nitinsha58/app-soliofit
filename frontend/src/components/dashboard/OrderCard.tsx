@@ -1,7 +1,7 @@
 'use client'
 
 import type { Order } from '@/lib/api/orders'
-import { paymentMeta, inr } from '@/lib/orderPayment'
+import { paymentMeta, inr, lastChanged } from '@/lib/orderPayment'
 
 interface Props {
   order: Order
@@ -75,17 +75,27 @@ export default function OrderCard({ order, onClick }: Props) {
         )}
       </div>
 
-      {/* Payment state pill + remaining due */}
-      {pay && (
-        <div className="flex items-center gap-2 mt-2">
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${pay.pillClass}`}>
-            {pay.label}
-          </span>
-          {remaining > 0 && (
-            <span className="text-[11px] text-[#6B6B67] tabular-nums">₹{inr(order.remaining)} due</span>
+      {/* Payment state pill + remaining due (left) · last-changed time (bottom-right) */}
+      <div className="flex items-center justify-between gap-2 mt-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {pay && (
+            <>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${pay.pillClass}`}>
+                {pay.label}
+              </span>
+              {remaining > 0 && (
+                <span className="text-[11px] text-[#6B6B67] tabular-nums">₹{inr(order.remaining)} due</span>
+              )}
+            </>
           )}
         </div>
-      )}
+        <span
+          className="text-[10px] text-[#B0B0AC] tabular-nums whitespace-nowrap flex-shrink-0"
+          title={`Last updated ${new Date(order.updated_at).toLocaleString('en-IN')}`}
+        >
+          {lastChanged(order.updated_at)}
+        </span>
+      </div>
     </div>
   )
 }

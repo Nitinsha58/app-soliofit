@@ -48,6 +48,8 @@ export default function BoardColumn({
     if (counts) onCounts(counts)
   }, [counts, onCounts])
 
+  // Unfiltered loaded count of the recent window — drives whether an older tail exists.
+  const recentLoadedCount = recent.data?.pages.reduce((n, p) => n + p.results.length, 0) ?? 0
   const recentRows = (recent.data?.pages.flatMap((p) => p.results) ?? []).filter(filterFn)
   const olderRows = (older.data?.pages.flatMap((p) => p.results) ?? []).filter(filterFn)
   const rows = recentRows.concat(olderRows)
@@ -73,8 +75,11 @@ export default function BoardColumn({
   }, [recent.hasNextPage, recent.isFetchingNextPage, older.hasNextPage, older.isFetchingNextPage, showOlder])
 
   const loading = recent.isLoading
-  // Show-older affordance: recent window drained, more history exists behind the cutoff.
-  const canShowOlder = isDelivered && !showOlder && !recent.hasNextPage && !recent.isFetchingNextPage
+  // Show-older affordance: recent window drained AND an older tail actually exists
+  // (loaded recent rows are fewer than the true Delivered total).
+  const canShowOlder =
+    isDelivered && !showOlder && !recent.hasNextPage && !recent.isFetchingNextPage &&
+    recentLoadedCount < total
 
   return (
     <div
