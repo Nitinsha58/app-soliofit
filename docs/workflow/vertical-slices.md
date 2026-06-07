@@ -577,6 +577,7 @@ Frontend (`/calendar`): month grid (Monday-start, 5/6 dynamic rows), proportiona
 - Order Details: full screen on mobile instead of side drawer
 - Add Order Flow: bottom sheet on mobile
 - All drawers and modals: full-screen on mobile
+- **Carry-forward (pre-VS-15 P3):** `QuickActions.tsx` "Mark Delivered" button squeezes/wraps at 375px — fix as part of the mobile drawer/action polish.
 - Verify all screens at 375px and 768px breakpoints
 
 **ADR:** None.
