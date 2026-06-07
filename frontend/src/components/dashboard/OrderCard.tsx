@@ -1,11 +1,13 @@
 'use client'
 
 import type { Order } from '@/lib/api/orders'
-import { paymentMeta, inr, lastChanged } from '@/lib/orderPayment'
+import { paymentMeta, inr, lastChanged, paidColorClass } from '@/lib/orderPayment'
 
 interface Props {
   order: Order
   onClick?: () => void
+  /** Previous status, shown as "From <status>" briefly after a drag move. */
+  movedFrom?: Order['status']
 }
 
 function formatDate(dateStr: string): string {
@@ -13,13 +15,12 @@ function formatDate(dateStr: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export default function OrderCard({ order, onClick }: Props) {
+export default function OrderCard({ order, onClick, movedFrom }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isOverdue = order.delivery_date < todayStr && order.status !== 'Delivered'
   const isToday = order.delivery_date === todayStr
-  const pay = paymentMeta(order.payment_state)
-  const remaining = Number(order.remaining)
+  const hasBill = paymentMeta(order.payment_state) !== null
 
   return (
     <div
@@ -47,7 +48,7 @@ export default function OrderCard({ order, onClick }: Props) {
               : 'bg-[#F0F0EE] text-[#6B6B67]'
           }`}
         >
-          {isOverdue ? '⚠ ' : ''}{formatDate(order.delivery_date)}
+          {formatDate(order.delivery_date)}
         </span>
       </div>
 
@@ -63,9 +64,10 @@ export default function OrderCard({ order, onClick }: Props) {
             </span>
           )}
         </div>
-        {pay ? (
+        {hasBill ? (
+          // Colour-coded paid amount (green/orange/red by state); "/ total" stays neutral.
           <span className="text-[13px] tabular-nums leading-none">
-            <span className="font-bold text-[#1A1A18]">₹{inr(order.amount_paid)}</span>
+            <span className={`font-bold ${paidColorClass(order.payment_state)}`}>₹{inr(order.amount_paid)}</span>
             <span className="font-medium text-[#B0B0AC]"> / ₹{inr(order.total_amount)}</span>
           </span>
         ) : (
@@ -75,20 +77,15 @@ export default function OrderCard({ order, onClick }: Props) {
         )}
       </div>
 
-      {/* Payment state pill + remaining due (left) · last-changed time (bottom-right) */}
+      {/* Move provenance "From <status>" (left) · last-changed time (bottom-right) */}
       <div className="flex items-center justify-between gap-2 mt-2">
-        <div className="flex items-center gap-2 min-w-0">
-          {pay && (
-            <>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${pay.pillClass}`}>
-                {pay.label}
-              </span>
-              {remaining > 0 && (
-                <span className="text-[11px] text-[#6B6B67] tabular-nums">₹{inr(order.remaining)} due</span>
-              )}
-            </>
-          )}
-        </div>
+        {movedFrom ? (
+          <span className="text-[10px] font-semibold text-[#6B6B67] bg-[#F0F0EE] px-1.5 py-0.5 rounded whitespace-nowrap">
+            From {movedFrom}
+          </span>
+        ) : (
+          <span />
+        )}
         <span
           className="text-[10px] text-[#B0B0AC] tabular-nums whitespace-nowrap flex-shrink-0"
           title={`Last updated ${new Date(order.updated_at).toLocaleString('en-IN')}`}

@@ -11,9 +11,11 @@ interface Props {
   disabled?: boolean
   /** Status accent applied as a brief ring after a drop confirms the move. */
   highlightColor?: string
+  /** Previous status, shown briefly as "From <status>" after a move. */
+  movedFrom?: Order['status']
 }
 
-export default function DraggableCard({ order, disabled = false, highlightColor }: Props) {
+export default function DraggableCard({ order, disabled = false, highlightColor, movedFrom }: Props) {
   const openOrderDetail = useUIStore((s) => s.openOrderDetail)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
@@ -38,6 +40,7 @@ export default function DraggableCard({ order, disabled = false, highlightColor 
     >
       <OrderCard
         order={order}
+        movedFrom={movedFrom}
         onClick={() => openOrderDetail(order.id)}
       />
     </div>

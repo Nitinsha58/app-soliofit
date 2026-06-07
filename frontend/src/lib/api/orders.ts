@@ -45,6 +45,8 @@ export interface OrderBoardPage {
   results: Order[]
   next_cursor: string | null
   counts: Record<Order['status'], number>
+  // Summed bill (total_amount) per status column — the column's total order value.
+  value: Record<Order['status'], string>
 }
 
 export async function listOrderColumn(params: {

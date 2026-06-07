@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { listOrderColumn, type Order, type OrderBoardPage } from '@/lib/api/orders'
+import { compactInr } from '@/lib/orderPayment'
 import DraggableCard from './DraggableCard'
 
 interface Props {
@@ -13,9 +14,10 @@ interface Props {
   /** Client-side filter over loaded rows (dashboard summary cards). May under-report. */
   filterFn: (o: Order) => boolean
   mutatingIds: Set<string>
-  recentlyMovedId: string | null
-  /** Reports the latest full per-status totals up to the board (for the collapsed Delivered badge). */
-  onCounts: (counts: OrderBoardPage['counts']) => void
+  /** The most recently moved card + where it came from (drives the ring + "From X"). */
+  recentlyMoved: { id: string; from: Order['status'] } | null
+  /** Reports the latest per-status totals + column values up to the board. */
+  onCounts: (counts: OrderBoardPage['counts'], value: OrderBoardPage['value']) => void
   headerAction?: React.ReactNode
 }
 
@@ -33,7 +35,7 @@ export function useColumnQuery(status: Order['status'], older: boolean, enabled 
 }
 
 export default function BoardColumn({
-  status, title, accent, filterFn, mutatingIds, recentlyMovedId, onCounts, headerAction,
+  status, title, accent, filterFn, mutatingIds, recentlyMoved, onCounts, headerAction,
 }: Props) {
   const isDelivered = status === 'Delivered'
   const { isOver, setNodeRef } = useDroppable({ id: status })
@@ -43,10 +45,11 @@ export default function BoardColumn({
   const older = useColumnQuery(status, true, isDelivered && showOlder)
 
   const counts = recent.data?.pages[0]?.counts
+  const value = recent.data?.pages[0]?.value
   const total = counts?.[status] ?? 0
   useEffect(() => {
-    if (counts) onCounts(counts)
-  }, [counts, onCounts])
+    if (counts && value) onCounts(counts, value)
+  }, [counts, value, onCounts])
 
   // Unfiltered loaded count of the recent window — drives whether an older tail exists.
   const recentLoadedCount = recent.data?.pages.reduce((n, p) => n + p.results.length, 0) ?? 0
@@ -92,6 +95,9 @@ export default function BoardColumn({
           <span className="text-[13px] font-semibold text-[#1A1A18] tracking-tight">{title}</span>
           <div className="flex items-center gap-2">
             {headerAction}
+            <span className="text-[11px] font-semibold text-[#A0A09C] tabular-nums">
+              {compactInr(value?.[status] ?? 0)}
+            </span>
             <span
               className="text-[11px] font-bold px-2 py-0.5 rounded-full tabular-nums"
               style={{ backgroundColor: `${accent}28`, color: accent }}
@@ -117,7 +123,8 @@ export default function BoardColumn({
               key={order.id}
               order={order}
               disabled={mutatingIds.has(order.id)}
-              highlightColor={order.id === recentlyMovedId ? accent : undefined}
+              highlightColor={order.id === recentlyMoved?.id ? accent : undefined}
+              movedFrom={order.id === recentlyMoved?.id ? recentlyMoved.from : undefined}
             />
           ))
         )}

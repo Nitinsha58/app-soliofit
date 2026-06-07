@@ -9,6 +9,8 @@
 
 _Amended 2026-06-07 (pre-implementation, from review, before any VS-20 code): pagination is exposed via an opt-in `board` action so the default `/api/orders/` list keeps its `Order[]` contract; "recent Delivered" is defined by a new `delivered_at` field; and the sort tuple is **per-column** — active columns by `(delivery_date, created_at, id)` ascending, the Delivered column by `(delivered_at, id)` descending (completion history reads newest-first). The core keyset-cursor decision is unchanged._
 
+_Amended 2026-06-08 (during VS-20 frontend review): the board response gains an additive **`value`** map — `Sum(total_amount)` per status, on the same grouped aggregate as `counts` — so each column header shows its total order value beside the count. Additive only; no consumer or sort change._
+
 ---
 
 ## Context
@@ -28,10 +30,11 @@ VS-20 introduces per-column lazy-load on scroll. The hard part is that the order
   {
     "results": [ /* annotated orders (amount_paid, has_delayed_installment, …) */ ],
     "next_cursor": "<opaque|null>",
-    "counts": { "Booked": 142, "Started": 30, "Ready": 8, "Partial Delivery": 3, "Delivered": 1204 }
+    "counts": { "Booked": 142, "Started": 30, "Ready": 8, "Partial Delivery": 3, "Delivered": 1204 },
+    "value":  { "Booked": "284000.00", ... }
   }
   ```
-  `counts` are full per-status **totals** for the active filter set, computed in a single grouped aggregate query — decoupled from the loaded page so headers stay accurate as the user scrolls.
+  `counts` are full per-status **totals** for the active filter set, computed in a single grouped aggregate query — decoupled from the loaded page so headers stay accurate as the user scrolls. `value` rides on the same grouped aggregate (`Sum(total_amount)` per status) and gives each column header its total order value next to the count.
 - **Delivered deferral:** a new nullable `Order.delivered_at` is set to `timezone.now()` when an order transitions **into** Delivered, and cleared if it ever transitions back out — so it always means "currently delivered, at this time." The Delivered column has two windows, each keyset-paged by `(delivered_at DESC, id DESC)`: the **default** window returns `delivered_at >= today − 30 days` (cutoff), and an explicit **`older=true`** mode returns `delivered_at < cutoff` behind a "show older" affordance — so no Delivered order is dropped, only deferred. A data migration backfills existing Delivered orders from their latest `DELIVERY_MARKED` activity timestamp (fallback `updated_at`). Add an index covering `(user, status, delivered_at)`. `updated_at` is explicitly rejected (any edit bumps it → long-delivered orders would resurface as "recent"); the activity timestamp is rejected as a query-time source (correlated subquery in the hot board path).
 - **Scope:** only the Kanban board consumes the new envelope (via the `board` action). Every other consumer keeps the legacy `GET /api/orders/` → `Order[]` contract: the Orders Schedule (`/orders`, date-range filtered for the visible week), the calendar day drill-down (single-date filtered), the customer profile (customer filtered), and the `delivery-load` aggregate. The Orders Schedule is grouped by delivery **date**, not by status column, so it does **not** use the per-column cursor — its result set is already bounded by the visible week.
 

@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { updateOrderStatus, type Order, type OrderBoardPage } from '@/lib/api/orders'
+import { compactInr } from '@/lib/orderPayment'
 import { useUIStore } from '@/stores/useUIStore'
 import BoardColumn from './BoardColumn'
 import OrderCard from './OrderCard'
@@ -57,7 +58,7 @@ function addToCache(old: Board | undefined, order: Order, to: Order['status']): 
   }
 }
 
-function CollapsedDelivered({ total, onShow }: { total: number | null; onShow: () => void }) {
+function CollapsedDelivered({ total, value, onShow }: { total: number | null; value: string | null; onShow: () => void }) {
   const { isOver, setNodeRef } = useDroppable({ id: DELIVERED.status })
   return (
     <div
@@ -68,12 +69,17 @@ function CollapsedDelivered({ total, onShow }: { total: number | null; onShow: (
       <div style={{ borderTop: `3px solid ${DELIVERED.accent}` }} className="px-3 pt-3 pb-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-[#A0A09C] tracking-tight">{DELIVERED.label}</span>
-          <button
-            onClick={onShow}
-            className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] bg-[#9CA3AF28] px-2 py-0.5 rounded-full transition-colors"
-          >
-            Show{total != null ? ` (${total})` : ''}
-          </button>
+          <div className="flex items-center gap-2">
+            {value != null && (
+              <span className="text-[11px] font-semibold text-[#A0A09C] tabular-nums">{compactInr(value)}</span>
+            )}
+            <button
+              onClick={onShow}
+              className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] bg-[#9CA3AF28] px-2 py-0.5 rounded-full transition-colors"
+            >
+              Show{total != null ? ` (${total})` : ''}
+            </button>
+          </div>
         </div>
       </div>
       <div className="px-2.5 pb-3">
@@ -85,14 +91,20 @@ function CollapsedDelivered({ total, onShow }: { total: number | null; onShow: (
   )
 }
 
+// A completed move, kept briefly to drive the Undo snackbar and the "From <status>"
+// provenance on the moved card. `order` is the card as it was before the move.
+type Move = { order: Order; from: Order['status']; to: Order['status'] }
+const MOVE_TTL = 6000
+
 export default function KanbanBoard() {
   const queryClient = useQueryClient()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set())
-  const [recentlyMovedId, setRecentlyMovedId] = useState<string | null>(null)
+  const [lastMove, setLastMove] = useState<Move | null>(null)
   const [showDelivered, setShowDelivered] = useState(false)
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null)
   const [counts, setCounts] = useState<OrderBoardPage['counts'] | null>(null)
+  const [value, setValue] = useState<OrderBoardPage['value'] | null>(null)
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const triggerOrdersRefresh = useUIStore((s) => s.triggerOrdersRefresh)
   const ordersRefreshKey = useUIStore((s) => s.ordersRefreshKey)
@@ -117,8 +129,11 @@ export default function KanbanBoard() {
 
   useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current) }, [])
 
-  // Latest totals come from whichever column reported most recently — same map everywhere.
-  const onCounts = useCallback((c: OrderBoardPage['counts']) => setCounts(c), [])
+  // Latest totals + per-column values come from whichever column reported most
+  // recently — both maps are identical across every column's response.
+  const onCounts = useCallback((c: OrderBoardPage['counts'], v: OrderBoardPage['value']) => {
+    setCounts(c); setValue(v)
+  }, [])
 
   const filterFn = useCallback((o: Order): boolean => {
     if (!activeFilter) return true
@@ -137,6 +152,31 @@ export default function KanbanBoard() {
     queryClient.invalidateQueries({ queryKey: ['orders-board', s] })
   }
 
+  // Optimistically move a card between column caches (membership, both badges, the
+  // totals map), fire the /status change, and reconcile from the server on settle.
+  function performMove(order: Order, from: Order['status'], to: Order['status']) {
+    queryClient.setQueryData<Board>(['orders-board', from], (old) => removeFromCache(old, order.id, from))
+    queryClient.setQueryData<Board>(['orders-board', from, 'older'], (old) => removeFromCache(old, order.id, from))
+    queryClient.setQueryData<Board>(['orders-board', to], (old) => addToCache(old, { ...order, status: to }, to))
+    setCounts((c) => (c ? { ...c, [from]: Math.max(0, c[from] - 1), [to]: c[to] + 1 } : c))
+
+    setMutatingIds((prev) => new Set(prev).add(order.id))
+    updateOrderStatus(order.id, to)
+      .then(() => triggerOrdersRefresh())
+      .catch(() => { invalidateColumn(from); invalidateColumn(to) })
+      .finally(() => {
+        invalidateColumn(from); invalidateColumn(to)
+        setMutatingIds((prev) => { const next = new Set(prev); next.delete(order.id); return next })
+      })
+  }
+
+  // Show the ring + "From <status>" + Undo snackbar for MOVE_TTL, then clear.
+  function flashMove(move: Move) {
+    setLastMove(move)
+    if (highlightTimer.current) clearTimeout(highlightTimer.current)
+    highlightTimer.current = setTimeout(() => setLastMove(null), MOVE_TTL)
+  }
+
   function handleDragStart({ active }: DragStartEvent) {
     setActiveOrder((active.data.current?.order as Order) ?? null)
   }
@@ -145,37 +185,28 @@ export default function KanbanBoard() {
     const order = (active.data.current?.order as Order) ?? null
     setActiveOrder(null)
     if (!over || !order) return
-
     const to = over.id as Order['status']
     const from = order.status
     if (from === to) return
-
-    // Optimistic: move the card between column caches, adjust both badges + the totals map.
-    queryClient.setQueryData<Board>(['orders-board', from], (old) => removeFromCache(old, order.id, from))
-    queryClient.setQueryData<Board>(['orders-board', from, 'older'], (old) => removeFromCache(old, order.id, from))
-    queryClient.setQueryData<Board>(['orders-board', to], (old) => addToCache(old, { ...order, status: to }, to))
-    setCounts((c) => (c ? { ...c, [from]: Math.max(0, c[from] - 1), [to]: c[to] + 1 } : c))
-
-    setMutatingIds((prev) => new Set(prev).add(order.id))
-    setRecentlyMovedId(order.id)
-    if (highlightTimer.current) clearTimeout(highlightTimer.current)
-    highlightTimer.current = setTimeout(() => setRecentlyMovedId(null), 1500)
-
-    updateOrderStatus(order.id, to)
-      .then(() => triggerOrdersRefresh())
-      .catch(() => {
-        // Roll back to authoritative server state for both columns.
-        invalidateColumn(from)
-        invalidateColumn(to)
-      })
-      .finally(() => {
-        // Reconcile membership, sort position, and totals from the server.
-        invalidateColumn(from)
-        invalidateColumn(to)
-        setMutatingIds((prev) => { const next = new Set(prev); next.delete(order.id); return next })
-      })
+    performMove(order, from, to)
+    flashMove({ order, from, to })
   }
 
+  // Undo = the compensating reverse move (writes its own activity). It re-flashes as a
+  // move back, so the snackbar's Undo also serves as redo.
+  function undoMove() {
+    if (!lastMove) return
+    const { order, from, to } = lastMove
+    performMove(order, to, from)
+    flashMove({ order, from: to, to: from })
+  }
+
+  function dismissMove() {
+    if (highlightTimer.current) clearTimeout(highlightTimer.current)
+    setLastMove(null)
+  }
+
+  const recentlyMoved = lastMove ? { id: lastMove.order.id, from: lastMove.from } : null
   const isEmpty = counts != null && Object.values(counts).reduce((a, b) => a + b, 0) === 0
 
   return (
@@ -205,7 +236,7 @@ export default function KanbanBoard() {
               accent={accent}
               filterFn={filterFn}
               mutatingIds={mutatingIds}
-              recentlyMovedId={recentlyMovedId}
+              recentlyMoved={recentlyMoved}
               onCounts={onCounts}
             />
           ))}
@@ -217,7 +248,7 @@ export default function KanbanBoard() {
               accent={DELIVERED.accent}
               filterFn={filterFn}
               mutatingIds={mutatingIds}
-              recentlyMovedId={recentlyMovedId}
+              recentlyMoved={recentlyMoved}
               onCounts={onCounts}
               headerAction={
                 <button
@@ -229,7 +260,11 @@ export default function KanbanBoard() {
               }
             />
           ) : (
-            <CollapsedDelivered total={counts?.Delivered ?? null} onShow={() => setShowDelivered(true)} />
+            <CollapsedDelivered
+              total={counts?.Delivered ?? null}
+              value={value?.Delivered ?? null}
+              onShow={() => setShowDelivered(true)}
+            />
           )}
         </div>
       </div>
@@ -241,6 +276,21 @@ export default function KanbanBoard() {
           </div>
         ) : null}
       </DragOverlay>
+
+      {lastMove && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg bg-[#1A1A18] px-4 py-2.5 text-[13px] text-white shadow-xl">
+          <span className="tabular-nums">
+            #{String(lastMove.order.order_number).padStart(4, '0')}
+            <span className="text-[#B0B0AC]">  {lastMove.from} → {lastMove.to}</span>
+          </span>
+          <button onClick={undoMove} className="font-semibold text-[#FBBF24] hover:text-[#FCD34D] transition-colors">
+            Undo
+          </button>
+          <button onClick={dismissMove} aria-label="Dismiss" className="text-[#B0B0AC] hover:text-white transition-colors">
+            ×
+          </button>
+        </div>
+      )}
     </DndContext>
   )
 }

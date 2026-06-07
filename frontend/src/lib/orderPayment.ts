@@ -21,6 +21,29 @@ export function paymentMeta(state: PaymentState): PaymentMeta | null {
   return state === 'unbilled' ? null : META[state]
 }
 
+// Colour applied to the *paid* amount on a card (the "/ total" stays neutral):
+// green = fully paid, orange = partial, red = overdue. Pending (unpaid, not yet
+// late) and unbilled stay neutral so a fresh order isn't alarmist.
+const PAID_COLOR: Record<PaymentState, string> = {
+  completed: 'text-emerald-600',
+  partial:   'text-amber-600',
+  overdue:   'text-red-600',
+  pending:   'text-[#1A1A18]',
+  unbilled:  'text-[#1A1A18]',
+}
+
+export function paidColorClass(state: PaymentState): string {
+  return PAID_COLOR[state]
+}
+
+/** Compact ₹ for column headers: 12345 → ₹12.3K, 250000 → ₹2.5L, 0 → ₹0. */
+export function compactInr(value: string | number): string {
+  const n = Number(value) || 0
+  if (n >= 100_000) return '₹' + (n / 100_000).toFixed(n % 100_000 === 0 ? 0 : 1) + 'L'
+  if (n >= 1_000) return '₹' + (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1) + 'K'
+  return '₹' + Math.round(n).toLocaleString('en-IN')
+}
+
 export function inr(value: string | number): string {
   return Number(value).toLocaleString('en-IN')
 }

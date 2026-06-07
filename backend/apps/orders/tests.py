@@ -554,6 +554,16 @@ class BoardActionTests(_Fixture):
         self.assertEqual(resp.data['counts']['Started'], 1)
         self.assertEqual(resp.data['counts']['Delivered'], 0)
 
+    def test_value_is_summed_bill_per_column(self):
+        # Each _order bills ₹1000; column value is the summed total_amount, full total.
+        for i in range(3):
+            self._order(i + 1, 'Booked', dd_offset=i)
+        self._order(10, 'Started')
+        resp = self.client.get(self.url, {'status': 'Booked', 'limit': 1})
+        self.assertEqual(Decimal(resp.data['value']['Booked']), Decimal('3000.00'))
+        self.assertEqual(Decimal(resp.data['value']['Started']), Decimal('1000.00'))
+        self.assertEqual(Decimal(resp.data['value']['Delivered']), Decimal('0.00'))
+
     def test_delivered_default_window_excludes_old(self):
         self._order(1, 'Delivered', delivered_days_ago=5)
         self._order(2, 'Delivered', delivered_days_ago=40)

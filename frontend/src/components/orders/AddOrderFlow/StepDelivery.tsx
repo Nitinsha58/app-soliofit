@@ -86,7 +86,7 @@ function loadLabel(count: number, dateStr: string, capacity: number): string {
     case 'none': return `${label} — no other orders`
     case 'light': return `${label} — ${count} order${count === 1 ? '' : 's'}`
     case 'busy': return `${label} — ${count} orders, moderate load`
-    case 'heavy': return `${label} — ${count} orders ⚠ High load`
+    case 'heavy': return `${label} — ${count} orders, high load`
   }
 }
 
@@ -247,7 +247,6 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
           onClick={() => selectDate(suggested.date)}
           className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium py-2 hover:bg-emerald-100 transition-colors"
         >
-          <span>💡</span>
           Suggested: {new Date(suggested.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
           {' '}— {suggested.count} of {capacity} capacity{bufferDays > 0 ? `, ${bufferDays}+ days out` : ''}
         </button>

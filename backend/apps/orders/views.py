@@ -277,13 +277,17 @@ class OrderViewSet(viewsets.ModelViewSet):
         next_cursor = self._encode_cursor(rows[-1], is_delivered) if (has_more and rows) else None
 
         # Per-status totals (clean base — no per-row annotations to keep GROUP BY simple).
+        # `counts` = order count; `value` = summed bill (total_amount) per column.
         base = Order.objects.filter(user=request.user, deleted_at__isnull=True)
         counts = {s: 0 for s in Order.Status.values}
-        for row in base.order_by().values('status').annotate(c=Count('id')):
+        value = {s: '0.00' for s in Order.Status.values}
+        for row in base.order_by().values('status').annotate(c=Count('id'), v=Sum('total_amount')):
             counts[row['status']] = row['c']
+            value[row['status']] = str(row['v'] or Decimal('0.00'))
 
         return Response({
             'results': OrderSerializer(rows, many=True, context={'request': request}).data,
             'next_cursor': next_cursor,
             'counts': counts,
+            'value': value,
         })
