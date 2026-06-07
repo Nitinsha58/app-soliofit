@@ -32,10 +32,10 @@ function Section({ title, description, children }: { title: string; description?
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-[#1A1A18] mb-1">{label}</label>
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-[#1A1A18] mb-1">{label}</label>
       {children}
     </div>
   )
@@ -197,20 +197,20 @@ export default function SettingsPage() {
         {/* Profile */}
         <Section title="Profile" description="Your boutique details, shown across the app.">
           <form onSubmit={saveProfile} className="space-y-4">
-            <Field label="Business name">
-              <input className={inputClass} value={profile.business_name}
+            <Field label="Business name" htmlFor="business_name">
+              <input id="business_name" className={inputClass} value={profile.business_name}
                 onChange={(e) => setProfile({ ...profile, business_name: e.target.value })} placeholder="My Boutique" />
             </Field>
-            <Field label="Owner name">
-              <input className={inputClass} value={profile.owner_name}
+            <Field label="Owner name" htmlFor="owner_name">
+              <input id="owner_name" className={inputClass} value={profile.owner_name}
                 onChange={(e) => setProfile({ ...profile, owner_name: e.target.value })} placeholder="Your name" />
             </Field>
-            <Field label="Phone">
-              <input className={inputClass} value={profile.phone} inputMode="tel"
+            <Field label="Phone" htmlFor="phone">
+              <input id="phone" className={inputClass} value={profile.phone} inputMode="tel"
                 onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Contact number" />
             </Field>
-            <Field label="Email">
-              <input className={`${inputClass} bg-[#F7F7F5] text-[#6B6B67] cursor-not-allowed`} value={user?.email ?? ''} disabled />
+            <Field label="Email" htmlFor="email">
+              <input id="email" className={`${inputClass} bg-[#F7F7F5] text-[#6B6B67] cursor-not-allowed`} value={user?.email ?? ''} disabled />
             </Field>
             <div className="flex items-center gap-3">
               <SaveButton saving={profileSaving}>Save profile</SaveButton>
@@ -222,16 +222,16 @@ export default function SettingsPage() {
         {/* Password */}
         <Section title="Change password">
           <form onSubmit={savePassword} className="space-y-4">
-            <Field label="Current password">
-              <input type="password" autoComplete="current-password" className={inputClass} value={pw.old_password}
+            <Field label="Current password" htmlFor="current_password">
+              <input id="current_password" type="password" autoComplete="current-password" className={inputClass} value={pw.old_password}
                 onChange={(e) => setPw({ ...pw, old_password: e.target.value })} />
             </Field>
-            <Field label="New password">
-              <input type="password" autoComplete="new-password" className={inputClass} value={pw.new_password}
+            <Field label="New password" htmlFor="new_password">
+              <input id="new_password" type="password" autoComplete="new-password" className={inputClass} value={pw.new_password}
                 onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
             </Field>
-            <Field label="Confirm new password">
-              <input type="password" autoComplete="new-password" className={inputClass} value={pw.confirm}
+            <Field label="Confirm new password" htmlFor="confirm_password">
+              <input id="confirm_password" type="password" autoComplete="new-password" className={inputClass} value={pw.confirm}
                 onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
             </Field>
             <div className="flex items-center gap-3">
@@ -246,13 +246,13 @@ export default function SettingsPage() {
         {/* Order settings */}
         <Section title="Order settings" description="Defaults used when booking orders and sizing your calendar workload.">
           <form onSubmit={saveOrderSettings} className="space-y-4">
-            <Field label="Default delivery buffer (days)">
-              <input type="number" min={0} max={60} className={inputClass} value={os.delivery_buffer_days}
+            <Field label="Default delivery buffer (days)" htmlFor="delivery_buffer_days">
+              <input id="delivery_buffer_days" type="number" min={0} max={60} className={inputClass} value={os.delivery_buffer_days}
                 onChange={(e) => setOs({ ...os, delivery_buffer_days: Math.max(0, Number(e.target.value) || 0) })} />
               <p className="text-xs text-[#6B6B67] mt-1">Add-Order suggests dates at least this many days out.</p>
             </Field>
-            <Field label="Daily capacity (garments/day)">
-              <input type="number" min={1} max={100} className={inputClass} value={os.daily_capacity}
+            <Field label="Daily capacity (garments/day)" htmlFor="daily_capacity">
+              <input id="daily_capacity" type="number" min={1} max={100} className={inputClass} value={os.daily_capacity}
                 onChange={(e) => setOs({ ...os, daily_capacity: Math.max(1, Number(e.target.value) || 1) })} />
               <p className="text-xs text-[#6B6B67] mt-1">Drives the calendar workload colouring and date suggestions.</p>
             </Field>

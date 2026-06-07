@@ -90,6 +90,10 @@ class OrderSettingsTests(_Fixture):
         resp = self.client.patch(self.url, {'daily_capacity': -1}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_zero_capacity_rejected(self):
+        resp = self.client.patch(self.url, {'daily_capacity': 0}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class NotificationPreferenceTests(_Fixture):
     url = '/api/auth/notification-preferences/'

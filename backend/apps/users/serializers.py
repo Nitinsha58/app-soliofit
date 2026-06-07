@@ -26,6 +26,12 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
+    # daily_capacity must be >= 1: a capacity of 0 makes `load < daily_capacity`
+    # unsatisfiable, which would silently hide the Add-Order suggestion. Bounds
+    # mirror the Settings form inputs.
+    delivery_buffer_days = serializers.IntegerField(min_value=0, max_value=60, required=False)
+    daily_capacity = serializers.IntegerField(min_value=1, max_value=100, required=False)
+
     class Meta:
         model = UserSettings
         fields = ['delivery_buffer_days', 'daily_capacity']

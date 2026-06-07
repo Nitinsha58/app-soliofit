@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchCalendar } from '@/lib/api/calendar'
 import { listOrders } from '@/lib/api/orders'
+import { getOrderSettings } from '@/lib/api/auth'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
 import NotificationBell from '@/components/dashboard/NotificationBell'
@@ -30,10 +31,12 @@ function fmtMoney(s: string | number): string {
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const WEEKDAYS    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
-// Single workload cue: Light 0–2 green / Busy 3–5 amber / Overloaded 6+ red.
-function workloadDot(workload: number): string {
-  if (workload >= 6) return 'bg-red-500'
-  if (workload >= 3) return 'bg-amber-500'
+// Single workload cue, relative to the user's daily_capacity:
+// Overloaded (red) at/over capacity · Busy (amber) from half capacity · Light (green) below.
+// At the default capacity of 6 this reproduces the original 0–2 / 3–5 / 6+ bands.
+function workloadDot(workload: number, capacity: number): string {
+  if (workload >= capacity) return 'bg-red-500'
+  if (workload >= Math.ceil(capacity / 2)) return 'bg-amber-500'
   return 'bg-emerald-500'
 }
 
@@ -145,6 +148,10 @@ export default function CalendarPage() {
     queryFn: () => fetchCalendar(year, monthIndex + 1),
     staleTime: 30_000,
   })
+
+  // Daily capacity drives the workload-dot thresholds (falls back to 6).
+  const { data: settings } = useQuery({ queryKey: ['order-settings'], queryFn: getOrderSettings })
+  const capacity = settings?.daily_capacity ?? 6
 
   // Monday-start grid covering exactly the weeks the month spans (5 or 6 rows).
   const monthStart   = new Date(year, monthIndex, 1)
@@ -269,7 +276,7 @@ export default function CalendarPage() {
                     </span>
                   )}
                   {info && info.workload > 0 && (
-                    <span className={`w-2 h-2 rounded-full ${workloadDot(info.workload)}`} aria-label="Workload" />
+                    <span className={`w-2 h-2 rounded-full ${workloadDot(info.workload, capacity)}`} aria-label="Workload" />
                   )}
                 </div>
 

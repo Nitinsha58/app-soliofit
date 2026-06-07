@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { getDeliveryLoad } from '@/lib/api/orders'
 import { getOrderSettings } from '@/lib/api/auth'
 
-const HIGH_LOAD = 13 // matches the red cell threshold below — triggers the soft confirm
+const HIGH_LOAD = 13 // absolute "very heavy" escalation, independent of capacity
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = [
@@ -43,33 +43,51 @@ function toDateStr(year: number, month: number, day: number): string {
   return `${year}-${pad(month + 1)}-${pad(day)}`
 }
 
-function cellBg(count: number): string {
-  if (count === 0) return ''
-  if (count <= 5) return 'bg-emerald-50'
-  if (count <= 12) return 'bg-amber-50'
-  return 'bg-red-50'
+// Workload band relative to the user's daily_capacity. At the default capacity
+// of 6 this gives light 1–2 / busy 3–5 / heavy 6+, matching the Calendar dots.
+type Band = 'none' | 'light' | 'busy' | 'heavy'
+function band(count: number, capacity: number): Band {
+  if (count === 0) return 'none'
+  if (count < Math.ceil(capacity / 2)) return 'light'
+  if (count < capacity) return 'busy'
+  return 'heavy'
 }
 
-function countColor(count: number): string {
-  if (count <= 5) return 'text-emerald-600'
-  if (count <= 12) return 'text-amber-600'
-  return 'text-red-600'
+function cellBg(count: number, capacity: number): string {
+  switch (band(count, capacity)) {
+    case 'none': return ''
+    case 'light': return 'bg-emerald-50'
+    case 'busy': return 'bg-amber-50'
+    case 'heavy': return 'bg-red-50'
+  }
 }
 
-function loadBgWhenSelected(count: number): string {
-  if (count === 0) return 'text-[#6B6B67]'
-  if (count <= 5) return 'text-emerald-700'
-  if (count <= 12) return 'text-amber-700'
-  return 'text-red-700'
+function countColor(count: number, capacity: number): string {
+  switch (band(count, capacity)) {
+    case 'busy': return 'text-amber-600'
+    case 'heavy': return 'text-red-600'
+    default: return 'text-emerald-600'
+  }
 }
 
-function loadLabel(count: number, dateStr: string): string {
+function loadBgWhenSelected(count: number, capacity: number): string {
+  switch (band(count, capacity)) {
+    case 'none': return 'text-[#6B6B67]'
+    case 'light': return 'text-emerald-700'
+    case 'busy': return 'text-amber-700'
+    case 'heavy': return 'text-red-700'
+  }
+}
+
+function loadLabel(count: number, dateStr: string, capacity: number): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const label = new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-  if (count === 0) return `${label} — no other orders`
-  if (count <= 5) return `${label} — ${count} order${count === 1 ? '' : 's'}`
-  if (count <= 12) return `${label} — ${count} orders, moderate load`
-  return `${label} — ${count} orders ⚠ High load`
+  switch (band(count, capacity)) {
+    case 'none': return `${label} — no other orders`
+    case 'light': return `${label} — ${count} order${count === 1 ? '' : 's'}`
+    case 'busy': return `${label} — ${count} orders, moderate load`
+    case 'heavy': return `${label} — ${count} orders ⚠ High load`
+  }
 }
 
 function addDays(d: Date, n: number): Date {
@@ -200,14 +218,14 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
               className={`
                 relative flex flex-col items-center justify-center rounded-lg py-2 text-xs font-medium transition-all
                 ${isSelected ? 'bg-[#C8952A] text-white' : ''}
-                ${!isSelected && !isPast ? `cursor-pointer hover:brightness-95 text-[#1A1A18] ${cellBg(count)}` : ''}
+                ${!isSelected && !isPast ? `cursor-pointer hover:brightness-95 text-[#1A1A18] ${cellBg(count, capacity)}` : ''}
                 ${isPast ? 'text-[#C8C8C4] cursor-not-allowed' : ''}
                 ${isToday && !isSelected ? 'ring-1 ring-[#C8952A] ring-inset' : ''}
               `}
             >
               <span className="leading-none">{day}</span>
               {count > 0 && !isSelected && !isPast && (
-                <span className={`text-[9px] font-bold leading-none mt-0.5 ${countColor(count)}`}>
+                <span className={`text-[9px] font-bold leading-none mt-0.5 ${countColor(count, capacity)}`}>
                   {count}
                 </span>
               )}
@@ -217,8 +235,8 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
       </div>
 
       {value && selectedLoad !== null && (
-        <p className={`mt-3 text-xs text-center font-medium ${loadBgWhenSelected(selectedLoad)}`}>
-          {loadLabel(selectedLoad, value)}
+        <p className={`mt-3 text-xs text-center font-medium ${loadBgWhenSelected(selectedLoad, capacity)}`}>
+          {loadLabel(selectedLoad, value, capacity)}
         </p>
       )}
 
@@ -235,10 +253,15 @@ export default function StepDelivery({ value, onChange, onNext, onBack }: Props)
         </button>
       )}
 
-      {/* O4 soft confirm — heavy-load day selected (non-blocking) */}
-      {value && selectedLoad !== null && selectedLoad >= HIGH_LOAD && (
+      {/* O4 soft confirm — selected day is at/over capacity (non-blocking).
+          Escalates wording past the absolute HIGH_LOAD mark. */}
+      {value && selectedLoad !== null && selectedLoad >= capacity && (
         <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
-          <p className="font-medium">This day is heavily loaded ({selectedLoad} orders).</p>
+          <p className="font-medium">
+            {selectedLoad >= HIGH_LOAD
+              ? `This day is very heavily loaded (${selectedLoad} orders).`
+              : `This day is at or over your daily capacity (${selectedLoad} of ${capacity}).`}
+          </p>
           {suggested && suggested.date !== value && (
             <button
               type="button"
