@@ -26,7 +26,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-13 | Customer profile | All 3 tabs: orders, payments, media | Done |
 | VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Done |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Done |
-| VS-15 | Calendar | Month view with workload coloring, date drill-down | Pending |
+| VS-15 | Calendar | Month view with workload coloring, date drill-down | Done |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
@@ -54,9 +54,10 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-13 | Customer profile | Done |
 | VS-14 | Global search | Done |
 | VS-15a | Orders Schedule | Done |
-| VS-15 | Calendar | **Active** |
+| VS-15 | Calendar | Done |
+| VS-16 | Settings | **Active** |
 
-_Window reviewed: 2026-06-04 (after VS-15a completion). Next review after VS-16._
+_Window reviewed: 2026-06-07 (after VS-15 completion). Next review after VS-16._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -503,7 +504,13 @@ Within the same tier: sort by `created_at` ascending.
 
 ---
 
-### VS-15 — Calendar
+### VS-15 — Calendar ✓
+
+**Completion record:** Commits `3b1b03b` → `332cd2d` → `cbcbda6` · Deviations: kept the existing `/api/calendar/` path (reworked payload) instead of a new `calendar-summary` action; preserved the approved workload-dot + late-pill model rather than the reference's single On-track/Busy/Overdue dot; omitted the reference's "Filters" button (no filter feature exists); dropped the pickup chip (not modelled in MVP). Calendar reached via Dashboard shortcut + Orders toolbar button — mobile bottom nav stays at 5 items.
+
+Backend: `CalendarView` (`apps/orders/calendar_views.py`) at `GET /api/calendar/?year=&month=` returns per-date `{deliveries, payments, payment_amount, late, workload}` via aggregate `.values().annotate()` (no N+1); unpaid `Installment` due-dates drive payment counts/amounts; `late` = past-due undelivered deliveries. 31/31 orders tests pass (incl. `CalendarViewTests` + `OrderNumberRaceTests`); media presign validation added with 9 tests.
+
+Frontend (`/calendar`): month grid (Monday-start, 5/6 dynamic rows), proportionate `min-h-[84px]` scrollable cells, today = filled accent circle, single workload dot (green 0–2 / amber 3–5 / red 6+), red "N late" pill, neutral 🚚/₹ event chips. Three summary cards (deliveries today / amount to collect / overdue) matching the reference top-nav; bold month header + green "Today" pill + notification bell. Mobile (375px) summary card stacks vertically so the amount renders without truncation (`cbcbda6`). Date tap → right panel (desktop) / bottom sheet (mobile) reusing `ScheduleCard`. Workload thresholds upgrade to capacity-based once VS-16 ships `daily_capacity`.
 
 **What:** Clean-minimal month view — per-day workload overview + date drill-down (per the `01` cell spec).
 
