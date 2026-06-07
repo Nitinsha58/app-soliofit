@@ -60,10 +60,12 @@ function SummaryCard({ icon, boxClass, value, label }: {
   icon: React.ReactNode; boxClass: string; value: string; label: string
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#ECEEF3] px-2.5 py-2 min-w-0">
-      <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${boxClass}`}>{icon}</span>
+    // Mobile: stack (icon on top) so the amount gets the card's full width and
+    // never truncates at 375px. sm+: icon-left horizontal row.
+    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 rounded-lg border border-[#ECEEF3] px-2 sm:px-2.5 py-2 min-w-0">
+      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${boxClass}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-[15px] font-extrabold text-[#0A0F1E] leading-tight tabular-nums truncate">{value}</p>
+        <p className="text-[13px] sm:text-[15px] font-extrabold text-[#0A0F1E] leading-tight tabular-nums whitespace-nowrap sm:truncate">{value}</p>
         <p className="text-[10px] text-[#6B6B67] leading-tight">{label}</p>
       </div>
     </div>
