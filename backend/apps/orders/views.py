@@ -1,10 +1,13 @@
+import base64
+import json
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, DecimalField, Exists, Max, OuterRef, Subquery, Sum, Value
+from django.db.models import Count, DecimalField, Exists, Max, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -188,3 +191,85 @@ class OrderViewSet(viewsets.ModelViewSet):
             .annotate(count=Count('id'))
         )
         return Response({str(row['delivery_date']): row['count'] for row in qs})
+
+    # ── VS-20: per-column keyset board (see ADR-0006) ──────────────────────────
+    DELIVERED_WINDOW_DAYS = 30
+
+    @staticmethod
+    def _encode_cursor(order, is_delivered):
+        if is_delivered:
+            payload = {'da': order.delivered_at.isoformat() if order.delivered_at else None,
+                       'id': str(order.id)}
+        else:
+            payload = {'dd': order.delivery_date.isoformat(),
+                       'ca': order.created_at.isoformat(), 'id': str(order.id)}
+        return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+    @staticmethod
+    def _decode_cursor(cursor, is_delivered):
+        try:
+            payload = json.loads(base64.urlsafe_b64decode(cursor.encode()))
+            if is_delivered:
+                return parse_datetime(payload['da']), payload['id']
+            return parse_date(payload['dd']), parse_datetime(payload['ca']), payload['id']
+        except Exception:
+            raise ValidationError({'cursor': 'Invalid cursor.'})
+
+    @action(detail=False, methods=['get'], url_path='board')
+    def board(self, request):
+        """One status column, keyset-paged. Active columns sort by
+        (delivery_date, created_at, id) asc; Delivered by (delivered_at, id) desc
+        with a recent-window default and an `older=true` mode."""
+        status_param = request.query_params.get('status')
+        if status_param not in Order.Status.values:
+            return Response(
+                {'detail': f'A valid status is required. Choices: {", ".join(Order.Status.values)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 50))
+        cursor = request.query_params.get('cursor')
+        is_delivered = status_param == Order.Status.DELIVERED
+
+        qs = self.get_queryset().filter(status=status_param)
+
+        if is_delivered:
+            cutoff = timezone.now() - timedelta(days=self.DELIVERED_WINDOW_DAYS)
+            older = request.query_params.get('older') in ('1', 'true', 'True')
+            if older:
+                qs = qs.filter(delivered_at__lt=cutoff)
+            else:
+                qs = qs.filter(Q(delivered_at__gte=cutoff) | Q(delivered_at__isnull=True))
+            qs = qs.order_by('-delivered_at', '-id')
+            if cursor:
+                da, cid = self._decode_cursor(cursor, is_delivered=True)
+                qs = qs.filter(Q(delivered_at__lt=da) | Q(delivered_at=da, id__lt=cid))
+        else:
+            qs = qs.order_by('delivery_date', 'created_at', 'id')
+            if cursor:
+                dd, ca, cid = self._decode_cursor(cursor, is_delivered=False)
+                qs = qs.filter(
+                    Q(delivery_date__gt=dd)
+                    | Q(delivery_date=dd, created_at__gt=ca)
+                    | Q(delivery_date=dd, created_at=ca, id__gt=cid)
+                )
+
+        rows = list(qs[:limit + 1])
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        next_cursor = self._encode_cursor(rows[-1], is_delivered) if (has_more and rows) else None
+
+        # Per-status totals (clean base — no per-row annotations to keep GROUP BY simple).
+        base = Order.objects.filter(user=request.user, deleted_at__isnull=True)
+        counts = {s: 0 for s in Order.Status.values}
+        for row in base.order_by().values('status').annotate(c=Count('id')):
+            counts[row['status']] = row['c']
+
+        return Response({
+            'results': OrderSerializer(rows, many=True, context={'request': request}).data,
+            'next_cursor': next_cursor,
+            'counts': counts,
+        })

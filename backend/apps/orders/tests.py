@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -503,3 +504,90 @@ class StatusFunnelDeliveredAtTests(_Fixture):
         self.order.refresh_from_db()
         self.assertEqual(self.order.delivered_at, first)
         self.assertEqual(OrderActivity.objects.filter(order=self.order).count(), marks_before)
+
+
+class BoardActionTests(_Fixture):
+    """VS-20 Unit 2 — per-column keyset board action."""
+
+    url = '/api/orders/board/'
+
+    def _order(self, num, status_='Booked', dd_offset=0, delivered_days_ago=None):
+        o = Order.objects.create(
+            user=self.user, customer=self.customer, order_number=num, status=status_,
+            delivery_date=date.today() + timedelta(days=dd_offset), total_amount=Decimal('1000.00'),
+        )
+        if delivered_days_ago is not None:
+            o.delivered_at = timezone.now() - timedelta(days=delivered_days_ago)
+            o.save(update_fields=['delivered_at'])
+        return o
+
+    def test_requires_valid_status(self):
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.url, {'status': 'Nope'}).status_code,
+                         status.HTTP_400_BAD_REQUEST)
+
+    def test_active_column_keyset_pages_all_rows_once_in_order(self):
+        for i in range(5):
+            self._order(i + 1, 'Booked', dd_offset=i)
+        seen, cursor = [], None
+        for _ in range(10):  # safety bound
+            params = {'status': 'Booked', 'limit': 2}
+            if cursor:
+                params['cursor'] = cursor
+            resp = self.client.get(self.url, params)
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            seen.extend(o['order_number'] for o in resp.data['results'])
+            cursor = resp.data['next_cursor']
+            if not cursor:
+                break
+        self.assertEqual(seen, [1, 2, 3, 4, 5])  # delivery_date ascending, no dup/skip
+
+    def test_counts_are_totals_regardless_of_page(self):
+        for i in range(3):
+            self._order(i + 1, 'Booked', dd_offset=i)
+        self._order(10, 'Started')
+        resp = self.client.get(self.url, {'status': 'Booked', 'limit': 1})
+        self.assertEqual(len(resp.data['results']), 1)  # page is small
+        self.assertEqual(resp.data['counts']['Booked'], 3)  # count is the total
+        self.assertEqual(resp.data['counts']['Started'], 1)
+        self.assertEqual(resp.data['counts']['Delivered'], 0)
+
+    def test_delivered_default_window_excludes_old(self):
+        self._order(1, 'Delivered', delivered_days_ago=5)
+        self._order(2, 'Delivered', delivered_days_ago=40)
+        resp = self.client.get(self.url, {'status': 'Delivered'})
+        self.assertEqual([o['order_number'] for o in resp.data['results']], [1])
+
+    def test_delivered_older_mode_returns_old_only(self):
+        self._order(1, 'Delivered', delivered_days_ago=5)
+        self._order(2, 'Delivered', delivered_days_ago=40)
+        resp = self.client.get(self.url, {'status': 'Delivered', 'older': 'true'})
+        self.assertEqual([o['order_number'] for o in resp.data['results']], [2])
+
+    def test_delivered_sorted_newest_completed_first(self):
+        self._order(1, 'Delivered', delivered_days_ago=2)
+        self._order(2, 'Delivered', delivered_days_ago=10)
+        self._order(3, 'Delivered', delivered_days_ago=1)
+        resp = self.client.get(self.url, {'status': 'Delivered'})
+        self.assertEqual([o['order_number'] for o in resp.data['results']], [3, 1, 2])
+
+    def test_results_carry_payment_annotations(self):
+        self._order(1, 'Booked')
+        resp = self.client.get(self.url, {'status': 'Booked'})
+        self.assertIn('payment_state', resp.data['results'][0])
+        self.assertIn('amount_paid', resp.data['results'][0])
+
+    def test_invalid_cursor_returns_400(self):
+        self._order(1, 'Booked')
+        resp = self.client.get(self.url, {'status': 'Booked', 'cursor': '!!!not-valid!!!'})
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_board_excludes_other_users(self):
+        self._order(1, 'Booked')
+        other = User.objects.create_user(email='x@test.com', password='p')
+        oc = Customer.objects.create(user=other, name='Z', phone='7')
+        Order.objects.create(user=other, customer=oc, order_number=99, status='Booked',
+                             delivery_date=date.today(), total_amount=Decimal('1.00'))
+        resp = self.client.get(self.url, {'status': 'Booked'})
+        self.assertEqual(len(resp.data['results']), 1)
+        self.assertEqual(resp.data['counts']['Booked'], 1)
