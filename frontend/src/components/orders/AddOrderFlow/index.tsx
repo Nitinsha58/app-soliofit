@@ -115,9 +115,9 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
       if (draft.pendingVoice) {
         const { blob, duration } = draft.pendingVoice
         const ext = blob.type.includes('ogg') ? '.ogg' : '.webm'
-        presignUpload('voice-notes', `recording${ext}`, blob.type || 'audio/webm')
-          .then(({ upload_url, public_url, s3_key }) =>
-            uploadToStorage(upload_url, new File([blob], `recording${ext}`, { type: blob.type }))
+        presignUpload('voice-notes', `recording${ext}`, blob.type || 'audio/webm', blob.size)
+          .then(({ upload_url, public_url, s3_key, content_type }) =>
+            uploadToStorage(upload_url, new File([blob], `recording${ext}`, { type: blob.type }), content_type)
               .then(() => saveVoiceNote(order.id, s3_key, public_url, Math.round(duration)))
           )
           .catch(() => {})

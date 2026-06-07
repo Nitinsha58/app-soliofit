@@ -122,12 +122,13 @@ export default function MicButton({ orderId, onNoteAdded }: Props) {
     setIsUploading(true)
     try {
       const ext = blob.type.includes('ogg') ? '.ogg' : '.webm'
-      const { upload_url, public_url, s3_key } = await presignUpload(
+      const { upload_url, public_url, s3_key, content_type } = await presignUpload(
         'voice-notes',
         `recording${ext}`,
         blob.type || 'audio/webm',
+        blob.size,
       )
-      await uploadToStorage(upload_url, new File([blob], `recording${ext}`, { type: blob.type }))
+      await uploadToStorage(upload_url, new File([blob], `recording${ext}`, { type: blob.type }), content_type)
       const note = await saveVoiceNote(orderId, s3_key, public_url, Math.round(durationSecs))
       if (mountedRef.current) { onNoteAdded(note); setIsUploading(false) }
     } catch {

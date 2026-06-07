@@ -17,15 +17,59 @@ def _use_stub():
     return not getattr(settings, 'S3_BUCKET_NAME', '')
 
 
+# Only the folders the app actually uploads to. Anything else (incl. path-like
+# input such as '../') is rejected — the s3_key prefix is never client-trusted.
+ALLOWED_FOLDERS = {'photos', 'voice-notes'}
+
+# Allowed upload MIME types → file extension. Extension is derived from the
+# validated content type, never from the client-supplied filename suffix.
+CONTENT_TYPE_EXT = {
+    'image/jpeg': '.jpg',
+    'image/png':  '.png',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'audio/webm': '.webm',
+    'audio/mp4':  '.m4a',
+    'audio/mpeg': '.mp3',
+    'audio/ogg':  '.ogg',
+}
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
 class PresignView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        folder       = request.data.get('folder', 'photos')
-        filename     = request.data.get('filename', 'upload')
-        content_type = request.data.get('content_type', 'image/jpeg')
+        folder   = request.data.get('folder', 'photos')
+        if folder not in ALLOWED_FOLDERS:
+            return Response({'detail': 'Invalid folder.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        ext     = Path(filename).suffix or '.jpg'
+        # Normalize off codec suffixes, e.g. 'audio/webm;codecs=opus' → 'audio/webm'.
+        raw_ct       = request.data.get('content_type') or 'image/jpeg'
+        content_type = raw_ct.split(';', 1)[0].strip().lower()
+        if content_type not in CONTENT_TYPE_EXT:
+            return Response(
+                {'detail': f'Unsupported content type: {content_type}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Advisory size guard (client-declared). Hard enforcement would require a
+        # presigned POST with content-length-range — deferred to a storage pass.
+        size = request.data.get('size')
+        if size is not None:
+            try:
+                size_int = int(size)
+            except (TypeError, ValueError):
+                return Response({'detail': 'Invalid size.'}, status=status.HTTP_400_BAD_REQUEST)
+            if size_int > MAX_UPLOAD_BYTES:
+                return Response(
+                    {'detail': f'File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        ext     = CONTENT_TYPE_EXT[content_type]
         s3_key  = f"{folder}/{uuid.uuid4()}{ext}"
 
         if _use_stub():
@@ -52,7 +96,12 @@ class PresignView(APIView):
                 f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
             )
 
-        return Response({'upload_url': upload_url, 'public_url': public_url, 's3_key': s3_key})
+        return Response({
+            'upload_url': upload_url,
+            'public_url': public_url,
+            's3_key': s3_key,
+            'content_type': content_type,
+        })
 
 
 class StubUploadView(APIView):

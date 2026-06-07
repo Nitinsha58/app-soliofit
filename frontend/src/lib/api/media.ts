@@ -41,18 +41,26 @@ export async function presignUpload(
   folder: string,
   filename: string,
   contentType: string,
-): Promise<{ upload_url: string; public_url: string; s3_key: string }> {
+  size?: number,
+): Promise<{ upload_url: string; public_url: string; s3_key: string; content_type: string }> {
   return apiRequest('/api/upload/presign/', {
     method: 'POST',
-    body: JSON.stringify({ folder, filename, content_type: contentType }),
+    body: JSON.stringify({ folder, filename, content_type: contentType, size }),
   })
 }
 
-export async function uploadToStorage(uploadUrl: string, file: File): Promise<void> {
+// contentType MUST be the value returned by presignUpload — a presigned PUT pins the
+// exact ContentType it was signed with, so the upload header has to match it (a raw
+// blob.type with a codec suffix would 403 on S3).
+export async function uploadToStorage(
+  uploadUrl: string,
+  file: File,
+  contentType: string,
+): Promise<void> {
   const res = await fetch(uploadUrl, {
     method: 'PUT',
     body: file,
-    headers: { 'Content-Type': file.type },
+    headers: { 'Content-Type': contentType },
   })
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
 }
@@ -82,11 +90,12 @@ export async function uploadPhoto(
   file: File,
   photoType: 'garment' | 'notes',
 ): Promise<OrderPhoto> {
-  const { upload_url, public_url, s3_key } = await presignUpload(
+  const { upload_url, public_url, s3_key, content_type } = await presignUpload(
     'photos',
     file.name,
     file.type || 'image/jpeg',
+    file.size,
   )
-  await uploadToStorage(upload_url, file)
+  await uploadToStorage(upload_url, file, content_type)
   return savePhoto(orderId, s3_key, public_url, photoType)
 }
