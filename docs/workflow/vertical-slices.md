@@ -659,11 +659,11 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 
 **Backend (`orders`):**
 - **Pagination is opt-in via a dedicated board action** — `GET /api/orders/board/?status=Booked&cursor=<opaque>&limit=20`. The default `GET /api/orders/` list is **unchanged** (returns a plain `Order[]`), so no existing caller's response shape changes.
-- Stable sort tuple `(delivery_date, created_at, id)`; the opaque cursor encodes the last row's tuple. `limit` default 20, capped (≤50). Keyset (not offset) so concurrent drags/creates/deletes don't skip or duplicate rows mid-scroll.
+- Per-column sort: active columns by `(delivery_date, created_at, id)` asc (soonest due first); Delivered by `(delivered_at, id)` desc (newest completed first). The opaque cursor encodes the relevant tuple. `limit` default 20, capped (≤50). Keyset (not offset) so concurrent drags/creates/deletes don't skip or duplicate rows mid-scroll.
 - Board response: `{ results: [...], next_cursor: <opaque|null>, counts: { Booked, Started, Ready, "Partial Delivery", Delivered } }`. `counts` are full per-status **totals**, from a single grouped aggregate query (no N+1). `results` keep the VS-19 `amount_paid` / `has_delayed_installment` annotations.
 - **Status changes funnel through `PATCH /api/orders/{id}/status/` only** (status is a domain event, not a field edit — it sets/clears `delivered_at`, writes activity, and changes board membership). `status` becomes read-only in `OrderSerializer`; `partial_update` **rejects** an incoming `status` with a 400 ("Use /status/ to change order status.") rather than silently ignoring it. `update_status` is the single transactional path: idempotent on a no-op; sets `delivered_at = now()` when moving **into** Delivered (previous status ≠ Delivered), clears it when moving out; writes the `DELIVERY_MARKED` / `PARTIAL_DELIVERY` / `STATUS_CHANGED` activity. (Also fixes the latent bug where QuickActions "Mark Delivered" PATCHed status and logged no activity.)
 - New nullable `Order.delivered_at`. Data migration backfills existing Delivered orders from the latest `DELIVERY_MARKED` activity timestamp (fallback `updated_at`); add an index over `(user, status, delivered_at)`.
-- Delivered column: the default page returns only `delivered_at >= today − 30 days`; older Delivered remain reachable via continued cursor ("show older"), not permanently excluded.
+- Delivered column: default window returns `delivered_at >= today − 30 days` (keyset by `delivered_at` desc); an explicit `older=true` mode returns `delivered_at < cutoff` behind a "show older" affordance — deferred, not excluded.
 - Every non-board consumer keeps the legacy `GET /api/orders/` → `Order[]` contract: the Orders Schedule (`/orders`, date-range filtered), the calendar day drill-down (single-date), the customer profile (customer filtered), and the `delivery-load` aggregate. None use the cursor.
 
 **Frontend:**
@@ -672,7 +672,11 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 - Board columns use React Query `useInfiniteQuery` keyed `[orders-board, status]`, `getNextPageParam = next_cursor`; append on an IntersectionObserver sentinel near the column bottom.
 - Column header shows the true total from `counts`; loaded-vs-total kept subtle.
 - Drag-and-drop: optimistically move the card on status change, then invalidate/refetch the **source and destination** column's first page (membership + counts change) — no full-board reload.
-- Delivered column shows a "Show older delivered" affordance while `next_cursor` continues.
+- **Touch-safe DnD:** configure a small activation delay/distance on the pointer/touch sensor so scrolling on phone/tablet doesn't accidentally start a drag (distinguish scroll vs drag intent).
+- **Recently-moved highlight:** a card just dropped into a new status gets a brief light status-colored border to confirm the change, then fades.
+- The **Delivered column always renders its droppable zone** (header + count + "show older") even when it defers aged cards, so a drop lands and the newly-delivered card appears at the top of the recent window (it gets `delivered_at = now()`).
+- Delivered column shows a "Show older delivered" affordance that fetches the `older=true` window while `next_cursor` continues.
+- During drag, auto-scroll the board horizontally near the edges so offscreen columns (e.g. Delivered) are reachable — or carry as a VS-17 mobile-polish item if dnd-kit autoscroll proves involved.
 - `ScheduleView` (`/orders`) is **unchanged** — it groups by delivery date over the visible week via the legacy `listOrders()`, not the per-column cursor.
 
 **Review checkpoint:** A column with 60+ orders loads ~20, scroll fetches more, header shows the true total. Drag a card across columns → both counts update, no duplicate/disappeared cards. Delivered shows recent first; "show older" pulls the rest. Per-page query count stays flat (no N+1; `amount_paid` still annotated). Calendar and customer-profile lists unchanged.
