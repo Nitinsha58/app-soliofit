@@ -1,6 +1,7 @@
 'use client'
 
 import type { Order } from '@/lib/api/orders'
+import { paymentMeta, inr } from '@/lib/orderPayment'
 
 interface Props {
   order: Order
@@ -16,6 +17,8 @@ const STATUS_COLORS: Record<Order['status'], string> = {
 }
 
 export default function ScheduleCard({ order, onClick }: Props) {
+  const pay = paymentMeta(order.payment_state)
+  const remaining = Number(order.remaining)
   return (
     <button
       type="button"
@@ -40,17 +43,27 @@ export default function ScheduleCard({ order, onClick }: Props) {
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_COLORS[order.status]}`}>
           {order.status}
         </span>
-        {order.has_delayed_installment && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-sm bg-red-50 text-red-600">
-            Delayed
+        {pay && (
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${pay.pillClass}`}>
+            {pay.label}
           </span>
         )}
       </div>
 
-      {/* Bill amount */}
-      <p className="text-[12px] font-bold text-[#1A1A18] tabular-nums mt-1.5 leading-none">
-        ₹{Number(order.total_amount).toLocaleString('en-IN')}
-      </p>
+      {/* Amount: paid / total (+ remaining), or plain bill when unbilled */}
+      {pay ? (
+        <p className="text-[12px] tabular-nums mt-1.5 leading-none">
+          <span className="font-bold text-[#1A1A18]">₹{inr(order.amount_paid)}</span>
+          <span className="font-semibold text-[#94A3B8]"> / ₹{inr(order.total_amount)}</span>
+          {remaining > 0 && (
+            <span className="font-medium text-[#64748B]"> · ₹{inr(order.remaining)} due</span>
+          )}
+        </p>
+      ) : (
+        <p className="text-[12px] font-bold text-[#1A1A18] tabular-nums mt-1.5 leading-none">
+          ₹{inr(order.total_amount)}
+        </p>
+      )}
     </button>
   )
 }

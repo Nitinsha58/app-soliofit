@@ -15,6 +15,9 @@ export interface Order {
   created_at: string
   updated_at: string
   has_delayed_installment: boolean
+  amount_paid: string
+  remaining: string
+  payment_state: 'completed' | 'overdue' | 'partial' | 'pending' | 'unbilled'
 }
 
 export const ORDER_STATUSES: Order['status'][] = [

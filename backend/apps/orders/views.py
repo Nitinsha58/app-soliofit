@@ -1,7 +1,8 @@
 from decimal import Decimal, InvalidOperation
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Exists, Max, OuterRef, Sum
+from django.db.models import Count, DecimalField, Exists, Max, OuterRef, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import viewsets, status
@@ -63,7 +64,20 @@ class OrderViewSet(viewsets.ModelViewSet):
             paid_date__isnull=True,
             due_date__lt=today,
         )
-        qs = qs.annotate(has_delayed_installment=Exists(delayed))
+        # Collected-to-date per order via a correlated subquery (no join → no N+1,
+        # no row multiplication). VS-19 derives remaining + payment_state from this.
+        money = DecimalField(max_digits=12, decimal_places=2)
+        paid = (
+            Installment.objects.filter(order=OuterRef('pk'), paid_date__isnull=False)
+            .order_by()
+            .values('order')
+            .annotate(total=Sum('amount'))
+            .values('total')
+        )
+        qs = qs.annotate(
+            has_delayed_installment=Exists(delayed),
+            amount_paid=Coalesce(Subquery(paid, output_field=money), Value(0, output_field=money)),
+        )
         return qs
 
     def perform_create(self, serializer):

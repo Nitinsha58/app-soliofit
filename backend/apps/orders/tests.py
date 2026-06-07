@@ -339,3 +339,112 @@ class CalendarViewTests(_Fixture):
         )
         resp = self._get(self.today.year, self.today.month)
         self.assertEqual(resp.data, {})
+
+
+class PaymentSummaryTests(_Fixture):
+    """VS-19 — order cards surface amount_paid / remaining / payment_state."""
+
+    def _order(self, num, total='10000.00'):
+        return Order.objects.create(
+            user=self.user, customer=self.customer, order_number=num,
+            delivery_date=date.today() + timedelta(days=10),
+            total_amount=Decimal(total),
+        )
+
+    def _inst(self, order, amount, *, paid=False, overdue=False):
+        due = date.today() - timedelta(days=5) if overdue else date.today() + timedelta(days=10)
+        return Installment.objects.create(
+            order=order, amount=Decimal(amount), due_date=due,
+            paid_date=(date.today() if paid else None),
+        )
+
+    def _card(self, order_id):
+        resp = self.client.get('/api/orders/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return next(o for o in resp.data if o['id'] == str(order_id))
+
+    def test_pending_when_nothing_paid(self):
+        o = self._order(1)
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'pending')
+        self.assertEqual(Decimal(card['amount_paid']), Decimal('0'))
+        self.assertEqual(Decimal(card['remaining']), Decimal('10000.00'))
+
+    def test_partial_when_some_paid(self):
+        o = self._order(1)
+        self._inst(o, '4000.00', paid=True)
+        self._inst(o, '6000.00')
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'partial')
+        self.assertEqual(Decimal(card['amount_paid']), Decimal('4000.00'))
+        self.assertEqual(Decimal(card['remaining']), Decimal('6000.00'))
+
+    def test_completed_when_fully_paid(self):
+        o = self._order(1)
+        self._inst(o, '10000.00', paid=True)
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'completed')
+        self.assertEqual(Decimal(card['remaining']), Decimal('0'))
+
+    def test_overdue_takes_precedence_over_partial(self):
+        o = self._order(1)
+        self._inst(o, '3000.00', paid=True)
+        self._inst(o, '7000.00', overdue=True)
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'overdue')
+        self.assertEqual(Decimal(card['remaining']), Decimal('7000.00'))
+
+    def test_unbilled_when_zero_total(self):
+        o = self._order(1, total='0.00')
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'unbilled')
+        self.assertEqual(Decimal(card['remaining']), Decimal('0'))
+
+    def test_remaining_not_negative_when_overpaid(self):
+        o = self._order(1, total='5000.00')
+        self._inst(o, '6000.00', paid=True)
+        card = self._card(o.id)
+        self.assertEqual(card['payment_state'], 'completed')
+        self.assertEqual(Decimal(card['remaining']), Decimal('0'))
+
+    def test_created_order_has_safe_payment_defaults(self):
+        resp = self.client.post('/api/orders/', {
+            'customer': str(self.customer.id), 'delivery_date': _future(),
+            'total_amount': 5000, 'priority': False, 'remarks': '',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['payment_state'], 'pending')
+        self.assertEqual(Decimal(resp.data['amount_paid']), Decimal('0'))
+        self.assertEqual(Decimal(resp.data['remaining']), Decimal('5000'))
+
+    def test_list_query_count_is_flat(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        o1 = self._order(1)
+        self._inst(o1, '4000.00', paid=True)
+        self._inst(o1, '6000.00')
+        with CaptureQueriesContext(connection) as one:
+            self.client.get('/api/orders/')
+
+        for n in range(2, 7):
+            ox = self._order(n)
+            self._inst(ox, '4000.00', paid=True)
+            self._inst(ox, '6000.00', overdue=True)
+        with CaptureQueriesContext(connection) as many:
+            self.client.get('/api/orders/')
+
+        # No N+1: query count is independent of how many orders/installments exist.
+        self.assertEqual(len(one.captured_queries), len(many.captured_queries))
+
+    def test_delivery_load_count_unaffected_by_payment_annotation(self):
+        d = date.today() + timedelta(days=10)
+        o1 = Order.objects.create(user=self.user, customer=self.customer, order_number=1,
+                                  delivery_date=d, total_amount=Decimal('10000.00'))
+        Order.objects.create(user=self.user, customer=self.customer, order_number=2,
+                             delivery_date=d, total_amount=Decimal('8000.00'))
+        # Differing paid amounts must NOT split the per-date count via GROUP BY.
+        self._inst(o1, '5000.00', paid=True)
+        resp = self.client.get(f'/api/orders/delivery-load/?from={d}&to={d}')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data[str(d)], 2)

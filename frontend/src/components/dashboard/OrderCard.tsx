@@ -1,6 +1,7 @@
 'use client'
 
 import type { Order } from '@/lib/api/orders'
+import { paymentMeta, inr } from '@/lib/orderPayment'
 
 interface Props {
   order: Order
@@ -17,6 +18,8 @@ export default function OrderCard({ order, onClick }: Props) {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isOverdue = order.delivery_date < todayStr && order.status !== 'Delivered'
   const isToday = order.delivery_date === todayStr
+  const pay = paymentMeta(order.payment_state)
+  const remaining = Number(order.remaining)
 
   return (
     <div
@@ -48,7 +51,7 @@ export default function OrderCard({ order, onClick }: Props) {
         </span>
       </div>
 
-      {/* Order number + priority + amount */}
+      {/* Order number + priority + paid/total (or plain bill when unbilled) */}
       <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#EBEBEA]">
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-[#B0B0AC] tabular-nums font-medium">
@@ -60,10 +63,29 @@ export default function OrderCard({ order, onClick }: Props) {
             </span>
           )}
         </div>
-        <span className="text-[15px] font-bold text-[#1A1A18] tabular-nums leading-none">
-          ₹{Number(order.total_amount).toLocaleString('en-IN')}
-        </span>
+        {pay ? (
+          <span className="text-[13px] tabular-nums leading-none">
+            <span className="font-bold text-[#1A1A18]">₹{inr(order.amount_paid)}</span>
+            <span className="font-medium text-[#B0B0AC]"> / ₹{inr(order.total_amount)}</span>
+          </span>
+        ) : (
+          <span className="text-[15px] font-bold text-[#1A1A18] tabular-nums leading-none">
+            ₹{inr(order.total_amount)}
+          </span>
+        )}
       </div>
+
+      {/* Payment state pill + remaining due */}
+      {pay && (
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${pay.pillClass}`}>
+            {pay.label}
+          </span>
+          {remaining > 0 && (
+            <span className="text-[11px] text-[#6B6B67] tabular-nums">₹{inr(order.remaining)} due</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
