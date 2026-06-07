@@ -6,14 +6,41 @@ Deletion is always best-effort: a missing object or a transient S3 error must
 never block the database mutation that triggered it. S3's DeleteObjects is itself
 idempotent — deleting a key that doesn't exist is not an error.
 """
+import re
 from pathlib import Path
 
 from django.conf import settings
+
+# The only shapes a stored key may take — exactly what PresignView mints:
+# "<folder>/<uuid4>.<ext>". Keys reaching delete_objects() are owner-controlled
+# input (saved on the media row at create time), so they MUST be validated against
+# this contract before they are ever trusted to address an S3 object or a stub
+# path — otherwise a forged key could delete an arbitrary bucket object or, in
+# stub mode, traverse out of MEDIA_ROOT/stub. Ext sets mirror views.CONTENT_TYPE_EXT.
+_UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+PHOTO_KEY_RE = re.compile(rf'^photos/{_UUID}\.(jpg|png|webp|heic|heif)$')
+VOICE_KEY_RE = re.compile(rf'^voice-notes/{_UUID}\.(webm|m4a|mp3|ogg)$')
+
+
+def is_valid_photo_key(key: str) -> bool:
+    return bool(key) and PHOTO_KEY_RE.fullmatch(key) is not None
+
+
+def is_valid_voice_key(key: str) -> bool:
+    return bool(key) and VOICE_KEY_RE.fullmatch(key) is not None
 
 
 def use_stub() -> bool:
     """True when no real bucket is configured — uploads/deletes hit local disk."""
     return not getattr(settings, 'S3_BUCKET_NAME', '')
+
+
+def public_url_for(request, s3_key: str) -> str:
+    """Derive the canonical public URL for a (validated) key — never trust the
+    client-sent value. Mirrors PresignView so the two can't drift."""
+    if use_stub():
+        return request.build_absolute_uri(f'{settings.MEDIA_URL}stub/{s3_key}')
+    return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
 
 
 def delete_objects(s3_keys) -> None:

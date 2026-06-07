@@ -628,13 +628,16 @@ class BoardActionTests(_Fixture):
 class DeleteOrderTests(_Fixture):
     """VS-21 — soft-delete an order, cascade-hide children, clean S3, log it."""
 
+    PHOTO_KEY = 'photos/11111111-1111-4111-8111-111111111111.jpg'
+    VOICE_KEY = 'voice-notes/22222222-2222-4222-8222-222222222222.webm'
+
     def _seed_media(self, order):
         OrderPhoto.objects.create(
-            order=order, s3_key='garment/p1.jpg',
+            order=order, s3_key=self.PHOTO_KEY,
             public_url='http://x/p1.jpg', photo_type='garment',
         )
         VoiceNote.objects.create(
-            order=order, s3_key='voice/v1.webm',
+            order=order, s3_key=self.VOICE_KEY,
             public_url='http://x/v1.webm', duration_seconds=4,
         )
 
@@ -686,7 +689,7 @@ class DeleteOrderTests(_Fixture):
         self._seed_media(order)
         _, mock_del = self._delete(order)
         self.assertEqual(mock_del.call_count, 1)
-        self.assertCountEqual(mock_del.call_args.args[0], ['garment/p1.jpg', 'voice/v1.webm'])
+        self.assertCountEqual(mock_del.call_args.args[0], [self.PHOTO_KEY, self.VOICE_KEY])
         media = self.client.get(f'/api/customers/{self.customer.id}/media/')
         self.assertEqual(media.data['photos'], [])
         self.assertEqual(media.data['voice_notes'], [])

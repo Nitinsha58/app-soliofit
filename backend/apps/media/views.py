@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.orders.models import Order
 from .models import OrderPhoto, VoiceNote
-from .s3 import delete_objects
+from .s3 import delete_objects, public_url_for
 from .serializers import OrderPhotoSerializer, VoiceNoteSerializer
 
 
@@ -75,7 +75,6 @@ class PresignView(APIView):
 
         if _use_stub():
             upload_url = request.build_absolute_uri(f'/api/upload/stub/{s3_key}')
-            public_url = request.build_absolute_uri(f'{settings.MEDIA_URL}stub/{s3_key}')
         else:
             import boto3  # noqa: PLC0415 — lazy import, only loaded when S3 is configured
             s3 = boto3.client(
@@ -93,9 +92,8 @@ class PresignView(APIView):
                 },
                 ExpiresIn=300,
             )
-            public_url = (
-                f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
-            )
+
+        public_url = public_url_for(request, s3_key)
 
         return Response({
             'upload_url': upload_url,
@@ -139,7 +137,11 @@ class OrderPhotoListCreateView(APIView):
         serializer = OrderPhotoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         count = OrderPhoto.objects.filter(order=order).count()
-        serializer.save(order=order, display_order=count)
+        serializer.save(
+            order=order,
+            display_order=count,
+            public_url=public_url_for(request, serializer.validated_data['s3_key']),
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -189,7 +191,10 @@ class VoiceNoteListCreateView(APIView):
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         serializer = VoiceNoteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(order=order)
+        serializer.save(
+            order=order,
+            public_url=public_url_for(request, serializer.validated_data['s3_key']),
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
