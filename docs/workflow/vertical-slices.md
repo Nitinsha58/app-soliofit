@@ -658,18 +658,20 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 **ADR:** [ADR-0006](../adr/ADR-0006-orders-list-scaling.md) — Orders list scaling via keyset cursor pagination. **Accepted.**
 
 **Backend (`orders`):**
-- `OrderViewSet.list` returns per-status keyset pages: `GET /api/orders/?status=Booked&cursor=<opaque>&limit=20` (plus the existing `customer`, `delivery_date_from/to` filters).
+- **Pagination is opt-in via a dedicated board action** — `GET /api/orders/board/?status=Booked&cursor=<opaque>&limit=20`. The default `GET /api/orders/` list is **unchanged** (returns a plain `Order[]`), so no existing caller's response shape changes.
 - Stable sort tuple `(delivery_date, created_at, id)`; the opaque cursor encodes the last row's tuple. `limit` default 20, capped (≤50). Keyset (not offset) so concurrent drags/creates/deletes don't skip or duplicate rows mid-scroll.
-- Response: `{ results: [...], next_cursor: <opaque|null>, counts: { Booked, Started, Ready, "Partial Delivery", Delivered } }`. `counts` are full per-status **totals** for the active filter set, from a single grouped aggregate query (no N+1). `results` keep the VS-19 `amount_paid` / `has_delayed_installment` annotations.
-- Delivered column: the default page returns only recent Delivered (delivered/updated within ~30 days); older Delivered remain reachable via continued cursor ("show older"), not permanently excluded.
-- Non-board consumers (`delivery-load` action, calendar, customer-profile order list) keep their own queries and are unaffected — cursor params only shape `list`.
+- Board response: `{ results: [...], next_cursor: <opaque|null>, counts: { Booked, Started, Ready, "Partial Delivery", Delivered } }`. `counts` are full per-status **totals**, from a single grouped aggregate query (no N+1). `results` keep the VS-19 `amount_paid` / `has_delayed_installment` annotations.
+- New nullable `Order.delivered_at` (set to `now()` on transition **into** Delivered in the `update_status` handler; cleared on transition out). Data migration backfills existing Delivered from the latest `DELIVERY_MARKED` activity (fallback `updated_at`); add an index over `(user, status, delivered_at)`.
+- Delivered column: the default page returns only `delivered_at >= today − 30 days`; older Delivered remain reachable via continued cursor ("show older"), not permanently excluded.
+- Every non-board consumer keeps the legacy `GET /api/orders/` → `Order[]` contract: the Orders Schedule (`/orders`, date-range filtered), the calendar day drill-down (single-date), the customer profile (customer filtered), and the `delivery-load` aggregate. None use the cursor.
 
 **Frontend:**
-- Board columns use React Query `useInfiniteQuery` keyed `[orders, status, filters]`, `getNextPageParam = next_cursor`; append on an IntersectionObserver sentinel near the column bottom.
+- New `listOrderColumn({ status, cursor, limit })` client for the board action; `listOrders()` (→ `Order[]`) stays as-is for all other callers.
+- Board columns use React Query `useInfiniteQuery` keyed `[orders-board, status]`, `getNextPageParam = next_cursor`; append on an IntersectionObserver sentinel near the column bottom.
 - Column header shows the true total from `counts`; loaded-vs-total kept subtle.
 - Drag-and-drop: optimistically move the card on status change, then invalidate/refetch the **source and destination** column's first page (membership + counts change) — no full-board reload.
 - Delivered column shows a "Show older delivered" affordance while `next_cursor` continues.
-- `ScheduleView` (`/orders`) consumes the same cursor source, grouped by date as today.
+- `ScheduleView` (`/orders`) is **unchanged** — it groups by delivery date over the visible week via the legacy `listOrders()`, not the per-column cursor.
 
 **Review checkpoint:** A column with 60+ orders loads ~20, scroll fetches more, header shows the true total. Drag a card across columns → both counts update, no duplicate/disappeared cards. Delivered shows recent first; "show older" pulls the rest. Per-page query count stays flat (no N+1; `amount_paid` still annotated). Calendar and customer-profile lists unchanged.
 

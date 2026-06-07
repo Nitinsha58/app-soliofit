@@ -7,6 +7,8 @@
 | **Deciders** | Nitin |
 | **Slice** | VS-20 |
 
+_Amended 2026-06-07 (pre-implementation, from review, before any VS-20 code): pagination is exposed via an opt-in `board` action so the default `/api/orders/` list keeps its `Order[]` contract; "recent Delivered" is defined by a new `delivered_at` field. The core keyset-cursor decision is unchanged._
+
 ---
 
 ## Context
@@ -19,7 +21,7 @@ VS-20 introduces per-column lazy-load on scroll. The hard part is that the order
 
 **Per-column keyset (cursor) pagination.** The board fetches one column (status) at a time and pages with an opaque cursor over a stable sort, not a numeric offset.
 
-- **Request:** `GET /api/orders/?status=Booked&cursor=<opaque>&limit=20` (composable with the existing `customer`, `delivery_date_from`, `delivery_date_to` filters). `limit` defaults to 20, capped at 50.
+- **Endpoint (opt-in):** a dedicated board action — `GET /api/orders/board/?status=Booked&cursor=<opaque>&limit=20` — returns the paginated envelope. The default `GET /api/orders/` list is **unchanged**: it still returns a plain `Order[]` for the date-range, customer, and calendar-drilldown consumers. Pagination is therefore opt-in and no existing caller's response shape changes. `limit` defaults to 20, capped at 50.
 - **Sort tuple:** `(delivery_date, created_at, id)` — deterministic and total, so the cursor always resumes at an unambiguous position. The cursor encodes the last row's tuple; the next page selects rows strictly after it.
 - **Response:**
   ```json
@@ -30,10 +32,10 @@ VS-20 introduces per-column lazy-load on scroll. The hard part is that the order
   }
   ```
   `counts` are full per-status **totals** for the active filter set, computed in a single grouped aggregate query — decoupled from the loaded page so headers stay accurate as the user scrolls.
-- **Delivered deferral:** the default Delivered page returns only recent Delivered (delivered/updated within ~30 days). Older Delivered are not dropped — they are reached by continuing the same cursor behind a "show older" affordance.
-- **Scope:** this shapes only `OrderViewSet.list` (the board path). Non-board consumers — the `delivery-load` action, the calendar aggregate, and the customer-profile order list — keep their own queries and are unaffected; cursor params are ignored there.
+- **Delivered deferral:** a new nullable `Order.delivered_at` is set to `timezone.now()` when an order transitions **into** Delivered, and cleared if it ever transitions back out — so it always means "currently delivered, at this time." The default Delivered page returns only `delivered_at >= today − 30 days`; older Delivered are not dropped — they are reached by continuing the same cursor behind a "show older" affordance. A data migration backfills existing Delivered orders from their latest `DELIVERY_MARKED` activity timestamp (fallback `updated_at`). Add an index covering `(user, status, delivered_at)`. `updated_at` is explicitly rejected (any edit bumps it → long-delivered orders would resurface as "recent"); the activity timestamp is rejected as a query-time source (correlated subquery in the hot board path).
+- **Scope:** only the Kanban board consumes the new envelope (via the `board` action). Every other consumer keeps the legacy `GET /api/orders/` → `Order[]` contract: the Orders Schedule (`/orders`, date-range filtered for the visible week), the calendar day drill-down (single-date filtered), the customer profile (customer filtered), and the `delivery-load` aggregate. The Orders Schedule is grouped by delivery **date**, not by status column, so it does **not** use the per-column cursor — its result set is already bounded by the visible week.
 
-**Frontend:** each column is a React Query `useInfiniteQuery` keyed `[orders, status, filters]` with `getNextPageParam = next_cursor`, appending pages on an IntersectionObserver sentinel. Drag-and-drop optimistically moves the card, then invalidates the **source and destination** columns' first page (membership and counts both change) — never a full-board reload.
+**Frontend:** a new `listOrderColumn({ status, cursor, limit })` client calls the board action; the existing `listOrders()` (returning `Order[]`) is untouched, so the Schedule, calendar, and customer-profile callers are unaffected. Each board column is a React Query `useInfiniteQuery` keyed `[orders-board, status]` with `getNextPageParam = next_cursor`, appending pages on an IntersectionObserver sentinel. Drag-and-drop optimistically moves the card, then invalidates the **source and destination** columns' first page (membership and counts both change) — never a full-board reload.
 
 ## Consequences
 
