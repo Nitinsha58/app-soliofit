@@ -1,3 +1,5 @@
+import base64
+import json
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -580,6 +582,24 @@ class BoardActionTests(_Fixture):
     def test_invalid_cursor_returns_400(self):
         self._order(1, 'Booked')
         resp = self.client.get(self.url, {'status': 'Booked', 'cursor': '!!!not-valid!!!'})
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def _b64(payload):
+        return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+    def test_decodable_but_invalid_active_cursor_returns_400(self):
+        # Valid base64/JSON, but the date fields and id are junk — parse_* return
+        # None and the id is not a UUID, which used to 500 at the queryset filter.
+        self._order(1, 'Booked')
+        cursor = self._b64({'dd': 'not-a-date', 'ca': 'also-bad', 'id': 'x'})
+        resp = self.client.get(self.url, {'status': 'Booked', 'cursor': cursor})
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_decodable_but_invalid_delivered_cursor_returns_400(self):
+        self._order(1, 'Delivered', delivered_days_ago=1)
+        cursor = self._b64({'da': 'not-a-datetime', 'id': 'x'})
+        resp = self.client.get(self.url, {'status': 'Delivered', 'cursor': cursor})
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_board_excludes_other_users(self):

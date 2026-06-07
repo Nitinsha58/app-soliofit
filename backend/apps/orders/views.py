@@ -1,5 +1,6 @@
 import base64
 import json
+import uuid
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -207,12 +208,25 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @staticmethod
     def _decode_cursor(cursor, is_delivered):
+        # Two failure modes to guard: (1) malformed base64/JSON raises in decode;
+        # (2) decodable-but-invalid payloads — parse_date/parse_datetime return
+        # None (not raise) for junk, and a non-UUID id only blows up later at the
+        # queryset filter. Validate every field here so both collapse to a 400.
         try:
             payload = json.loads(base64.urlsafe_b64decode(cursor.encode()))
+            cid = payload['id']
+            uuid.UUID(str(cid))  # rejects non-UUID ids before they reach the filter
             if is_delivered:
-                return parse_datetime(payload['da']), payload['id']
-            return parse_date(payload['dd']), parse_datetime(payload['ca']), payload['id']
-        except Exception:
+                da = parse_datetime(payload['da'])
+                if da is None:
+                    raise ValueError('da')
+                return da, cid
+            dd = parse_date(payload['dd'])
+            ca = parse_datetime(payload['ca'])
+            if dd is None or ca is None:
+                raise ValueError('dd/ca')
+            return dd, ca, cid
+        except (ValueError, TypeError, KeyError, AttributeError, json.JSONDecodeError):
             raise ValidationError({'cursor': 'Invalid cursor.'})
 
     @action(detail=False, methods=['get'], url_path='board')
