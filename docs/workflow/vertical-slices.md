@@ -31,7 +31,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
-| VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Pending |
+| VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Pending |
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Pending |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Pending |
@@ -57,7 +57,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-15 | Calendar | Done |
 | VS-16 | Settings | Done |
 | VS-19 | Order payment summary | Done |
-| VS-20 | Orders list scaling | **Active** |
+| VS-20 | Orders list scaling | Done |
+| VS-21 | Delete order | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 still needs a tenancy ADR at its activation; VS-18 needs a deployment ADR at its activation._
@@ -680,6 +681,8 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 - `ScheduleView` (`/orders`) is **unchanged** — it groups by delivery date over the visible week via the legacy `listOrders()`, not the per-column cursor.
 
 **Review checkpoint:** A column with 60+ orders loads ~20, scroll fetches more, header shows the true total. Drag a card across columns → both counts update, no duplicate/disappeared cards. Delivered shows recent first; "show older" pulls the rest. Per-page query count stays flat (no N+1; `amount_paid` still annotated). Calendar and customer-profile lists unchanged.
+
+**Completion record (2026-06-08):** Backend (units 1–2) `e5e9584`/`b691959`/`d37d10f`/`254a152`, cursor 400 hardening `8e5f1fd`; frontend (unit 3) `467d88f`; review rounds `0d16c2a` (older-tail gating, touch sensors, last-changed time), `4c9a6b9` (undo snackbar, paid recolor, column value, emoji purge), `cba1d7c` (persistent colored provenance, always-on Delivered, red pending), `d3297cf` (one-shot undo, black value chip). Backend 57 tests (incl. 12 BoardActionTests); `delivered_at` field + backfill migration; board response `{results,next_cursor,counts,value}`. ADR-0006 accepted + amended twice (per-column sort pre-impl; additive `value` during review). Scope notes: Delivered ships as a normal always-visible column (no collapse); summary-card filters apply client-side over loaded rows (under-reports by design). Deferred to **VS-17**: horizontal board auto-scroll during drag (dnd-kit autoscroll), QuickActions "Mark Delivered" 375px wrap. Follow-up: swap remaining monochrome icon glyphs (`✓`/`✕`) in payment-drawer buttons for SVGs (no-emoji rule).
 
 ---
 
