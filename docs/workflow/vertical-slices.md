@@ -32,9 +32,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Pending |
-| VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Backlog |
-| VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Backlog |
-| VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Backlog |
+| VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Pending |
+| VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Pending |
+| VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Pending |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
 
 > **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
@@ -59,8 +59,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-19 | Order payment summary | Done |
 | VS-20 | Orders list scaling | **Active** |
 
-_Window reviewed: 2026-06-07 (after VS-16 completion). Next review after VS-19._
-_VS-20 requires an ADR at activation (orders-list scaling / pagination strategy) — write it with the user before implementing._
+_Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
+_Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 still needs a tenancy ADR at its activation; VS-18 needs a deployment ADR at its activation._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -613,7 +613,7 @@ Review deviations addressed before close: workload-dot bands made capacity-relat
 - `nginx/nginx.conf`: `/` → Next.js (3000), `/api/` → Django (8000)
 - `.github/workflows/deploy.yml`: build both images on push to `main`, SSH into EC2, pull + restart
 
-**ADR:** Write ADR-0006 (deployment strategy) here.
+**ADR:** Write a deployment-strategy ADR at activation (next sequential ID — ADR-0006 is taken by orders list scaling, so this will likely be ADR-0008 after VS-23's tenancy ADR). Do not hardcode the number ahead of time.
 
 **Note:** Requires EC2 provisioned and SSH key configured as a GitHub secret. Flag before starting this slice.
 
@@ -648,6 +648,98 @@ Review deviations addressed before close: workload-dot bands made capacity-relat
 Backend: `OrderViewSet.get_queryset()` annotates `amount_paid` via a Coalesce'd `Sum` subquery (no join → no N+1, no row multiplication), alongside the existing `has_delayed_installment` `Exists`. `OrderSerializer` derives `amount_paid` / `remaining` (`max(total − paid, 0)`) / `payment_state` in pure Python from those annotations, with safe defaults for freshly-created (un-annotated) orders. `payment_state` ∈ `completed | overdue | partial | pending | unbilled` — mirrors `payments.views._classify_order`. 9 tests (state matrix, safe-create defaults, flat query count, delivery-load grouping guard); 108 backend total, frontend type-check clean.
 
 Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both cards show `₹paid / ₹total` with a colored state pill (Paid/Partial/Unpaid/Overdue) + "₹X due"; Paid hides due text; `unbilled` → plain bill, no pill. On `ScheduleCard` the unified pill **replaced** the standalone "Delayed" badge (one payment signal). Card layout: "Paid / total progress" option.
+
+---
+
+### VS-20 — Orders List Scaling
+
+**What:** Replace the currently-unbounded orders list (`OrderViewSet` has `pagination_class = None`) with **per-column keyset (cursor) pagination + lazy-load on scroll**, so the board stays fast as orders accumulate. Category counts stay true totals (not loaded counts); aged Delivered orders are deferred behind a "show older" cursor continuation rather than dropped.
+
+**ADR:** [ADR-0006](../adr/ADR-0006-orders-list-scaling.md) — Orders list scaling via keyset cursor pagination. **Accepted.**
+
+**Backend (`orders`):**
+- `OrderViewSet.list` returns per-status keyset pages: `GET /api/orders/?status=Booked&cursor=<opaque>&limit=20` (plus the existing `customer`, `delivery_date_from/to` filters).
+- Stable sort tuple `(delivery_date, created_at, id)`; the opaque cursor encodes the last row's tuple. `limit` default 20, capped (≤50). Keyset (not offset) so concurrent drags/creates/deletes don't skip or duplicate rows mid-scroll.
+- Response: `{ results: [...], next_cursor: <opaque|null>, counts: { Booked, Started, Ready, "Partial Delivery", Delivered } }`. `counts` are full per-status **totals** for the active filter set, from a single grouped aggregate query (no N+1). `results` keep the VS-19 `amount_paid` / `has_delayed_installment` annotations.
+- Delivered column: the default page returns only recent Delivered (delivered/updated within ~30 days); older Delivered remain reachable via continued cursor ("show older"), not permanently excluded.
+- Non-board consumers (`delivery-load` action, calendar, customer-profile order list) keep their own queries and are unaffected — cursor params only shape `list`.
+
+**Frontend:**
+- Board columns use React Query `useInfiniteQuery` keyed `[orders, status, filters]`, `getNextPageParam = next_cursor`; append on an IntersectionObserver sentinel near the column bottom.
+- Column header shows the true total from `counts`; loaded-vs-total kept subtle.
+- Drag-and-drop: optimistically move the card on status change, then invalidate/refetch the **source and destination** column's first page (membership + counts change) — no full-board reload.
+- Delivered column shows a "Show older delivered" affordance while `next_cursor` continues.
+- `ScheduleView` (`/orders`) consumes the same cursor source, grouped by date as today.
+
+**Review checkpoint:** A column with 60+ orders loads ~20, scroll fetches more, header shows the true total. Drag a card across columns → both counts update, no duplicate/disappeared cards. Delivered shows recent first; "show older" pulls the rest. Per-page query count stays flat (no N+1; `amount_paid` still annotated). Calendar and customer-profile lists unchanged.
+
+---
+
+### VS-21 — Delete Order
+
+**What:** Let the owner soft-delete a mistaken/cancelled order, cascading to its installments and media, cleaning up S3 objects, and logging the deletion. No hard delete in MVP. **Distinct from** the Settings → "Delete all data" danger-zone item (an account-level wipe, currently a disabled "coming soon"); VS-21 is per-order.
+
+**ADR:** None expected — soft-delete via `deleted_at` is already established (the `destroy` handler already sets `order.deleted_at`). Add one only if S3 cleanup needs an async job.
+
+**Backend:**
+- `DELETE /api/orders/{id}/` already soft-deletes the order. Extend to cascade: soft-delete its installments (keep payment history queryable but excluded from active queries) and its media rows; enqueue/perform best-effort S3 object deletion (tolerate already-missing objects).
+- Add an `order_deleted` type to `OrderActivity.Type`; log it.
+- Restore is out of scope for MVP (rows are recoverable in the DB); no restore UI.
+- Open detail to settle at activation: hard-delete vs soft-delete of installment rows; whether S3 deletion is synchronous or deferred.
+
+**Frontend:**
+- Delete action in the Order Details drawer danger area, behind an explicit confirmation naming the order and its side effects ("Delete order #0042? This also removes its installments and photos.").
+- On success: close drawer, remove the card (invalidate the column), toast.
+
+**Review checkpoint:** Deleting an order removes it from board, calendar, search, and customer profile; its installments drop out of payment totals; S3 objects are removed (or cleanup enqueued); the activity log records the deletion. No one-tap accidental delete.
+
+---
+
+### VS-22 — Forgot Password
+
+**What:** Pre-login password reset via an emailed link (Gmail SMTP).
+
+**ADR:** None expected — uses Django's built-in token machinery; SMTP is already planned in `08-devops`. Flag only if we choose a custom token model.
+
+**Backend:**
+- Use Django's `PasswordResetTokenGenerator` (no new model).
+- `POST /api/auth/password-reset/` `{ email }` → always 200 (no account enumeration); if the email matches a user, email a reset link. Rate-limit per email/IP.
+- `POST /api/auth/password-reset/confirm/` `{ uid, token, new_password }` → validate token (expiry via `PASSWORD_RESET_TIMEOUT`, default 3 days), run `validate_password`, set the new password, invalidate the token.
+- Email link targets the frontend: `https://<host>/reset-password?uid=<uid>&token=<token>`.
+
+**Frontend:**
+- `/forgot-password`: email input → neutral success copy ("If that email exists, we've sent a reset link.").
+- `/reset-password`: reads uid+token from the query, new+confirm password, calls confirm; success → redirect to login with a toast; invalid/expired token → clear error + link back to `/forgot-password`.
+- "Forgot password?" link on the login page.
+
+**Review checkpoint:** Requesting a reset for a real email delivers a link that lets you set a new password and log in. Unknown email → identical success copy (no enumeration). Expired/garbage token → friendly error. Rate limit blocks rapid repeats.
+
+---
+
+### VS-23 — Boutique Tenant (schema foundation)
+
+**What:** Introduce a `Boutique` entity that owns all tenant data and per-boutique order numbering — scoped to a **single boutique** for MVP. This is schema future-proofing so staff accounts / multi-boutique can arrive later without a painful FK migration. **Not SaaS:** no signup, billing, staff roles, tenant admin, or multi-boutique onboarding — those stay post-MVP per `09-mvp-scope`.
+
+**ADR:** Write a tenancy ADR at activation (next sequential ID) — covers the `Boutique` model, the `boutique` FK rollout, the data backfill into one seeded boutique, and the per-boutique `order_number` migration. **Required before implementation.**
+
+**Backend:**
+- `Boutique` model (name, owning `User`, timestamps); `User` belongs to one boutique.
+- Add a `boutique` FK (or scope via the owning relation — decide in the ADR) to tenant-owned models: orders, customers, installments, media, user settings, notification prefs, activities.
+- Data migration: create one seeded Boutique, backfill all existing rows to it.
+- `order_number` becomes unique **per boutique** — replaces the global `Max(order_number)+1` counter + retry in `OrderViewSet.perform_create`; update the uniqueness constraint and numbering.
+- Querysets scope by the request user's boutique (alongside / instead of `user=`).
+
+**Frontend:** Minimal/none for MVP — the boutique is implicit (single). Settings already shows the business name.
+
+**Review checkpoint:** All existing data belongs to one seeded boutique with nothing lost in backfill; new orders number per boutique; queries are boutique-scoped; no signup/multi-tenant UI appears; `09-mvp-scope` still accurately lists multi-boutique/SaaS as post-MVP.
+
+---
+
+### VS-08b — Voice Format Conversion (deferred)
+
+**Status:** Backlog — **Deferred. Not in the current MVP execution order** (VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18). Tracked for post-MVP; pull in only if iOS playback becomes a launch blocker.
+
+**What (if revived):** Server-side `.webm` → `.mp3` conversion so iOS Safari can play voice notes recorded as WebM/Opus. Recording already works everywhere; the gap is iOS playback of WebM. Would add an FFmpeg conversion step on upload and store an `.mp3` alongside (or in place of) the original.
 
 ---
 

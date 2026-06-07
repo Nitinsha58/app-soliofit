@@ -48,16 +48,18 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-13 | Customer profile | Complete |
 | VS-15a | Orders Schedule | Complete |
 | VS-14 | Global search | Complete |
-| VS-15 | Calendar | Active |
-| VS-16 | Settings | Not started |
-| VS-17 | Mobile layout | Not started |
-| VS-18 | Production deployment | Not started |
-| VS-19 | Order payment summary | Backlog |
-| VS-20 | Orders list scaling | Backlog |
-| VS-21 | Delete order | Backlog |
-| VS-22 | Forgot password | Backlog |
-| VS-23 | Boutique tenant | Backlog |
-| VS-08b | Voice format (webm→mp3) | Backlog — Deferred |
+| VS-15 | Calendar | Complete |
+| VS-16 | Settings | Complete |
+| VS-19 | Order payment summary | Complete |
+| VS-20 | Orders list scaling | Active |
+| VS-21 | Delete order | Pending |
+| VS-22 | Forgot password | Pending |
+| VS-23 | Boutique tenant | Pending |
+| VS-17 | Mobile layout | Pending |
+| VS-18 | Production deployment | Pending |
+| VS-08b | Voice format (webm→mp3) | Backlog — Deferred (not in current execution order) |
+
+_Execution order for the final batch: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18._
 
 Full specifications: [`/workflow/vertical-slices.md`](./workflow/vertical-slices.md)
 
@@ -74,3 +76,4 @@ ADRs are written incrementally as each slice requires a documented decision. No 
 | [ADR-0003](./adr/ADR-0003-database-orm.md) | Database — PostgreSQL + Django ORM | Accepted | VS-00 |
 | [ADR-0004](./adr/ADR-0004-frontend-framework.md) | Frontend Framework — Next.js 14 App Router + shadcn/ui | Accepted | VS-00 |
 | [ADR-0005](./adr/ADR-0005-s3-presigned-url-strategy.md) | S3 Presigned URL Strategy with Local Stub Mode | Accepted | VS-07 |
+| [ADR-0006](./adr/ADR-0006-orders-list-scaling.md) | Orders List Scaling via Keyset Cursor Pagination | Accepted | VS-20 |
