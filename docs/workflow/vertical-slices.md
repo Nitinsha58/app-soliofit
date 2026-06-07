@@ -27,10 +27,10 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-15a | Orders Schedule | `/orders` week view — order cards grouped by delivery date, priority-sorted | Done |
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Done |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Done |
-| VS-16 | Settings | Profile edit, password change, notification toggles | Pending |
+| VS-16 | Settings | Profile edit, password change, notification toggles | Done |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
-| VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Backlog |
+| VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Pending |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Backlog |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Backlog |
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Backlog |
@@ -55,9 +55,10 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-14 | Global search | Done |
 | VS-15a | Orders Schedule | Done |
 | VS-15 | Calendar | Done |
-| VS-16 | Settings | **Active** |
+| VS-16 | Settings | Done |
+| VS-19 | Order payment summary | **Active** |
 
-_Window reviewed: 2026-06-07 (after VS-15 completion). Next review after VS-16._
+_Window reviewed: 2026-06-07 (after VS-16 completion). Next review after VS-19._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -542,7 +543,7 @@ Frontend (`/calendar`): month grid (Monday-start, 5/6 dynamic rows), proportiona
 **Backend:**
 - `NotificationPreference` model (OneToOne to User, 4 boolean toggles)
 - `delivery_buffer_days` (PositiveSmallIntegerField, default 0) — on User or a `UserSettings` 1:1
-- `daily_capacity` (PositiveSmallIntegerField, default 6) — garments the shop can finish per day. Drives the calendar workload-dot thresholds once set (Light ≤ ⅓·cap, Overloaded ≥ cap); until set, VS-15 uses the interim count thresholds (0–2 / 3–5 / 6+).
+- `daily_capacity` (PositiveSmallIntegerField, default 6, min 1) — garments the shop can finish per day. Drives the calendar workload-dot thresholds, relative to capacity: Light < ⌈½·cap⌉, Busy ⌈½·cap⌉–cap, Overloaded ≥ cap. At the default capacity of 6 this reproduces the interim bands VS-15 shipped (0–2 / 3–5 / 6+); the same bands colour the Add-Order mini-calendar.
 - Add to `users` migration
 - `PATCH /api/auth/me/` — update name, business name, phone
 - `POST /api/auth/change-password/` — verify old, set new
@@ -554,7 +555,7 @@ Frontend (`/calendar`): month grid (Monday-start, 5/6 dynamic rows), proportiona
 - Profile section: business name, owner name, phone, change password form
 - Order Settings section: numeric input for default delivery buffer days
 - Order Settings section: numeric input for daily capacity (workload) — feeds the VS-15 calendar dot thresholds
-- **Add-Order recommendation pill (O4)** in `StepDelivery`: "Suggested: <nearest date ≥ today + buffer_days with ≤5 load>" pill below the picker, plus a soft confirm when a high-load (13+) date is selected
+- **Add-Order recommendation pill (O4)** in `StepDelivery`: "Suggested: <nearest date ≥ today + buffer_days with load < daily_capacity>" pill below the picker, plus a soft confirm when the selected date is at/over capacity (escalating wording past an absolute 13+ "very heavy" mark)
 - Notification preferences: 4 toggles
 - Danger Zone: "Delete all data" (typed confirmation phrase) — **deferred for MVP: render as a disabled control with a "coming soon" note**
 - Logout button
@@ -562,6 +563,14 @@ Frontend (`/calendar`): month grid (Monday-start, 5/6 dynamic rows), proportiona
 **ADR:** None.
 
 **Review checkpoint:** Update business name → persists on reload. Change password → can log in with new password. Toggle notification preference → persists. Set buffer days = 2 → Add-Order recommendation skips the next 2 days. High-load date → soft confirm appears.
+
+**Completion record:** Commits `c44cb0a` (backend), `81f6e8e` (frontend), `c85a032` (VS-17 carry-forward), `6faa041` (review fixes) · Deferred: none.
+
+Backend: `UserSettings` 1:1 (`delivery_buffer_days` default 0, `daily_capacity` default 6, min 1 / max 100) and `NotificationPreference` 1:1 (4 booleans, default True). **Notification prefs are preference-only — not wired to any delivery channel; stored for a future notification pipeline.** `PATCH /api/auth/me/` (email read-only), `POST /api/auth/change-password/` (verifies old, validates new, `update_session_auth_hash` keeps the session valid), `GET/PATCH /api/auth/order-settings/` and `/notification-preferences/` (auto-create on first access). 13 users-app tests, 99 backend total.
+
+Frontend: `/settings` (Profile, Change password, Order settings, Notification toggles, disabled "Delete all data" danger zone, mobile logout); `ProfileMenu` mobile avatar (initials owner→business→email) in the Dashboard header → Settings + Logout (desktop keeps the sidebar). `StepDelivery` O4: suggests the nearest date with `load < daily_capacity` (≥ today + buffer), capacity-relative soft confirm escalating past an absolute 13+ mark. `client.ts` surfaces DRF field errors (e.g. wrong current password).
+
+Review deviations addressed before close: workload-dot bands made capacity-relative on both the Calendar and the Add-Order mini-calendar (half-capacity rule — default cap=6 reproduces 0–2 / 3–5 / 6+); `daily_capacity=0` rejected at the serializer; Settings labels associated to inputs via `htmlFor`/`id`. Slice + vault wording reconciled to the half-capacity rule.
 
 ---
 
