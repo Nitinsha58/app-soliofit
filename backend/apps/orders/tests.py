@@ -448,3 +448,58 @@ class PaymentSummaryTests(_Fixture):
         resp = self.client.get(f'/api/orders/delivery-load/?from={d}&to={d}')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data[str(d)], 2)
+
+
+class StatusFunnelDeliveredAtTests(_Fixture):
+    """VS-20 Unit 1 — status changes funnel through /status/, maintaining
+    delivered_at and the activity log."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()  # status defaults to Booked
+        self.url = f'/api/orders/{self.order.id}/'
+        self.status_url = f'/api/orders/{self.order.id}/status/'
+
+    def test_generic_patch_status_rejected(self):
+        resp = self.client.patch(self.url, {'status': 'Delivered'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('/status/', resp.data['detail'])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'Booked')
+        self.assertIsNone(self.order.delivered_at)
+
+    def test_generic_patch_non_status_fields_still_work(self):
+        resp = self.client.patch(self.url, {'remarks': 'rush'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.remarks, 'rush')
+
+    def test_into_delivered_sets_delivered_at_and_logs_activity(self):
+        resp = self.client.patch(self.status_url, {'status': 'Delivered'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(resp.data['delivered_at'])
+        self.order.refresh_from_db()
+        self.assertIsNotNone(self.order.delivered_at)
+        # Regression: the old QuickActions PATCH path logged no activity.
+        self.assertTrue(OrderActivity.objects.filter(
+            order=self.order, activity_type=OrderActivity.Type.DELIVERY_MARKED).exists())
+
+    def test_out_of_delivered_clears_delivered_at(self):
+        self.client.patch(self.status_url, {'status': 'Delivered'}, format='json')
+        self.order.refresh_from_db()
+        self.assertIsNotNone(self.order.delivered_at)
+        self.client.patch(self.status_url, {'status': 'Ready'}, format='json')
+        self.order.refresh_from_db()
+        self.assertIsNone(self.order.delivered_at)
+
+    def test_redeliver_is_idempotent_noop(self):
+        self.client.patch(self.status_url, {'status': 'Delivered'}, format='json')
+        self.order.refresh_from_db()
+        first = self.order.delivered_at
+        marks_before = OrderActivity.objects.filter(order=self.order).count()
+        # Re-PATCH the same status → no-op: delivered_at and activity unchanged.
+        resp = self.client.patch(self.status_url, {'status': 'Delivered'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.delivered_at, first)
+        self.assertEqual(OrderActivity.objects.filter(order=self.order).count(), marks_before)

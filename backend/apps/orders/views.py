@@ -96,6 +96,13 @@ class OrderViewSet(viewsets.ModelViewSet):
                     raise
 
     def partial_update(self, request, *args, **kwargs):
+        # Status is a domain event, not a field edit — it must go through the
+        # /status/ action (which maintains delivered_at + the activity log).
+        if 'status' in request.data:
+            return Response(
+                {'detail': 'Use /status/ to change order status.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if 'total_amount' in request.data:
             order = self.get_object()
             try:
@@ -126,9 +133,22 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         old_status = order.status
+        if new_status == old_status:
+            # Idempotent no-op: don't write an activity or touch delivered_at.
+            order = self.get_queryset().get(pk=order.pk)
+            return Response(OrderSerializer(order, context={'request': request}).data)
+
+        update_fields = ['status', 'updated_at']
         with transaction.atomic():
             order.status = new_status
-            order.save(update_fields=['status', 'updated_at'])
+            # delivered_at tracks "currently delivered, since when".
+            if new_status == Order.Status.DELIVERED and old_status != Order.Status.DELIVERED:
+                order.delivered_at = timezone.now()
+                update_fields.append('delivered_at')
+            elif old_status == Order.Status.DELIVERED and new_status != Order.Status.DELIVERED:
+                order.delivered_at = None
+                update_fields.append('delivered_at')
+            order.save(update_fields=update_fields)
             if new_status == Order.Status.DELIVERED:
                 activity_type = OrderActivity.Type.DELIVERY_MARKED
             elif new_status == Order.Status.PARTIAL_DELIVERY:

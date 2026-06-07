@@ -56,7 +56,9 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'customer', 'customer_name', 'customer_phone',
             'customer_address', 'status', 'delivery_date', 'total_amount',
-            'priority', 'remarks', 'created_at', 'updated_at',
+            'priority', 'remarks', 'created_at', 'updated_at', 'delivered_at',
             'has_delayed_installment', 'amount_paid', 'remaining', 'payment_state',
         ]
-        read_only_fields = ['id', 'order_number', 'created_at', 'updated_at']
+        # `status` is read-only here: status is a domain event changed only via
+        # the /status/ action (sets/clears delivered_at + writes activity).
+        read_only_fields = ['id', 'order_number', 'status', 'created_at', 'updated_at', 'delivered_at']

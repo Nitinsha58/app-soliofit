@@ -22,6 +22,9 @@ class Order(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
     updated_at    = models.DateTimeField(auto_now=True)
     deleted_at    = models.DateTimeField(null=True, blank=True)
+    # Set when the order transitions into Delivered, cleared if it moves back out.
+    # Drives the VS-20 "recent Delivered" board deferral (delivered_at >= today-30d).
+    delivered_at  = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'orders'
@@ -29,6 +32,7 @@ class Order(models.Model):
             models.Index(fields=['user', 'status']),
             models.Index(fields=['user', 'delivery_date']),
             models.Index(fields=['customer']),
+            models.Index(fields=['user', 'status', 'delivered_at']),
         ]
 
     def __str__(self):

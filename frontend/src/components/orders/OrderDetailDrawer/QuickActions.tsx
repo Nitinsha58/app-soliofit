@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import type { Order } from '@/lib/api/orders'
-import { updateOrder } from '@/lib/api/orders'
+import { updateOrderStatus } from '@/lib/api/orders'
 
 interface Props {
   order: Order
@@ -69,7 +69,7 @@ export default function QuickActions({ order, onOrderChange, onUpdated }: Props)
   async function handleMarkDelivered() {
     if (mountedRef.current) { setDelivering(true); setDeliveryError(false) }
     try {
-      await updateOrder(order.id, { status: 'Delivered' })
+      await updateOrderStatus(order.id, 'Delivered')
       onUpdated()
       if (!mountedRef.current) return
       onOrderChange({ status: 'Delivered' })

@@ -54,9 +54,11 @@ export async function getOrder(id: string): Promise<Order> {
   return apiRequest<Order>(`/api/orders/${id}/`)
 }
 
+// `status` is intentionally excluded — it is a domain event changed only via
+// updateOrderStatus() (the /status/ action). The generic PATCH rejects it.
 export async function updateOrder(
   id: string,
-  data: Partial<Pick<Order, 'delivery_date' | 'total_amount' | 'priority' | 'remarks' | 'status'>>,
+  data: Partial<Pick<Order, 'delivery_date' | 'total_amount' | 'priority' | 'remarks'>>,
   signal?: AbortSignal
 ): Promise<Order> {
   return apiRequest<Order>(`/api/orders/${id}/`, {
