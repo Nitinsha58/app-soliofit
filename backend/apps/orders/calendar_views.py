@@ -1,25 +1,33 @@
 import calendar as _calendar
 from datetime import date
 
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.payments.models import Installment
 from .models import Order
 
 
 class CalendarView(APIView):
-    """Per-date order counts + overdue flags for one month.
+    """Per-date workload summary for one month.
 
     GET /api/calendar/?year=2026&month=6
-    → {"2026-06-04": {"count": 5, "has_overdue": true}, ...}
+    → {"2026-06-04": {"deliveries": 3, "payments": 1, "payment_amount": "700.00",
+                       "late": 2, "workload": 4}, ...}
 
-    A date is `has_overdue` when it is in the past (< today) and still holds at
-    least one order that is not yet Delivered. Scoped to the requesting user;
-    soft-deleted orders are excluded.
+    - deliveries  = orders whose delivery_date is that day
+    - payments    = unpaid installments whose due_date is that day
+    - payment_amount = summed amount of those unpaid installments
+    - late        = deliveries that are past-due and not yet Delivered
+    - workload    = deliveries + payments (interim count metric; VS-16's
+                    daily_capacity upgrades the dot thresholds)
+
+    Scoped to the requesting user; soft-deleted orders excluded. Only dates
+    that carry work appear in the response (empty days recede in the grid).
     """
     permission_classes = [IsAuthenticated]
 
@@ -45,22 +53,44 @@ class CalendarView(APIView):
         last  = date(year, month, _calendar.monthrange(year, month)[1])
         today = timezone.localdate()
 
-        base = Order.objects.filter(
+        orders = Order.objects.filter(
             user=request.user,
             deleted_at__isnull=True,
             delivery_date__gte=first,
             delivery_date__lte=last,
         )
-        counts = base.values('delivery_date').annotate(count=Count('id'))
-        overdue_dates = set(
-            base.filter(delivery_date__lt=today)
-                .exclude(status=Order.Status.DELIVERED)
-                .values_list('delivery_date', flat=True)
+        deliveries = {
+            row['delivery_date']: row['c']
+            for row in orders.values('delivery_date').annotate(c=Count('id'))
+        }
+        late = {
+            row['delivery_date']: row['c']
+            for row in orders.filter(delivery_date__lt=today)
+                             .exclude(status=Order.Status.DELIVERED)
+                             .values('delivery_date').annotate(c=Count('id'))
+        }
+
+        installments = Installment.objects.filter(
+            order__user=request.user,
+            order__deleted_at__isnull=True,
+            paid_date__isnull=True,
+            due_date__gte=first,
+            due_date__lte=last,
         )
-        return Response({
-            str(row['delivery_date']): {
-                'count': row['count'],
-                'has_overdue': row['delivery_date'] in overdue_dates,
+        pay_count, pay_amount = {}, {}
+        for row in installments.values('due_date').annotate(c=Count('id'), s=Sum('amount')):
+            pay_count[row['due_date']]  = row['c']
+            pay_amount[row['due_date']] = row['s']
+
+        result = {}
+        for d in set(deliveries) | set(pay_count) | set(late):
+            dl = deliveries.get(d, 0)
+            pc = pay_count.get(d, 0)
+            result[str(d)] = {
+                'deliveries': dl,
+                'payments': pc,
+                'payment_amount': str(pay_amount.get(d) or '0'),
+                'late': late.get(d, 0),
+                'workload': dl + pc,
             }
-            for row in counts
-        })
+        return Response(result)

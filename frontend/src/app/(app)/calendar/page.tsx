@@ -22,14 +22,27 @@ function addDays(d: Date, n: number): Date {
   return r
 }
 
+function fmtMoney(s: string | number): string {
+  return Number(s).toLocaleString('en-IN')
+}
+
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const WEEKDAYS    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
-// 1–5 green, 6–12 amber, 13+ red. 0 → no badge.
-function loadBadge(count: number): string {
-  if (count >= 13) return 'bg-red-100 text-red-700'
-  if (count >= 6)  return 'bg-amber-100 text-amber-700'
-  return 'bg-emerald-100 text-emerald-700'
+// Single workload cue: Light 0–2 green / Busy 3–5 amber / Overloaded 6+ red.
+function workloadDot(workload: number): string {
+  if (workload >= 6) return 'bg-red-500'
+  if (workload >= 3) return 'bg-amber-500'
+  return 'bg-emerald-500'
+}
+
+function TruckIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="6" width="13" height="11" rx="1" /><path d="M14 9h4l3 3v5h-7" />
+      <circle cx="6" cy="18" r="1.6" /><circle cx="17.5" cy="18" r="1.6" />
+    </svg>
+  )
 }
 
 // ── Day-orders drill-down panel ──────────────────────────────────────────────
@@ -93,8 +106,8 @@ function DayPanel({ date, onClose }: { date: string; onClose: () => void }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
-  const [viewDate, setViewDate]       = useState<Date>(() => new Date())
-  const [selectedDate, setSelected]   = useState<string | null>(null)
+  const [viewDate, setViewDate]     = useState<Date>(() => new Date())
+  const [selectedDate, setSelected] = useState<string | null>(null)
 
   const year       = viewDate.getFullYear()
   const monthIndex = viewDate.getMonth()           // 0–11
@@ -113,6 +126,12 @@ export default function CalendarPage() {
   const weeks        = Math.ceil((firstWeekday + daysInMonth) / 7)
   const gridStart    = addDays(monthStart, -firstWeekday)
   const cells        = Array.from({ length: weeks * 7 }, (_, i) => addDays(gridStart, i))
+
+  // Slim summary: today's deliveries + amount to collect, and month overdue total.
+  const todayCell      = load[todayStr]
+  const deliveriesToday = todayCell?.deliveries ?? 0
+  const toCollectToday  = todayCell?.payment_amount ?? '0'
+  const overdueMonth    = Object.values(load).reduce((sum, c) => sum + c.late, 0)
 
   const goPrev  = () => setViewDate(new Date(year, monthIndex - 1, 1))
   const goNext  = () => setViewDate(new Date(year, monthIndex + 1, 1))
@@ -154,6 +173,17 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* ── Slim summary line ──────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-white border-b border-[#ECEEF3] text-[11px] text-[#475569] flex-shrink-0 flex-wrap">
+        <span><strong className="text-[#1A1A18] font-bold tabular-nums">{deliveriesToday}</strong> deliveries due today</span>
+        <span className="text-[#C8CDD9]">·</span>
+        <span><strong className="text-[#1A1A18] font-bold tabular-nums">₹{fmtMoney(toCollectToday)}</strong> to collect</span>
+        <span className="text-[#C8CDD9]">·</span>
+        <span className={overdueMonth > 0 ? 'text-red-600 font-semibold' : ''}>
+          <span className="tabular-nums">{overdueMonth}</span> overdue
+        </span>
+      </div>
+
       {/* ── Grid ───────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col p-3 min-h-0">
         {/* Weekday header */}
@@ -169,12 +199,10 @@ export default function CalendarPage() {
           style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}
         >
           {cells.map((cell) => {
-            const dateStr     = toDateStr(cell)
-            const inMonth     = cell.getMonth() === monthIndex
-            const isToday     = dateStr === todayStr
-            const info        = load[dateStr]
-            const count       = info?.count ?? 0
-            const hasOverdue  = info?.has_overdue ?? false
+            const dateStr  = toDateStr(cell)
+            const inMonth  = cell.getMonth() === monthIndex
+            const isToday  = dateStr === todayStr
+            const info     = load[dateStr]
 
             // Adjacent-month days: shown muted (not blank) for a continuous grid.
             if (!inMonth) {
@@ -191,20 +219,43 @@ export default function CalendarPage() {
                 type="button"
                 onClick={() => setSelected(dateStr)}
                 className={`rounded-md border p-1.5 flex flex-col text-left transition-colors bg-white hover:border-[#C8952A] ${
-                  isToday ? 'border-[#C8952A] border-2' : 'border-[#E0E3EB]'
+                  isToday ? 'border-[#C8952A]' : 'border-[#E0E3EB]'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className={`text-[12px] font-semibold tabular-nums ${isToday ? 'text-[#C8952A]' : 'text-[#1A1A18]'}`}>
-                    {cell.getDate()}
-                  </span>
-                  {hasOverdue && <span className="w-1.5 h-1.5 rounded-full bg-red-500" aria-label="Has overdue deliveries" />}
-                </div>
-                {count > 0 && (
-                  <div className="mt-auto">
-                    <span className={`inline-block text-[11px] font-bold px-1.5 py-0.5 rounded ${loadBadge(count)}`}>
-                      {count}
+                {/* Top row: date (today = filled circle) + workload dot */}
+                <div className="flex items-start justify-between">
+                  {isToday ? (
+                    <span className="w-[22px] h-[22px] flex items-center justify-center rounded-full bg-[#C8952A] text-white text-[12px] font-bold tabular-nums -mt-0.5 -ml-0.5">
+                      {cell.getDate()}
                     </span>
+                  ) : (
+                    <span className="text-[12px] font-semibold tabular-nums text-[#1A1A18]">{cell.getDate()}</span>
+                  )}
+                  {info && info.workload > 0 && (
+                    <span className={`w-2 h-2 rounded-full ${workloadDot(info.workload)}`} aria-label="Workload" />
+                  )}
+                </div>
+
+                {/* Late flag — highest priority, the only red text in a cell */}
+                {info && info.late > 0 && (
+                  <span className="mt-1 inline-block w-fit text-[10px] font-bold text-red-700 bg-red-50 rounded px-1 py-0.5">
+                    {info.late} late
+                  </span>
+                )}
+
+                {/* Event chips — neutral, icon-differentiated, anchored bottom */}
+                {info && (info.deliveries > 0 || info.payments > 0) && (
+                  <div className="mt-auto flex items-center gap-1 flex-wrap pt-1">
+                    {info.deliveries > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#475569] bg-[#EEF0F4] rounded px-1 py-0.5">
+                        <TruckIcon />{info.deliveries}
+                      </span>
+                    )}
+                    {info.payments > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#475569] bg-[#EEF0F4] rounded px-1 py-0.5">
+                        ₹{info.payments}
+                      </span>
+                    )}
                   </div>
                 )}
               </button>

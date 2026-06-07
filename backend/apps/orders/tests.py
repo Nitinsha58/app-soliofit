@@ -264,7 +264,12 @@ class CalendarViewTests(_Fixture):
     def _get(self, year, month):
         return self.client.get(f'/api/calendar/?year={year}&month={month}')
 
-    def test_counts_per_date(self):
+    def _installment(self, order, due, amount='500.00', paid=None):
+        return Installment.objects.create(
+            order=order, amount=Decimal(amount), due_date=due, paid_date=paid,
+        )
+
+    def test_deliveries_per_date(self):
         d1 = self.today.replace(day=10)
         d2 = self.today.replace(day=20)
         self._order(d1)
@@ -272,26 +277,45 @@ class CalendarViewTests(_Fixture):
         self._order(d2)
         resp = self._get(self.today.year, self.today.month)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data[str(d1)]['count'], 2)
-        self.assertEqual(resp.data[str(d2)]['count'], 1)
+        self.assertEqual(resp.data[str(d1)]['deliveries'], 2)
+        self.assertEqual(resp.data[str(d2)]['deliveries'], 1)
 
-    def test_has_overdue_true_for_past_undelivered(self):
+    def test_payments_and_workload(self):
+        d = self.today.replace(day=12)
+        order = self._order(d)
+        self._installment(order, d, amount='700.00')
+        resp = self._get(self.today.year, self.today.month)
+        cell = resp.data[str(d)]
+        self.assertEqual(cell['deliveries'], 1)
+        self.assertEqual(cell['payments'], 1)
+        self.assertEqual(cell['payment_amount'], '700.00')
+        self.assertEqual(cell['workload'], 2)   # 1 delivery + 1 payment
+
+    def test_paid_installment_not_counted(self):
+        d = self.today.replace(day=14)
+        order = self._order(d)
+        self._installment(order, d, amount='700.00', paid=d)
+        resp = self._get(self.today.year, self.today.month)
+        self.assertEqual(resp.data[str(d)]['payments'], 0)
+        self.assertEqual(resp.data[str(d)]['workload'], 1)  # delivery only
+
+    def test_late_true_for_past_undelivered(self):
         past = self.today - timedelta(days=40)  # prior month
         self._order(past, status='Booked')
         resp = self._get(past.year, past.month)
-        self.assertTrue(resp.data[str(past)]['has_overdue'])
+        self.assertEqual(resp.data[str(past)]['late'], 1)
 
-    def test_delivered_past_not_overdue(self):
+    def test_delivered_past_not_late(self):
         past = self.today - timedelta(days=40)
         self._order(past, status='Delivered')
         resp = self._get(past.year, past.month)
-        self.assertFalse(resp.data[str(past)]['has_overdue'])
+        self.assertEqual(resp.data[str(past)]['late'], 0)
 
-    def test_future_not_overdue(self):
+    def test_future_not_late(self):
         future = self.today + timedelta(days=40)
         self._order(future, status='Booked')
         resp = self._get(future.year, future.month)
-        self.assertFalse(resp.data[str(future)]['has_overdue'])
+        self.assertEqual(resp.data[str(future)]['late'], 0)
 
     def test_missing_params_400(self):
         self.assertEqual(self.client.get('/api/calendar/').status_code, 400)

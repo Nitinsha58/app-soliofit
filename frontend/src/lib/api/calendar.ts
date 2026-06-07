@@ -1,8 +1,11 @@
 import { apiRequest } from './client'
 
 export interface CalendarDay {
-  count: number
-  has_overdue: boolean
+  deliveries: number
+  payments: number
+  payment_amount: string
+  late: number
+  workload: number
 }
 
 // month is 1-indexed (Jan = 1), matching the backend query params.
