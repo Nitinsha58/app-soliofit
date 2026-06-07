@@ -242,3 +242,76 @@ class OrderNumberRaceTests(_Fixture):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data['order_number'], 2)
         self.assertEqual(Order.objects.filter(order_number=2).count(), 1)
+
+
+class CalendarViewTests(_Fixture):
+    def setUp(self):
+        super().setUp()
+        self.today = date.today()
+        self._n = 0
+
+    def _order(self, delivery, status='Booked', user=None):
+        self._n += 1
+        return Order.objects.create(
+            user=user or self.user,
+            customer=self.customer,
+            order_number=self._n,
+            delivery_date=delivery,
+            total_amount=Decimal('1000.00'),
+            status=status,
+        )
+
+    def _get(self, year, month):
+        return self.client.get(f'/api/calendar/?year={year}&month={month}')
+
+    def test_counts_per_date(self):
+        d1 = self.today.replace(day=10)
+        d2 = self.today.replace(day=20)
+        self._order(d1)
+        self._order(d1)
+        self._order(d2)
+        resp = self._get(self.today.year, self.today.month)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data[str(d1)]['count'], 2)
+        self.assertEqual(resp.data[str(d2)]['count'], 1)
+
+    def test_has_overdue_true_for_past_undelivered(self):
+        past = self.today - timedelta(days=40)  # prior month
+        self._order(past, status='Booked')
+        resp = self._get(past.year, past.month)
+        self.assertTrue(resp.data[str(past)]['has_overdue'])
+
+    def test_delivered_past_not_overdue(self):
+        past = self.today - timedelta(days=40)
+        self._order(past, status='Delivered')
+        resp = self._get(past.year, past.month)
+        self.assertFalse(resp.data[str(past)]['has_overdue'])
+
+    def test_future_not_overdue(self):
+        future = self.today + timedelta(days=40)
+        self._order(future, status='Booked')
+        resp = self._get(future.year, future.month)
+        self.assertFalse(resp.data[str(future)]['has_overdue'])
+
+    def test_missing_params_400(self):
+        self.assertEqual(self.client.get('/api/calendar/').status_code, 400)
+
+    def test_invalid_month_400(self):
+        self.assertEqual(self._get(self.today.year, 13).status_code, 400)
+
+    def test_non_integer_param_400(self):
+        self.assertEqual(self.client.get('/api/calendar/?year=abc&month=6').status_code, 400)
+
+    def test_empty_month_returns_empty(self):
+        resp = self._get(self.today.year, self.today.month)
+        self.assertEqual(resp.data, {})
+
+    def test_user_isolation(self):
+        other = User.objects.create_user(email='other@test.com', password='pass')
+        other_customer = Customer.objects.create(user=other, name='Bob', phone='8888888888')
+        Order.objects.create(
+            user=other, customer=other_customer, order_number=999,
+            delivery_date=self.today.replace(day=15), total_amount=Decimal('1000.00'),
+        )
+        resp = self._get(self.today.year, self.today.month)
+        self.assertEqual(resp.data, {})
