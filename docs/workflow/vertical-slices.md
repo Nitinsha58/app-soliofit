@@ -30,8 +30,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-16 | Settings | Profile edit, password change, notification toggles | Done |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
-| VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Pending |
-| VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Backlog |
+| VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
+| VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Pending |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Backlog |
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Backlog |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Backlog |
@@ -56,9 +56,11 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-15a | Orders Schedule | Done |
 | VS-15 | Calendar | Done |
 | VS-16 | Settings | Done |
-| VS-19 | Order payment summary | **Active** |
+| VS-19 | Order payment summary | Done |
+| VS-20 | Orders list scaling | **Active** |
 
 _Window reviewed: 2026-06-07 (after VS-16 completion). Next review after VS-19._
+_VS-20 requires an ADR at activation (orders-list scaling / pagination strategy) — write it with the user before implementing._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -640,6 +642,12 @@ Review deviations addressed before close: workload-dot bands made capacity-relat
 **ADR:** None — one additive annotation + presentational serializer fields; isolated and easily reversible (noted in commit body).
 
 **Review checkpoint:** Order with 1 of 2 installments paid → "Partial · ₹X due", amount line shows `₹paid / ₹total`. Fully paid → "Paid", no due text, remaining ₹0. Past-due unpaid installment → "Overdue" (red). Zero-bill order → no pill. Order-list query count is flat regardless of how many cards render (assert via `assertNumQueries`).
+
+**Completion record:** Commits `bb153f7` (code), `7ccdfce` (spec) · Deferred: none · Scope: limited to `OrderCard` (Kanban) + `ScheduleCard` (Orders Schedule). `CustomerOrdersTab` left as a row-list (customer profile already shows customer-level outstanding balance + a Payments tab).
+
+Backend: `OrderViewSet.get_queryset()` annotates `amount_paid` via a Coalesce'd `Sum` subquery (no join → no N+1, no row multiplication), alongside the existing `has_delayed_installment` `Exists`. `OrderSerializer` derives `amount_paid` / `remaining` (`max(total − paid, 0)`) / `payment_state` in pure Python from those annotations, with safe defaults for freshly-created (un-annotated) orders. `payment_state` ∈ `completed | overdue | partial | pending | unbilled` — mirrors `payments.views._classify_order`. 9 tests (state matrix, safe-create defaults, flat query count, delivery-load grouping guard); 108 backend total, frontend type-check clean.
+
+Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both cards show `₹paid / ₹total` with a colored state pill (Paid/Partial/Unpaid/Overdue) + "₹X due"; Paid hides due text; `unbilled` → plain bill, no pill. On `ScheduleCard` the unified pill **replaced** the standalone "Delayed" badge (one payment signal). Card layout: "Paid / total progress" option.
 
 ---
 
