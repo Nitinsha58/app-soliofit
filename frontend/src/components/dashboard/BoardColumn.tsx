@@ -14,8 +14,10 @@ interface Props {
   /** Client-side filter over loaded rows (dashboard summary cards). May under-report. */
   filterFn: (o: Order) => boolean
   mutatingIds: Set<string>
-  /** The most recently moved card + where it came from (drives the ring + "From X"). */
-  recentlyMoved: { id: string; from: Order['status'] } | null
+  /** Card id to flash with the transient recently-moved ring (clears after a few seconds). */
+  highlightId: string | null
+  /** Persistent map of orderId → previous status, drives the "From <status>" tag that stays. */
+  movedFromMap: Record<string, Order['status']>
   /** Reports the latest per-status totals + column values up to the board. */
   onCounts: (counts: OrderBoardPage['counts'], value: OrderBoardPage['value']) => void
   headerAction?: React.ReactNode
@@ -35,7 +37,7 @@ export function useColumnQuery(status: Order['status'], older: boolean, enabled 
 }
 
 export default function BoardColumn({
-  status, title, accent, filterFn, mutatingIds, recentlyMoved, onCounts, headerAction,
+  status, title, accent, filterFn, mutatingIds, highlightId, movedFromMap, onCounts, headerAction,
 }: Props) {
   const isDelivered = status === 'Delivered'
   const { isOver, setNodeRef } = useDroppable({ id: status })
@@ -95,7 +97,11 @@ export default function BoardColumn({
           <span className="text-[13px] font-semibold text-[#1A1A18] tracking-tight">{title}</span>
           <div className="flex items-center gap-2">
             {headerAction}
-            <span className="text-[11px] font-semibold text-[#A0A09C] tabular-nums">
+            {/* Value of work in this stage — highlighted in the column colour, slightly larger. */}
+            <span
+              className="text-[12.5px] font-bold px-1.5 py-0.5 rounded tabular-nums"
+              style={{ backgroundColor: `${accent}1F`, color: accent }}
+            >
               {compactInr(value?.[status] ?? 0)}
             </span>
             <span
@@ -123,8 +129,8 @@ export default function BoardColumn({
               key={order.id}
               order={order}
               disabled={mutatingIds.has(order.id)}
-              highlightColor={order.id === recentlyMoved?.id ? accent : undefined}
-              movedFrom={order.id === recentlyMoved?.id ? recentlyMoved.from : undefined}
+              highlightColor={order.id === highlightId ? accent : undefined}
+              movedFrom={movedFromMap[order.id]}
             />
           ))
         )}

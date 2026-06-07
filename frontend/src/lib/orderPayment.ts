@@ -22,13 +22,13 @@ export function paymentMeta(state: PaymentState): PaymentMeta | null {
 }
 
 // Colour applied to the *paid* amount on a card (the "/ total" stays neutral):
-// green = fully paid, orange = partial, red = overdue. Pending (unpaid, not yet
-// late) and unbilled stay neutral so a fresh order isn't alarmist.
+// green = fully paid, orange = partial, red = nothing collected (pending) or
+// overdue. Unbilled (no bill) stays neutral.
 const PAID_COLOR: Record<PaymentState, string> = {
   completed: 'text-emerald-600',
   partial:   'text-amber-600',
   overdue:   'text-red-600',
-  pending:   'text-[#1A1A18]',
+  pending:   'text-red-600',
   unbilled:  'text-[#1A1A18]',
 }
 

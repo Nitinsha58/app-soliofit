@@ -6,7 +6,6 @@ import {
   DragOverlay,
   MouseSensor,
   TouchSensor,
-  useDroppable,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -14,7 +13,6 @@ import {
 } from '@dnd-kit/core'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { updateOrderStatus, type Order, type OrderBoardPage } from '@/lib/api/orders'
-import { compactInr } from '@/lib/orderPayment'
 import { useUIStore } from '@/stores/useUIStore'
 import BoardColumn from './BoardColumn'
 import OrderCard from './OrderCard'
@@ -25,8 +23,10 @@ const COLUMNS: { status: Order['status']; label: string; accent: string }[] = [
   { status: 'Started',          label: 'Started',          accent: '#A78BFA' },
   { status: 'Ready',            label: 'Ready',            accent: '#34D399' },
   { status: 'Partial Delivery', label: 'Partial Delivery', accent: '#FBBF24' },
+  // Delivered is a normal column now: recent window shown, older tail behind
+  // "Show older delivered" inside the column — never hidden.
+  { status: 'Delivered',        label: 'Delivered',        accent: '#9CA3AF' },
 ]
-const DELIVERED = { status: 'Delivered' as const, label: 'Delivered', accent: '#9CA3AF' }
 
 type Board = InfiniteData<OrderBoardPage, string | null>
 
@@ -58,41 +58,8 @@ function addToCache(old: Board | undefined, order: Order, to: Order['status']): 
   }
 }
 
-function CollapsedDelivered({ total, value, onShow }: { total: number | null; value: string | null; onShow: () => void }) {
-  const { isOver, setNodeRef } = useDroppable({ id: DELIVERED.status })
-  return (
-    <div
-      ref={setNodeRef}
-      className="flex flex-col w-72 flex-shrink-0 rounded-xl bg-[#F7F7F5] overflow-hidden transition-all"
-      style={{ boxShadow: isOver ? `inset 0 0 0 2px ${DELIVERED.accent}` : 'inset 0 0 0 1px #E5E5E2' }}
-    >
-      <div style={{ borderTop: `3px solid ${DELIVERED.accent}` }} className="px-3 pt-3 pb-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-[#A0A09C] tracking-tight">{DELIVERED.label}</span>
-          <div className="flex items-center gap-2">
-            {value != null && (
-              <span className="text-[11px] font-semibold text-[#A0A09C] tabular-nums">{compactInr(value)}</span>
-            )}
-            <button
-              onClick={onShow}
-              className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] bg-[#9CA3AF28] px-2 py-0.5 rounded-full transition-colors"
-            >
-              Show{total != null ? ` (${total})` : ''}
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="px-2.5 pb-3">
-        <div className={`flex items-center justify-center py-7 rounded-lg border border-dashed transition-colors ${isOver ? 'border-[#9CA3AF]' : 'border-[#DCDCD8]'}`}>
-          <p className="text-xs text-[#C8C8C4]">{isOver ? 'Drop to deliver' : 'Hidden'}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// A completed move, kept briefly to drive the Undo snackbar and the "From <status>"
-// provenance on the moved card. `order` is the card as it was before the move.
+// A completed move, kept briefly to drive the Undo snackbar and the recently-moved
+// ring. `order` is the card as it was before the move.
 type Move = { order: Order; from: Order['status']; to: Order['status'] }
 const MOVE_TTL = 6000
 
@@ -101,10 +68,11 @@ export default function KanbanBoard() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set())
   const [lastMove, setLastMove] = useState<Move | null>(null)
-  const [showDelivered, setShowDelivered] = useState(false)
+  // Persistent origin per card (orderId → previous status). Survives refetches so the
+  // "From <status>" tag stays with the card for the whole session, not just briefly.
+  const [movedFromMap, setMovedFromMap] = useState<Record<string, Order['status']>>({})
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null)
   const [counts, setCounts] = useState<OrderBoardPage['counts'] | null>(null)
-  const [value, setValue] = useState<OrderBoardPage['value'] | null>(null)
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const triggerOrdersRefresh = useUIStore((s) => s.triggerOrdersRefresh)
   const ordersRefreshKey = useUIStore((s) => s.ordersRefreshKey)
@@ -129,11 +97,10 @@ export default function KanbanBoard() {
 
   useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current) }, [])
 
-  // Latest totals + per-column values come from whichever column reported most
-  // recently — both maps are identical across every column's response.
-  const onCounts = useCallback((c: OrderBoardPage['counts'], v: OrderBoardPage['value']) => {
-    setCounts(c); setValue(v)
-  }, [])
+  // Latest per-status totals come from whichever column reported most recently —
+  // identical across every column's response. (Per-column `value` is read locally
+  // in each BoardColumn header.)
+  const onCounts = useCallback((c: OrderBoardPage['counts']) => setCounts(c), [])
 
   const filterFn = useCallback((o: Order): boolean => {
     if (!activeFilter) return true
@@ -159,6 +126,7 @@ export default function KanbanBoard() {
     queryClient.setQueryData<Board>(['orders-board', from, 'older'], (old) => removeFromCache(old, order.id, from))
     queryClient.setQueryData<Board>(['orders-board', to], (old) => addToCache(old, { ...order, status: to }, to))
     setCounts((c) => (c ? { ...c, [from]: Math.max(0, c[from] - 1), [to]: c[to] + 1 } : c))
+    setMovedFromMap((m) => ({ ...m, [order.id]: from }))  // persistent origin tag
 
     setMutatingIds((prev) => new Set(prev).add(order.id))
     updateOrderStatus(order.id, to)
@@ -206,7 +174,7 @@ export default function KanbanBoard() {
     setLastMove(null)
   }
 
-  const recentlyMoved = lastMove ? { id: lastMove.order.id, from: lastMove.from } : null
+  const highlightId = lastMove ? lastMove.order.id : null
   const isEmpty = counts != null && Object.values(counts).reduce((a, b) => a + b, 0) === 0
 
   return (
@@ -236,36 +204,11 @@ export default function KanbanBoard() {
               accent={accent}
               filterFn={filterFn}
               mutatingIds={mutatingIds}
-              recentlyMoved={recentlyMoved}
+              highlightId={highlightId}
+              movedFromMap={movedFromMap}
               onCounts={onCounts}
             />
           ))}
-
-          {showDelivered ? (
-            <BoardColumn
-              status={DELIVERED.status}
-              title={DELIVERED.label}
-              accent={DELIVERED.accent}
-              filterFn={filterFn}
-              mutatingIds={mutatingIds}
-              recentlyMoved={recentlyMoved}
-              onCounts={onCounts}
-              headerAction={
-                <button
-                  onClick={() => setShowDelivered(false)}
-                  className="text-[11px] font-semibold text-[#A0A09C] hover:text-[#6B6B67] transition-colors"
-                >
-                  Hide
-                </button>
-              }
-            />
-          ) : (
-            <CollapsedDelivered
-              total={counts?.Delivered ?? null}
-              value={value?.Delivered ?? null}
-              onShow={() => setShowDelivered(true)}
-            />
-          )}
         </div>
       </div>
 

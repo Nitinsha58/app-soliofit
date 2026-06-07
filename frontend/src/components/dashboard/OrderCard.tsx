@@ -1,6 +1,6 @@
 'use client'
 
-import type { Order } from '@/lib/api/orders'
+import { STATUS_ACCENT, type Order } from '@/lib/api/orders'
 import { paymentMeta, inr, lastChanged, paidColorClass } from '@/lib/orderPayment'
 
 interface Props {
@@ -77,10 +77,13 @@ export default function OrderCard({ order, onClick, movedFrom }: Props) {
         )}
       </div>
 
-      {/* Move provenance "From <status>" (left) · last-changed time (bottom-right) */}
+      {/* Move provenance "From <status>" in the source-status colour (left) · last-changed time (right) */}
       <div className="flex items-center justify-between gap-2 mt-2">
         {movedFrom ? (
-          <span className="text-[10px] font-semibold text-[#6B6B67] bg-[#F0F0EE] px-1.5 py-0.5 rounded whitespace-nowrap">
+          <span
+            className="text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+            style={{ color: STATUS_ACCENT[movedFrom], backgroundColor: `${STATUS_ACCENT[movedFrom]}1F` }}
+          >
             From {movedFrom}
           </span>
         ) : (
