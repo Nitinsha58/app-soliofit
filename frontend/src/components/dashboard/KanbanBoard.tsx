@@ -160,13 +160,13 @@ export default function KanbanBoard() {
     flashMove({ order, from, to })
   }
 
-  // Undo = the compensating reverse move (writes its own activity). It re-flashes as a
-  // move back, so the snackbar's Undo also serves as redo.
+  // Undo = a one-shot compensating reverse move (writes its own activity), then the
+  // snackbar dismisses. Not re-offered, so repeated clicks can't ping-pong the card.
   function undoMove() {
     if (!lastMove) return
     const { order, from, to } = lastMove
     performMove(order, to, from)
-    flashMove({ order, from: to, to: from })
+    dismissMove()
   }
 
   function dismissMove() {

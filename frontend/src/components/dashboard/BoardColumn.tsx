@@ -97,10 +97,10 @@ export default function BoardColumn({
           <span className="text-[13px] font-semibold text-[#1A1A18] tracking-tight">{title}</span>
           <div className="flex items-center gap-2">
             {headerAction}
-            {/* Value of work in this stage — highlighted in the column colour, slightly larger. */}
+            {/* Value of work in this stage — black on a column-coloured background, slightly larger. */}
             <span
-              className="text-[12.5px] font-bold px-1.5 py-0.5 rounded tabular-nums"
-              style={{ backgroundColor: `${accent}1F`, color: accent }}
+              className="text-[12.5px] font-bold px-1.5 py-0.5 rounded tabular-nums text-[#1A1A18]"
+              style={{ backgroundColor: `${accent}33` }}
             >
               {compactInr(value?.[status] ?? 0)}
             </span>
