@@ -445,11 +445,11 @@ Frontend (final — `1de905d`): Infinite horizontal scroll replacing week-pagina
 **Frontend:**
 - Update `listOrders` (or equivalent API client function) to accept `{ deliveryDateFrom?, deliveryDateTo?, customerId? }` — replacing the current `customerId`-only signature.
 - New `/orders` page component: `OrdersSchedulePage`
-- Fetch current week (Mon–Sun) on mount via TanStack Query, keyed by week start date
+- Infinite horizontal day-column timeline (see completion record for the shipped detail): `loadedWeeks` state + `useQueries` (one query per week, keyed by week start), `IntersectionObserver` sentinels load adjacent weeks, DOM capped at `MAX_WEEKS`
 - Group orders by `delivery_date` client-side
 - Within each date group, sort by priority tier (see below)
-- Week navigation: ← / → buttons shift the date range by 7 days, trigger refetch. "Today" button resets to current week.
-- Card: reuse existing `OrderCard` component — identical to Kanban card
+- Navigation: scroll horizontally to move through weeks; a passive month label tracks the center column; a "Today" button scrolls back to today's column. (No ← / → week-pagination buttons — superseded during the layout rework.)
+- Card: dedicated narrow `ScheduleCard` for ~200px columns (not a reuse of the Kanban `OrderCard`)
 - Click card → open existing `OrderDetailsDrawer` (right side panel on desktop, full screen on mobile)
 - Sidebar "Orders" link and mobile bottom nav "Orders" item both resolve to `/orders`
 
@@ -473,9 +473,9 @@ Within the same tier: sort by `created_at` ascending.
 - One column fully visible with adjacent column peeking (~20px) to indicate scrollability
 - Same priority ordering as desktop
 
-**ADR:** None. No new architectural decisions — additive filter on existing viewset, reuse of existing card and drawer components.
+**ADR:** None. No new architectural decisions — additive filter on existing viewset, dedicated `ScheduleCard`, reuse of the existing drawer.
 
-**Review checkpoint:** Navigate to `/orders` — page loads (no 404). Current week's orders appear in correct date columns. Within one column, overdue orders are at the top and delivered orders at the bottom. Click a card — Order Details drawer opens. ← / → navigation changes the week and refetches. Sidebar "Orders" and mobile bottom nav "Orders" both open this page. `GET /api/orders/?delivery_date_from=2026-06-02&delivery_date_to=2026-06-08` returns only orders in that range.
+**Review checkpoint:** Navigate to `/orders` — page loads (no 404). Current week's orders appear in correct date columns. Within one column, overdue orders are at the top and delivered orders at the bottom. Click a card — Order Details drawer opens. Scrolling left/right loads adjacent weeks without a jump; "Today" returns to today's column. Sidebar "Orders" and mobile bottom nav "Orders" both open this page. `GET /api/orders/?delivery_date_from=2026-06-02&delivery_date_to=2026-06-08` returns only orders in that range.
 
 ---
 
