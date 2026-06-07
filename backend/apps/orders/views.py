@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, Max, OuterRef, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -67,10 +67,19 @@ class OrderViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0
-        with transaction.atomic():
-            order = serializer.save(user=self.request.user, order_number=max_num + 1)
-            create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
+        # order_number is a global counter (Max + 1). Two concurrent creates can read
+        # the same max and collide on the unique constraint, so retry on IntegrityError
+        # with a fresh read inside a fresh transaction. Per-boutique numbering: VS-23.
+        for attempt in range(5):
+            max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0
+            try:
+                with transaction.atomic():
+                    order = serializer.save(user=self.request.user, order_number=max_num + 1)
+                    create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
+                return
+            except IntegrityError:
+                if attempt == 4:
+                    raise
 
     def partial_update(self, request, *args, **kwargs):
         if 'total_amount' in request.data:

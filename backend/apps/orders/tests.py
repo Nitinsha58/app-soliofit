@@ -221,3 +221,24 @@ class OrderDateFilterTests(_Fixture):
         resp = self.client.get(f'/api/orders/?delivery_date_from={self.today}&delivery_date_to={self.today}')
         nums = {o['order_number'] for o in resp.data}
         self.assertNotIn(99, nums)
+
+
+class OrderNumberRaceTests(_Fixture):
+    def test_retry_recovers_from_unique_collision(self):
+        # Seed an existing order at number 1.
+        self._create_order()
+        # Simulate a race: first aggregate read is stale (0 → tries 1 → collides),
+        # second read is correct (1 → tries 2 → succeeds). No threading needed.
+        from unittest import mock
+        with mock.patch(
+            'apps.orders.views.Order.objects.aggregate',
+            side_effect=[{'order_number__max': 0}, {'order_number__max': 1}],
+        ):
+            resp = self.client.post('/api/orders/', {
+                'customer': str(self.customer.id),
+                'delivery_date': _future(),
+                'total_amount': '5000.00',
+            })
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['order_number'], 2)
+        self.assertEqual(Order.objects.filter(order_number=2).count(), 1)
