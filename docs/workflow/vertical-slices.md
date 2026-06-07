@@ -619,6 +619,30 @@ Review deviations addressed before close: workload-dot bands made capacity-relat
 
 ---
 
+### VS-19 — Order Payment Summary
+
+**What:** Order cards surface how much has been collected and the order's payment state, so the boutique can see outstanding balances at a glance without opening each order. Reuses the VS-11 payments-dashboard taxonomy so the cards and that dashboard never disagree.
+
+**Backend (`orders`):**
+- `OrderViewSet.get_queryset()` gains an `amount_paid` annotation: `Coalesce(Subquery(Sum of installments where paid_date is set), 0)` — the same subquery style as the existing `has_delayed_installment` `Exists` annotation. No per-card query (no N+1).
+- `OrderSerializer` exposes three read-only fields derived in Python from the two annotations (`amount_paid`, `has_delayed_installment`):
+  - `amount_paid` — total collected
+  - `remaining` — `max(total_amount − amount_paid, 0)`
+  - `payment_state` ∈ `completed | overdue | partial | pending` (mirrors `payments.views._classify_order`), plus `unbilled` when `total_amount == 0` so a zero-bill order does not read as paid
+- Defaults are safe on freshly-created orders (no annotation present → `amount_paid` 0, state `pending`/`unbilled`).
+
+**Frontend:**
+- `Order` type extended with `amount_paid` / `remaining` / `payment_state`.
+- Both card surfaces — `OrderCard` (Kanban) and `ScheduleCard` (Orders Schedule) — show **`₹paid / ₹total`** on the amount line, with a colored state pill + "₹X due" beneath (the "Paid / total progress" layout). Paid state hides the due text.
+- Labels: Paid (emerald) / Partial (amber) / Unpaid (neutral) / Overdue (red); `unbilled` → no pill, plain bill amount only.
+- On `ScheduleCard` the unified payment pill **replaces** the standalone "Delayed" badge — one payment signal, not two.
+
+**ADR:** None — one additive annotation + presentational serializer fields; isolated and easily reversible (noted in commit body).
+
+**Review checkpoint:** Order with 1 of 2 installments paid → "Partial · ₹X due", amount line shows `₹paid / ₹total`. Fully paid → "Paid", no due text, remaining ₹0. Past-due unpaid installment → "Overdue" (red). Zero-bill order → no pill. Order-list query count is flat regardless of how many cards render (assert via `assertNumQueries`).
+
+---
+
 ## Completion Criteria
 
 A slice is complete when:
