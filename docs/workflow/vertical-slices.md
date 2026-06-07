@@ -693,10 +693,11 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 **ADR:** None expected — soft-delete via `deleted_at` is already established (the `destroy` handler already sets `order.deleted_at`). Add one only if S3 cleanup needs an async job.
 
 **Backend:**
-- `DELETE /api/orders/{id}/` already soft-deletes the order. Extend to cascade: soft-delete its installments (keep payment history queryable but excluded from active queries) and its media rows; enqueue/perform best-effort S3 object deletion (tolerate already-missing objects).
-- Add an `order_deleted` type to `OrderActivity.Type`; log it.
-- Restore is out of scope for MVP (rows are recoverable in the DB); no restore UI.
-- Open detail to settle at activation: hard-delete vs soft-delete of installment rows; whether S3 deletion is synchronous or deferred.
+- `DELETE /api/orders/{id}/` soft-deletes the order (sets `deleted_at`). The cascade is **already enforced by the existing invariant**: every active query for installments and media is scoped through `order__deleted_at__isnull=True` (verified across payments, dashboard, search, calendar, customer-profile, board), so flagging the order makes all children disappear from active views with no per-child `deleted_at` and no schema change. Child rows are **kept** (no hard delete) — payment history stays queryable, only excluded.
+- **S3 cleanup is synchronous + best-effort**: on delete, the order's photo + voice-note `s3_key`s are collected and passed to a shared `apps.media.s3.delete_objects()` (batched `DeleteObjects`, idempotent on missing keys, swallows errors — never blocks the soft-delete). The single-object photo/voice deletes were refactored onto the same helper. No async job → no ADR.
+- `OrderActivity.Type.ORDER_DELETED` added and logged (with `order_number`) inside the same transaction as the `deleted_at` write.
+- Ownership/idempotency come free from `get_queryset` (user-scoped, `deleted_at__isnull=True`): another user's order and an already-deleted order both 404, and the second delete performs no second S3 cleanup or activity.
+- Restore is out of scope for MVP (rows recoverable in the DB); no restore UI. **Settled at activation:** installment/media rows are soft (kept, parent-filtered), not hard-deleted; S3 deletion is synchronous best-effort.
 
 **Frontend:**
 - Delete action in the Order Details drawer danger area, behind an explicit confirmation naming the order and its side effects ("Delete order #0042? This also removes its installments and photos.").

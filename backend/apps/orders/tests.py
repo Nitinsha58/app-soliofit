@@ -2,6 +2,7 @@ import base64
 import json
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -9,6 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.customers.models import Customer
+from apps.media.models import OrderPhoto, VoiceNote
 from apps.orders.models import Order, OrderActivity
 from apps.payments.models import Installment
 from apps.users.models import User
@@ -621,3 +623,102 @@ class BoardActionTests(_Fixture):
         resp = self.client.get(self.url, {'status': 'Booked'})
         self.assertEqual(len(resp.data['results']), 1)
         self.assertEqual(resp.data['counts']['Booked'], 1)
+
+
+class DeleteOrderTests(_Fixture):
+    """VS-21 — soft-delete an order, cascade-hide children, clean S3, log it."""
+
+    def _seed_media(self, order):
+        OrderPhoto.objects.create(
+            order=order, s3_key='garment/p1.jpg',
+            public_url='http://x/p1.jpg', photo_type='garment',
+        )
+        VoiceNote.objects.create(
+            order=order, s3_key='voice/v1.webm',
+            public_url='http://x/v1.webm', duration_seconds=4,
+        )
+
+    def _delete(self, order):
+        # delete_objects is patched everywhere so no real S3/disk work runs in tests.
+        with patch('apps.orders.views.delete_objects') as mock_del:
+            resp = self.client.delete(f'/api/orders/{order.id}/')
+        return resp, mock_del
+
+    def test_soft_deletes_and_returns_204(self):
+        order = self._create_order()
+        resp, _ = self._delete(order)
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        order.refresh_from_db()
+        self.assertIsNotNone(order.deleted_at)  # row kept, flagged
+
+    def test_logs_order_deleted_activity(self):
+        order = self._create_order()
+        self._delete(order)
+        act = OrderActivity.objects.filter(order=order, activity_type=OrderActivity.Type.ORDER_DELETED)
+        self.assertEqual(act.count(), 1)
+        self.assertEqual(act.first().metadata['order_number'], order.order_number)
+
+    def test_excluded_from_list_and_board(self):
+        order = self._create_order()
+        self._delete(order)
+        self.assertEqual(self.client.get('/api/orders/').data, [])
+        board = self.client.get('/api/orders/board/', {'status': order.status})
+        self.assertEqual(board.data['results'], [])
+        self.assertEqual(board.data['counts'][order.status], 0)
+
+    def test_excluded_from_customer_orders(self):
+        order = self._create_order()
+        self._delete(order)
+        resp = self.client.get('/api/orders/', {'customer': str(self.customer.id)})
+        self.assertEqual(resp.data, [])
+
+    def test_installments_excluded_from_payments(self):
+        order = self._create_order()
+        Installment.objects.create(order=order, amount=Decimal('5000.00'), due_date=date.today())
+        before = self.client.get('/api/payments/orders/')
+        self.assertIn(str(order.id), str(before.data))
+        self._delete(order)
+        after = self.client.get('/api/payments/orders/')
+        self.assertNotIn(str(order.id), str(after.data))
+
+    def test_media_cleaned_best_effort_and_excluded(self):
+        order = self._create_order()
+        self._seed_media(order)
+        _, mock_del = self._delete(order)
+        self.assertEqual(mock_del.call_count, 1)
+        self.assertCountEqual(mock_del.call_args.args[0], ['garment/p1.jpg', 'voice/v1.webm'])
+        media = self.client.get(f'/api/customers/{self.customer.id}/media/')
+        self.assertEqual(media.data['photos'], [])
+        self.assertEqual(media.data['voice_notes'], [])
+
+    def test_excluded_from_search(self):
+        order = self._create_order()
+        query = f'#{order.order_number}'  # search needs >= 2 chars; '#1' parses to order 1
+        before = self.client.get('/api/search/', {'q': query})
+        self.assertIn(str(order.id), str(before.data))
+        self._delete(order)
+        after = self.client.get('/api/search/', {'q': query})
+        self.assertNotIn(str(order.id), str(after.data))
+
+    def test_other_users_order_cannot_be_deleted(self):
+        order = self._create_order()
+        other = User.objects.create_user(email='intruder@test.com', password='p')
+        intruder = APIClient(); intruder.force_authenticate(user=other)
+        with patch('apps.orders.views.delete_objects') as mock_del:
+            resp = intruder.delete(f'/api/orders/{order.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        mock_del.assert_not_called()
+        order.refresh_from_db()
+        self.assertIsNone(order.deleted_at)
+
+    def test_deleting_twice_is_404_second_time(self):
+        order = self._create_order()
+        self._delete(order)
+        resp, mock_del = self._delete(order)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        mock_del.assert_not_called()  # no second cleanup
+        self.assertEqual(
+            OrderActivity.objects.filter(
+                order=order, activity_type=OrderActivity.Type.ORDER_DELETED).count(),
+            1,
+        )

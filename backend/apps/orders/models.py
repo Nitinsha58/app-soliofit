@@ -42,6 +42,7 @@ class Order(models.Model):
 class OrderActivity(models.Model):
     class Type(models.TextChoices):
         ORDER_CREATED       = 'order_created',       'Order Created'
+        ORDER_DELETED       = 'order_deleted',       'Order Deleted'
         STATUS_CHANGED      = 'status_changed',      'Status Changed'
         DELIVERY_MARKED     = 'delivery_marked',     'Delivery Marked'
         PARTIAL_DELIVERY    = 'partial_delivery',    'Partial Delivery'

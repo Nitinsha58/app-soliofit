@@ -14,6 +14,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.media.s3 import delete_objects
 from apps.payments.models import Installment
 from .models import Order, OrderActivity
 from .serializers import OrderSerializer
@@ -124,8 +125,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        instance.deleted_at = timezone.now()
-        instance.save(update_fields=['deleted_at'])
+        # Soft-delete (VS-21): set deleted_at + log the deletion atomically. The order's
+        # installments and media rows are kept but vanish from every active query because
+        # those are all scoped through order__deleted_at__isnull=True. S3 blobs are then
+        # cleaned up best-effort (tolerates already-missing objects). No hard delete.
+        keys = list(instance.photos.values_list('s3_key', flat=True))
+        keys += list(instance.voice_notes.values_list('s3_key', flat=True))
+        with transaction.atomic():
+            instance.deleted_at = timezone.now()
+            instance.save(update_fields=['deleted_at'])
+            create_order_activity(
+                instance,
+                OrderActivity.Type.ORDER_DELETED,
+                {'order_number': instance.order_number},
+            )
+        delete_objects(keys)
 
     @action(detail=True, methods=['patch'], url_path='status')
     def update_status(self, request, pk=None):

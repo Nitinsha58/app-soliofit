@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.orders.models import Order
 from .models import OrderPhoto, VoiceNote
+from .s3 import delete_objects
 from .serializers import OrderPhotoSerializer, VoiceNoteSerializer
 
 
@@ -161,22 +162,7 @@ class OrderPhotoDetailView(APIView):
         if not photo:
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if _use_stub():
-            stub_file = Path(settings.MEDIA_ROOT) / 'stub' / photo.s3_key
-            stub_file.unlink(missing_ok=True)
-        else:
-            try:
-                import boto3  # noqa: PLC0415
-                s3 = boto3.client(
-                    's3',
-                    region_name=settings.AWS_REGION,
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                )
-                s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=photo.s3_key)
-            except Exception:
-                pass  # don't block deletion if S3 call fails
-
+        delete_objects([photo.s3_key])
         photo.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -226,21 +212,6 @@ class VoiceNoteDetailView(APIView):
         if not note:
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if _use_stub():
-            stub_file = Path(settings.MEDIA_ROOT) / 'stub' / note.s3_key
-            stub_file.unlink(missing_ok=True)
-        else:
-            try:
-                import boto3  # noqa: PLC0415
-                s3 = boto3.client(
-                    's3',
-                    region_name=settings.AWS_REGION,
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                )
-                s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=note.s3_key)
-            except Exception:
-                pass
-
+        delete_objects([note.s3_key])
         note.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
