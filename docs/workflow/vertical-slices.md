@@ -32,7 +32,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
-| VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Pending |
+| VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Done |
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Pending |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Pending |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
@@ -58,7 +58,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-16 | Settings | Done |
 | VS-19 | Order payment summary | Done |
 | VS-20 | Orders list scaling | Done |
-| VS-21 | Delete order | **Active** |
+| VS-21 | Delete order | Done |
+| VS-22 | Forgot password | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 still needs a tenancy ADR at its activation; VS-18 needs a deployment ADR at its activation._
@@ -707,6 +708,12 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 - Added a minimal global toast: `useUIStore.showToast/dismissToast` + a `ToastHost` rendered in `AppShell` (single transient bottom-center pill, auto-dismiss). `['orders-schedule']` added to the `AppShell` refresh fan-out so deletes (and any order mutation) drop the card from the Orders Schedule too.
 
 **Review checkpoint:** Deleting an order removes it from board, calendar, search, and customer profile; its installments drop out of payment totals; S3 objects are removed (or cleanup enqueued); the activity log records the deletion. No one-tap accidental delete.
+
+**Completion record (2026-06-09):** Commits `01f6fc1` (backend soft-delete + S3 cleanup + activity), `5445d98` (media `s3_key` validation security fix), `6c2b8ae` (frontend confirm flow). Browser-verified: delete removes the card and drawer, toast shown. No deferrals.
+
+Backend: `perform_destroy` collects the order's photo + voice-note `s3_key`s, then within one `transaction.atomic()` sets `deleted_at`, writes `OrderActivity.Type.ORDER_DELETED` (with `order_number`), and after commit calls `apps.media.s3.delete_objects()` (batched, idempotent, best-effort — never blocks the soft-delete). Cascade is free: the verified invariant is that every active child query already scopes `order__deleted_at__isnull=True` (payments, dashboard, search, calendar, customer-profile, board), so child rows are kept (payment history queryable) but excluded from all active views — no per-child `deleted_at`, no schema change. Ownership + idempotency come from `get_queryset` (user-scoped, `deleted_at__isnull=True`): another user's order and a re-delete both 404 with no second cleanup. **Security prerequisite shipped (`5445d98`):** new `apps.media.s3` module is the single source of truth for valid keys (`photos/<uuid>.<img-ext>` / `voice-notes/<uuid>.<audio-ext>`, no `..`/absolute); media-create serializers now `validate_s3_key` and `public_url` is derived server-side (read-only) — closing the hole where a client-forgeable key could delete an arbitrary bucket object (or path-traverse out of `MEDIA_ROOT/stub` in dev) via order/media delete. The single-object photo/voice deletes were refactored onto the same `delete_objects([key])` helper. 138 backend tests (9 `DeleteOrderTests` + 4 `MediaKeyValidationTests`). No ADR — soft-delete + synchronous best-effort cleanup needed no new architectural decision.
+
+Frontend: `DangerZone` at the drawer bottom — two-step (no one-tap): "Delete order" expands an in-place confirmation naming the order (`#0042`) and side effects ("This also removes its installments and photos. This can't be undone.") with explicit Delete/Cancel. `deleteOrder(id)` → `DELETE /api/orders/{id}/`; on success `showToast`, `onUpdated()` (the `ordersRefreshKey` fan-out — board/schedule/customer/payments/dashboard/notifications all refetch, card disappears), then close drawer; on error inline message, stay open. Added a minimal global toast (`useUIStore.showToast/dismissToast` + `ToastHost` in `AppShell`, single transient bottom-center pill, auto-dismiss 3s) and added `['orders-schedule']` to the AppShell refresh fan-out so deletes drop the card from the Orders Schedule too. No emoji (project rule). `tsc` clean.
 
 ---
 

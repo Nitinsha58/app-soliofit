@@ -52,8 +52,8 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-16 | Settings | Complete |
 | VS-19 | Order payment summary | Complete |
 | VS-20 | Orders list scaling | Complete |
-| VS-21 | Delete order | Active |
-| VS-22 | Forgot password | Pending |
+| VS-21 | Delete order | Complete |
+| VS-22 | Forgot password | Active |
 | VS-23 | Boutique tenant | Pending |
 | VS-17 | Mobile layout | Pending |
 | VS-18 | Production deployment | Pending |
