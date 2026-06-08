@@ -6,6 +6,8 @@ from .views import (
     ChangePasswordView,
     OrderSettingsView,
     NotificationPreferenceView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 urlpatterns = [
@@ -15,4 +17,6 @@ urlpatterns = [
     path('change-password/', ChangePasswordView.as_view(), name='auth-change-password'),
     path('order-settings/', OrderSettingsView.as_view(), name='auth-order-settings'),
     path('notification-preferences/', NotificationPreferenceView.as_view(), name='auth-notification-preferences'),
+    path('password-reset/', PasswordResetRequestView.as_view(), name='auth-password-reset'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='auth-password-reset-confirm'),
 ]
