@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -71,6 +72,14 @@ export default function LoginPage() {
             {errors.password && (
               <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
             )}
+            <div className="mt-1.5 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {serverError && (

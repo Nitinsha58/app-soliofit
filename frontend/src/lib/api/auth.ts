@@ -37,6 +37,26 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   })
 }
 
+// Pre-login reset. The request endpoint always succeeds (no account enumeration);
+// confirm throws ApiError(400) on an invalid/expired link or a rejected password.
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiRequest('/api/auth/password-reset/', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export async function confirmPasswordReset(
+  uid: string,
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  await apiRequest('/api/auth/password-reset/confirm/', {
+    method: 'POST',
+    body: JSON.stringify({ uid, token, new_password: newPassword }),
+  })
+}
+
 export interface OrderSettings {
   delivery_buffer_days: number
   daily_capacity: number
