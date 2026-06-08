@@ -701,8 +701,10 @@ Frontend: `Order` type + `lib/orderPayment.ts` (`paymentMeta`, `inr`). Both card
 - Restore is out of scope for MVP (rows recoverable in the DB); no restore UI. **Settled at activation:** installment/media rows are soft (kept, parent-filtered), not hard-deleted; S3 deletion is synchronous best-effort.
 
 **Frontend:**
-- Delete action in the Order Details drawer danger area, behind an explicit confirmation naming the order and its side effects ("Delete order #0042? This also removes its installments and photos.").
-- On success: close drawer, remove the card (invalidate the column), toast.
+- `DangerZone` section at the bottom of the Order Details drawer: a **two-step** delete (no one-tap) — "Delete order" expands an in-place confirmation naming the order and its side effects ("Delete order #0042? This also removes its installments and photos. This can't be undone.") with explicit Delete/Cancel.
+- `deleteOrder(id)` client → `DELETE /api/orders/{id}/`.
+- On success: `showToast("Order #0042 deleted")`, `onUpdated()` (the existing `ordersRefreshKey` fan-out — board, schedule, customer, payments, dashboard, notifications all refetch and the card disappears), then close the drawer. On error: inline message, stay open.
+- Added a minimal global toast: `useUIStore.showToast/dismissToast` + a `ToastHost` rendered in `AppShell` (single transient bottom-center pill, auto-dismiss). `['orders-schedule']` added to the `AppShell` refresh fan-out so deletes (and any order mutation) drop the card from the Orders Schedule too.
 
 **Review checkpoint:** Deleting an order removes it from board, calendar, search, and customer profile; its installments drop out of payment totals; S3 objects are removed (or cleanup enqueued); the activity log records the deletion. No one-tap accidental delete.
 

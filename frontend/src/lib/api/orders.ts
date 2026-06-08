@@ -113,6 +113,11 @@ export async function updateOrderStatus(
   })
 }
 
+// Soft-deletes the order (cascades to its installments/media + S3 cleanup, server-side).
+export async function deleteOrder(id: string): Promise<void> {
+  await apiRequest<void>(`/api/orders/${id}/`, { method: 'DELETE' })
+}
+
 export async function getDeliveryLoad(from: string, to: string): Promise<Record<string, number>> {
   return apiRequest<Record<string, number>>(
     `/api/orders/delivery-load/?from=${from}&to=${to}`

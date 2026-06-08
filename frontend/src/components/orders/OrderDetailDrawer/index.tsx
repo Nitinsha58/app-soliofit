@@ -9,6 +9,7 @@ import OrderInfoSection from './OrderInfoSection'
 import PhotoSection from './PhotoSection'
 import VoiceSection from './VoiceSection'
 import ActivityFeed from './ActivityFeed'
+import DangerZone from './DangerZone'
 
 interface Props {
   orderId: string
@@ -112,11 +113,13 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
             />
 
             {/* Deferred sections */}
-            <div className="pt-1 pb-6">
+            <div className="pt-1">
               <PhotoSection orderId={order.id} />
               <VoiceSection orderId={order.id} />
               <ActivityFeed orderId={order.id} />
             </div>
+
+            <DangerZone order={order} onUpdated={onUpdated} onClose={onClose} />
           </div>
         )}
       </div>

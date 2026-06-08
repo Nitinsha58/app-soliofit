@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { useUIStore } from '@/stores/useUIStore'
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
+import ToastHost from './ToastHost'
 import AddOrderFlow from '@/components/orders/AddOrderFlow'
 import OrderDetailDrawer from '@/components/orders/OrderDetailDrawer'
 
@@ -27,6 +28,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   useEffect(() => {
     if (ordersRefreshKey === 0) return
+    void queryClient.invalidateQueries({ queryKey: ['orders-schedule'] })
     void queryClient.refetchQueries({ queryKey: ['dashboard-summary'] })
     void queryClient.refetchQueries({ queryKey: ['notification-counts'] })
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
@@ -91,6 +93,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           onUpdated={triggerOrdersRefresh}
         />
       )}
+      <ToastHost />
     </div>
   )
 }
