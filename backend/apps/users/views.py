@@ -126,6 +126,19 @@ class NotificationPreferenceView(APIView):
         return Response(serializer.data)
 
 
+def _expiry_phrase():
+    """Human-readable token lifetime derived from PASSWORD_RESET_TIMEOUT so the
+    email copy can never drift from the configured value."""
+    seconds = settings.PASSWORD_RESET_TIMEOUT
+    if seconds % 86400 == 0:
+        n, unit = seconds // 86400, 'day'
+    elif seconds % 3600 == 0:
+        n, unit = seconds // 3600, 'hour'
+    else:
+        n, unit = max(1, seconds // 60), 'minute'
+    return f"{n} {unit}" if n == 1 else f"{n} {unit}s"
+
+
 def _send_password_reset_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
@@ -135,7 +148,8 @@ def _send_password_reset_email(user):
         message=(
             "We received a request to reset your Soliofit password.\n\n"
             f"Reset it here: {link}\n\n"
-            "This link expires in 3 days. If you didn't request this, you can safely ignore this email."
+            f"This link expires in {_expiry_phrase()}. If you didn't request this, "
+            "you can safely ignore this email."
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],

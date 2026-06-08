@@ -6,7 +6,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from rest_framework import status
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from .models import UserSettings, NotificationPreference
 
@@ -152,6 +152,17 @@ class PasswordResetRequestTests(TestCase):
         resp = self.client.post(self.url, {'email': 'TAILOR@test.com'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_expiry_copy_matches_configured_timeout(self):
+        # Default 3 days renders "3 days"...
+        self.client.post(self.url, {'email': 'tailor@test.com'}, format='json')
+        self.assertIn('expires in 3 days', mail.outbox[0].body)
+
+    @override_settings(PASSWORD_RESET_TIMEOUT=3600)
+    def test_expiry_copy_tracks_non_day_timeout(self):
+        # ...and a 1-hour timeout renders "1 hour" (no hardcoded "3 days").
+        self.client.post(self.url, {'email': 'tailor@test.com'}, format='json')
+        self.assertIn('expires in 1 hour', mail.outbox[0].body)
 
     def test_unknown_email_no_enumeration(self):
         resp = self.client.post(self.url, {'email': 'nobody@test.com'}, format='json')
