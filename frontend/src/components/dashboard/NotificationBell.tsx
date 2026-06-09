@@ -128,10 +128,13 @@ export default function NotificationBell({ dropdownSide = 'right' }: Props) {
   const total = counts?.total ?? 0
   const hasAny = total > 0
 
+  // Mobile: a fixed, full-width panel below the 56px AppHeader (anchored w-80
+  // dropdowns crowd/clip at 375px). Desktop: the anchored w-80 dropdown.
   const dropdownClass =
-    dropdownSide === 'left'
-      ? 'absolute left-0 top-full mt-2 w-80 z-50'
-      : 'absolute right-0 top-full mt-2 w-80 z-50'
+    'fixed left-3 right-3 top-[60px] z-50 ' +
+    (dropdownSide === 'left'
+      ? 'lg:absolute lg:left-0 lg:right-auto lg:top-full lg:mt-2 lg:w-80'
+      : 'lg:absolute lg:left-auto lg:right-0 lg:top-full lg:mt-2 lg:w-80')
 
   const allEmpty =
     notifs &&

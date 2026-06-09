@@ -26,9 +26,9 @@ export default function CreateCustomerModal({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center lg:p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.12)] w-full max-w-md p-6">
+      <div className="relative bg-white rounded-t-2xl lg:rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.12)] w-full lg:max-w-md p-6 max-h-[92vh] overflow-y-auto">
 
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-[#1A1A18]">Add Customer</h2>

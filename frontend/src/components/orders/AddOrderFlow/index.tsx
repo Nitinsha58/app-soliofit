@@ -130,8 +130,8 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center lg:p-4 bg-black/40">
+      <div className="bg-white rounded-t-2xl lg:rounded-2xl shadow-xl w-full lg:max-w-lg flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E5E2] flex-shrink-0">
           <div>
