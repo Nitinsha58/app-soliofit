@@ -32,6 +32,9 @@ every authenticated screen.
 - No changes to the search backend, `fetchSearch`, or result shape.
 - No dynamic-title override machinery (route map only; override hook deferred).
 - No redesign of the order drawer, add-order flow, or entity detail screens.
+- Tablet icon rail (per product docs) — **deferred, out of scope for VS-17.**
+  The tablet breakpoint keeps today's behavior (mobile bottom nav, no sidebar).
+  See AppHeader → Tablet for the coexistence constraint.
 
 ## Architecture — one engine, three shells
 
@@ -107,8 +110,13 @@ and only the surrounding shell differs.
 - **Primary-action slot:** Dashboard/Orders surface "Add Order" (desktop
   button; mobile keeps the bottom-nav `⊕` FAB, so the header action there is
   desktop-only). Other routes pass nothing.
-- **Responsive:** desktop shows the inline search bar; below `lg` (and tablet
-  when tight) it collapses to a search icon that opens `SearchSheet`.
+- **Responsive:** desktop (`lg+`) shows the inline search bar; below `lg`
+  (mobile and tablet) it collapses to a search icon that opens `SearchSheet`.
+- **Tablet (md, 768–1023px):** currently uses the mobile bottom nav (`MobileNav`
+  is `lg:hidden`) with no sidebar. The product-docs **icon rail is deferred —
+  out of scope for VS-17.** `AppHeader` must be built to coexist with a future
+  rail without rework: it lives in the right content column and must not assume
+  the desktop sidebar is the only possible left offset.
 - **Keyboard:** `⌘K` / `Ctrl-K` focuses desktop search / opens the mobile
   sheet. May defer to a follow-up if it complicates Unit 4.
 
@@ -139,7 +147,9 @@ Each unit is independently reviewable and leaves the app working.
    shell over them. Pure refactor, no UX change — safe checkpoint.
 3. **Unit 3 — AppHeader shell + AppShell restructure.** Introduce `AppHeader`,
    relocate bell/profile, strip per-page title rows, slim the sidebar. Search
-   trigger initially routes to `/search`.
+   trigger initially routes to `/search`. Tablet icon rail is out of scope;
+   `AppHeader` must be structured to coexist with a future rail (right-column
+   placement, no hard sidebar-width assumption).
 4. **Unit 4 — Wire GlobalSearch as global surface.** Add store state, the
    desktop `SearchDropdown` and mobile `SearchSheet`, and `⌘K`. Delivers
    "search from anywhere."
