@@ -28,7 +28,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-14 | Global search | Search by customer name, phone, order ID (pg_trgm) | Done |
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Done |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Done |
-| VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Pending |
+| VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Done |
 | VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
@@ -61,7 +61,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-21 | Delete order | Done |
 | VS-22 | Forgot password | Done |
 | VS-23 | Boutique tenant | Done |
-| VS-17 | Mobile layout | **Active** |
+| VS-17 | Mobile layout | Done |
+| VS-18 | Production deployment | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 tenancy decision recorded in ADR-0007 (Accepted); VS-18 still needs a deployment ADR at its activation._
@@ -69,6 +70,7 @@ _2026-06-09: VS-23 (Boutique tenant) closed — ADR-0007 Accepted, schema on fin
 _2026-06-09: VS-17 in progress — QuickActions drawer unit landed (`3ce7e75`): Photos/Voice/Payment shortcuts now scroll to their live sections (were dead buttons), the "Mark Delivered" 375px wrap carry-forward (spec line below) is fixed, and a "Payments" section header was added as the Payment shortcut's landing target. Remaining VS-17 units: bottom nav, responsive Kanban (single-column + selector), full-screen drawers/sheets on mobile, 375px/768px sweep._
 _2026-06-09: VS-17 — **Global Search + shared AppHeader** unit landed (6 commits `1de1300`→`68ae8c4`; spec `docs/superpowers/specs/2026-06-09-global-search-appheader-design.md`, plan `docs/superpowers/plans/2026-06-09-global-search-appheader.md`). Bottom nav back to five items (Dashboard·Orders·⊕·Payments·Customers; Search removed; Home→Dashboard). Search is now a global command surface — one engine (`useSearch`+`SearchResults`), three shells (`SearchPage` full route, `SearchSheet` mobile overlay, `SearchDropdown` desktop). New persistent `AppHeader` (title + per-route Add-Order slot + search + notifications + profile) in `AppShell`; sidebar slimmed to sections; per-page title rows removed; Calendar moved into `ProfileMenu` for mobile; Calendar/Orders/BoardColumn full-height math corrected for the 56px header. Tablet icon rail explicitly deferred. Remaining VS-17 units: responsive Kanban (single-column + column selector), full-screen mobile drawers/sheets audit, 375/768 breakpoint sweep._
 _2026-06-09: VS-17 — **Responsive Kanban (mobile single-column)** unit landed (2 commits `4552e66`→`ea0ab6c`; spec `docs/superpowers/specs/2026-06-09-responsive-kanban-design.md`, plan `docs/superpowers/plans/2026-06-09-responsive-kanban.md`). `KanbanBoard` is now a responsive switch: desktop board unchanged (`hidden lg:block`); mobile (`lg:hidden`) renders `MobileBoard` — one focused status column + `ColumnChips` + compact `AttentionRail` (Delayed·Today·Upcoming; Pending/Overdue excluded — Payments domain). `MobileBoard` loads all five columns; smart default focus = status with most delayed loaded rows (ties by column order, else Booked); tapping a date pill applies the cross-board filter, chips show filtered counts, focus auto-jumps to the heaviest status. DnD stays desktop-only; mobile status change via the existing detail-drawer dropdown. Remaining VS-17 units: full-screen mobile drawers/sheets audit, 375/768 breakpoint sweep._
+_2026-06-10: VS-17 (Mobile Layout) **closed — Done.** Five units shipped: QuickActions drawer (`3ce7e75`); Global Search + shared AppHeader (`1de1300`→`68ae8c4`); Responsive Kanban mobile single-column (`4552e66`→`ea0ab6c`); mobile overlay audit — consistent bottom-sheet/full-width patterns (`d90c2fa`); final 375/768 breakpoint sweep (visual + static — no clipping/overflow defects). No ADR required. **Deferred follow-up (tracked, not a blocker):** `PaymentKanban` (the `/payments` board) is still a horizontally-scrolling multi-column board on mobile — functional/contained (scrolls, doesn't clip); giving it the single-column treatment is its own design/unit, out of the responsive-Kanban spec scope. **VS-18 (Production deployment) is now Active — the last MVP slice; needs a deployment ADR at activation.**_
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
