@@ -1,8 +1,9 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import NotificationBell from '@/components/dashboard/NotificationBell'
 import ProfileMenu from './ProfileMenu'
+import SearchDropdown from '@/components/search/SearchDropdown'
 import { useUIStore } from '@/stores/useUIStore'
 
 const ROUTE_META: { prefix: string; title: string; addOrder?: boolean }[] = [
@@ -25,8 +26,8 @@ function SearchIcon() {
 
 export default function AppHeader() {
   const pathname = usePathname()
-  const router = useRouter()
   const openAddOrder = useUIStore((s) => s.openAddOrder)
+  const openSearch = useUIStore((s) => s.openSearch)
 
   const meta = ROUTE_META.find((m) => pathname === m.prefix || pathname.startsWith(m.prefix + '/'))
   const title = meta?.title ?? ''
@@ -36,13 +37,7 @@ export default function AppHeader() {
       <div className="h-14 flex items-center gap-3 px-4 lg:px-6">
         <h1 className="text-base lg:text-lg font-semibold text-[#1A1A18] truncate flex-shrink-0">{title}</h1>
 
-        <button
-          onClick={() => router.push('/search')}
-          className="hidden lg:flex items-center gap-2 flex-1 max-w-md ml-2 px-3 py-2 text-sm text-[#A0A09C] bg-[#F5F5F3] border border-[#E5E5E2] rounded-lg hover:border-[#C8952A] transition-colors"
-        >
-          <SearchIcon />
-          <span>Search customers, orders…</span>
-        </button>
+        <div className="hidden lg:flex flex-1"><SearchDropdown /></div>
 
         <div className="flex items-center gap-2 ml-auto">
           {meta?.addOrder && (
@@ -55,7 +50,7 @@ export default function AppHeader() {
           )}
 
           <button
-            onClick={() => router.push('/search')}
+            onClick={openSearch}
             aria-label="Search"
             className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-[#6B6B67] hover:bg-[#F5F5F3] transition-colors"
           >

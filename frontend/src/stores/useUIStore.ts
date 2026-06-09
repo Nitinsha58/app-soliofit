@@ -9,6 +9,9 @@ interface UIStore {
   selectedOrderId: string | null
   openOrderDetail: (id: string) => void
   closeOrderDetail: () => void
+  searchOpen: boolean
+  openSearch: () => void
+  closeSearch: () => void
   // Lightweight global toast (single, transient). Rendered by ToastHost in AppShell.
   toast: { id: number; message: string } | null
   showToast: (message: string) => void
@@ -24,6 +27,9 @@ export const useUIStore = create<UIStore>((set) => ({
   selectedOrderId: null,
   openOrderDetail: (id) => set({ selectedOrderId: id }),
   closeOrderDetail: () => set({ selectedOrderId: null }),
+  searchOpen: false,
+  openSearch: () => set({ searchOpen: true }),
+  closeSearch: () => set({ searchOpen: false }),
   toast: null,
   showToast: (message) => set({ toast: { id: Date.now(), message } }),
   dismissToast: () => set({ toast: null }),

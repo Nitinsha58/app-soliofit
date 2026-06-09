@@ -13,6 +13,7 @@ import MobileNav from './MobileNav'
 import ToastHost from './ToastHost'
 import AddOrderFlow from '@/components/orders/AddOrderFlow'
 import OrderDetailDrawer from '@/components/orders/OrderDetailDrawer'
+import SearchSheet from '@/components/search/SearchSheet'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -24,6 +25,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     triggerOrdersRefresh,
     ordersRefreshKey,
     selectedOrderId, closeOrderDetail,
+    searchOpen,
   } = useUIStore()
 
   const queryClient = useQueryClient()
@@ -96,6 +98,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         />
       )}
       <ToastHost />
+      {searchOpen && <SearchSheet />}
     </div>
   )
 }
