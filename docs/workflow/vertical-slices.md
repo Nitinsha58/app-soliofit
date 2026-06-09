@@ -66,6 +66,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 tenancy decision recorded in ADR-0007 (Accepted); VS-18 still needs a deployment ADR at its activation._
 _2026-06-09: VS-23 (Boutique tenant) closed — ADR-0007 Accepted, schema on final tenancy foundation. **VS-17 (Mobile layout) is now Active.** Two slices remain to MVP close: VS-17 → VS-18._
+_2026-06-09: VS-17 in progress — QuickActions drawer unit landed (`3ce7e75`): Photos/Voice/Payment shortcuts now scroll to their live sections (were dead buttons), the "Mark Delivered" 375px wrap carry-forward (spec line below) is fixed, and a "Payments" section header was added as the Payment shortcut's landing target. Remaining VS-17 units: bottom nav, responsive Kanban (single-column + selector), full-screen drawers/sheets on mobile, 375px/768px sweep._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
