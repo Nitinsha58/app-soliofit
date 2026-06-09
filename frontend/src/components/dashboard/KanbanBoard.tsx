@@ -228,7 +228,7 @@ export default function KanbanBoard() {
 
       {/* Mobile board (single focused column) */}
       <div className="lg:hidden">
-        <MobileBoard />
+        <MobileBoard activeFilter={activeFilter} setActiveFilter={setActiveFilter} filterFn={filterFn} />
       </div>
 
       {/* Undo snackbar (shared) */}

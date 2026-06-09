@@ -5,6 +5,7 @@ import type { Order } from '@/lib/api/orders'
 import { useColumnQuery } from './BoardColumn'
 import ColumnChips, { type Chip } from './ColumnChips'
 import FocusedColumn from './FocusedColumn'
+import AttentionRail, { type RailFilter } from './AttentionRail'
 
 const CHIPS: Chip[] = [
   { status: 'Booked',           label: 'Booked',    accent: '#60A5FA' },
@@ -23,7 +24,13 @@ function todayStr(): string {
   return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`
 }
 
-export default function MobileBoard() {
+interface Props {
+  activeFilter: RailFilter | null
+  setActiveFilter: (f: RailFilter | null) => void
+  filterFn: (o: Order) => boolean
+}
+
+export default function MobileBoard({ activeFilter, setActiveFilter, filterFn }: Props) {
   const booked    = useColumnQuery('Booked', false)
   const started   = useColumnQuery('Started', false)
   const ready     = useColumnQuery('Ready', false)
@@ -44,36 +51,61 @@ export default function MobileBoard() {
   const [focused, setFocused] = useState<Order['status']>('Booked')
   const didDefault = useRef(false)
 
-  useEffect(() => {
-    if (didDefault.current || !anyPage) return
-    const today = todayStr()
+  const filtering = activeFilter !== null
+
+  // When filtering, chip counts + the focused list reflect filterFn over loaded rows;
+  // otherwise chips use raw per-status totals and the list shows all loaded rows.
+  const displayCounts = (filtering
+    ? Object.fromEntries(CHIPS.map((c) => [c.status, rowsByStatus[c.status].filter(filterFn).length]))
+    : counts) as Record<Order['status'], number>
+  const displayRows = filtering ? rowsByStatus[focused].filter(filterFn) : rowsByStatus[focused]
+
+  // Status with the most matches for `predicate`; ties break by CHIPS order; else Booked.
+  function pickFocus(predicate: (o: Order) => boolean): Order['status'] {
     let best: Order['status'] = 'Booked'
     let bestN = 0
     for (const c of CHIPS) {
-      const n = rowsByStatus[c.status].filter((o) => o.status !== 'Delivered' && o.delivery_date < today).length
+      const n = rowsByStatus[c.status].filter(predicate).length
       if (n > bestN) { bestN = n; best = c.status }
     }
-    setFocused(best)
+    return best
+  }
+
+  // Smart default focus (most delayed loaded rows, else Booked), once, when data first lands.
+  useEffect(() => {
+    if (didDefault.current || !anyPage) return
+    const today = todayStr()
+    setFocused(pickFocus((o) => o.status !== 'Delivered' && o.delivery_date < today))
     didDefault.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booked.data, started.data, ready.data, partial.data, delivered.data])
+
+  // On filter change: a date filter auto-focuses the status with the most matches;
+  // clearing it restores the smart default (most delayed, else Booked).
+  useEffect(() => {
+    const today = todayStr()
+    setFocused(pickFocus(filtering ? filterFn : (o) => o.status !== 'Delivered' && o.delivery_date < today))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter])
 
   const q = queries[focused]
   const chip = CHIPS.find((c) => c.status === focused)!
 
   return (
     <div className="space-y-3">
-      <ColumnChips chips={CHIPS} counts={counts} selected={focused} onSelect={setFocused} />
+      <AttentionRail activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+      <ColumnChips chips={CHIPS} counts={displayCounts} selected={focused} onSelect={setFocused} />
       <FocusedColumn
         label={chip.label}
         accent={chip.accent}
         value={value[focused]}
-        count={counts[focused] ?? 0}
-        rows={rowsByStatus[focused]}
+        count={displayCounts[focused] ?? 0}
+        rows={displayRows}
         isLoading={q.isLoading}
-        hasNextPage={!!q.hasNextPage}
+        hasNextPage={!!q.hasNextPage && !filtering}
         isFetchingNextPage={q.isFetchingNextPage}
         onLoadMore={() => q.fetchNextPage()}
-        emptyLabel={`No ${chip.label} orders`}
+        emptyLabel={filtering ? `No matching ${chip.label} orders` : `No ${chip.label} orders`}
       />
     </div>
   )
