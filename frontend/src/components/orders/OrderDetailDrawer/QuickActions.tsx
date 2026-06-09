@@ -13,8 +13,8 @@ interface Props {
 interface ActionButton {
   label: string
   icon: React.ReactNode
-  live: boolean
   variant?: 'default' | 'danger'
+  disabled?: boolean
   onClick?: () => void
 }
 
@@ -83,41 +83,51 @@ export default function QuickActions({ order, onOrderChange, onUpdated }: Props)
 
   const isDelivered = order.status === 'Delivered'
 
+  // The Photos/Voice/Payment sections live further down the drawer; these are
+  // shortcuts that scroll to them (not disabled features).
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const actions: ActionButton[] = [
     {
       label: 'Photos',
       icon: <PhotoIcon />,
-      live: false,
+      onClick: () => scrollToSection('order-photos'),
     },
     {
       label: 'Voice',
       icon: <MicIcon />,
-      live: false,
+      onClick: () => scrollToSection('order-voice'),
     },
     {
       label: 'Payment',
       icon: <PaymentIcon />,
-      live: false,
+      onClick: () => scrollToSection('order-payment'),
     },
     {
       label: isDelivered ? 'Delivered' : 'Mark Delivered',
       icon: <CheckIcon />,
-      live: true,
       variant: 'danger',
-      onClick: () => setConfirming(true),
+      disabled: isDelivered,
+      onClick: isDelivered ? undefined : () => setConfirming(true),
     },
   ]
 
   return (
     <div className="px-5 py-3 border-b border-[#E5E5E2]">
-      <div className="flex items-center gap-2">
-        {actions.map(({ label, icon, live, variant, onClick }) => (
+      {/* flex-wrap + shrink-0 + whitespace-nowrap: each button is atomic, so at
+          375px the whole "Mark Delivered" button drops to a second row instead of
+          its label reflowing/clipping inside the button. Stays one clean row
+          wherever there's space (≥~410px content: tablet, desktop panel). */}
+      <div className="flex flex-wrap items-center gap-2">
+        {actions.map(({ label, icon, variant, disabled, onClick }) => (
           <button
             key={label}
-            onClick={live ? onClick : undefined}
-            disabled={!live || isDelivered}
-            className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-              !live || isDelivered
+            onClick={onClick}
+            disabled={disabled}
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+              disabled
                 ? 'text-[#C8C8C4] border-[#EBEBEA] bg-[#FAFAF9] cursor-not-allowed'
                 : variant === 'danger'
                 ? 'text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 cursor-pointer'
@@ -138,14 +148,14 @@ export default function QuickActions({ order, onOrderChange, onUpdated }: Props)
           </p>
           <button
             onClick={() => { setConfirming(false); setDeliveryError(false) }}
-            className="text-xs text-[#6B6B67] hover:text-[#1A1A18] transition-colors"
+            className="text-xs text-[#6B6B67] hover:text-[#1A1A18] border border-[#E5E5E2] hover:border-[#D5D5D2] bg-white px-3.5 py-2 rounded-md transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleMarkDelivered}
             disabled={delivering}
-            className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md transition-colors disabled:opacity-60"
+            className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-md transition-colors disabled:opacity-60"
           >
             {delivering ? 'Saving…' : 'Confirm'}
           </button>

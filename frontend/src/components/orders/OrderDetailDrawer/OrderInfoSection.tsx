@@ -167,12 +167,20 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
           )}
         </div>
 
-        {/* Payment schedule — reactive to bill amount typed above */}
-        <PaymentSchedule
-          orderId={order.id}
-          billAmount={parseFloat(form.total_amount) || 0}
-          onUpdated={onUpdated}
-        />
+        {/* Payment schedule — reactive to bill amount typed above.
+            id anchor = scroll target for the QuickActions "Payment" shortcut.
+            Section header gives the shortcut an unambiguous landing target so
+            it reads as a distinct block, not mid-Order-Information. */}
+        <div id="order-payment" className="scroll-mt-3 pt-1">
+          <h4 className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">
+            Payments
+          </h4>
+          <PaymentSchedule
+            orderId={order.id}
+            billAmount={parseFloat(form.total_amount) || 0}
+            onUpdated={onUpdated}
+          />
+        </div>
 
         {/* Customer address (read-only) */}
         {order.customer_address && (

@@ -112,10 +112,15 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
               onUpdated={onUpdated}
             />
 
-            {/* Deferred sections */}
+            {/* Deferred sections. id anchors are the scroll targets for the
+                QuickActions shortcuts; scroll-mt gives a little breathing room. */}
             <div className="pt-1">
-              <PhotoSection orderId={order.id} />
-              <VoiceSection orderId={order.id} />
+              <div id="order-photos" className="scroll-mt-3">
+                <PhotoSection orderId={order.id} />
+              </div>
+              <div id="order-voice" className="scroll-mt-3">
+                <VoiceSection orderId={order.id} />
+              </div>
               <ActivityFeed orderId={order.id} />
             </div>
 
