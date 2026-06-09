@@ -72,10 +72,7 @@ export default function CustomersPage() {
   return (
     <div className="p-6">
       <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-[#1A1A18]">Customers</h1>
-          <p className="text-xs text-[#A0A09C] mt-0.5">{countLabel}</p>
-        </div>
+        <p className="text-xs text-[#A0A09C]">{countLabel}</p>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] transition-colors"

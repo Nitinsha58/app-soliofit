@@ -7,7 +7,6 @@ import { listOrders } from '@/lib/api/orders'
 import { getOrderSettings } from '@/lib/api/auth'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
-import NotificationBell from '@/components/dashboard/NotificationBell'
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -172,12 +171,12 @@ export default function CalendarPage() {
   const goToday = () => setViewDate(new Date())
 
   return (
-    <div className="flex flex-col bg-[#F0F1F4] lg:h-dvh" style={{ height: 'calc(100dvh - 56px)' }}>
+    <div className="flex flex-col h-full bg-[#F0F1F4]">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-[#E5E5E2] flex-shrink-0">
-        <h1 className="text-[18px] font-extrabold text-[#0A0F1E] tracking-tight">
+        <h2 className="text-[18px] font-extrabold text-[#0A0F1E] tracking-tight">
           {MONTH_NAMES[monthIndex]} {year}
-        </h1>
+        </h2>
         {isFetching && (
           <div className="w-3.5 h-3.5 border-2 border-[#C8952A] border-t-transparent rounded-full animate-spin flex-shrink-0" />
         )}
@@ -206,10 +205,6 @@ export default function CalendarPage() {
           Today
         </button>
 
-        {/* Bell — mobile only (desktop sidebar carries it), matching the reference */}
-        <div className="lg:hidden flex-shrink-0">
-          <NotificationBell dropdownSide="right" />
-        </div>
       </div>
 
       {/* ── Summary cards ──────────────────────────────────────────────── */}

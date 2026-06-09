@@ -108,7 +108,7 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
       {/* Cards — independently scrollable */}
       <div
         className="flex flex-col gap-1.5 overflow-y-auto pb-3"
-        style={{ maxHeight: 'calc(100dvh - 110px)' }}
+        style={{ maxHeight: 'calc(100dvh - 166px)' }}
       >
         {sorted.length === 0 ? (
           <div className="flex items-center justify-center py-5">
@@ -286,10 +286,7 @@ export default function OrdersSchedulePage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="flex flex-col bg-[#F0F1F4] lg:h-dvh"
-      style={{ height: 'calc(100dvh - 56px)' }}
-    >
+    <div className="flex flex-col h-full bg-[#F0F1F4]">
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#D4D8E4] flex-shrink-0">
 

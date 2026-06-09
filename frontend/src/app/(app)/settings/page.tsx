@@ -191,8 +191,6 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-xl font-semibold text-[#1A1A18] mb-6">Settings</h1>
-
       <div className="space-y-5">
         {/* Profile */}
         <Section title="Profile" description="Your boutique details, shown across the app.">

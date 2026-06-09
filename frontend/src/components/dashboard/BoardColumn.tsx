@@ -114,7 +114,7 @@ export default function BoardColumn({
         </div>
       </div>
 
-      <div ref={scrollRef} className="px-2.5 pb-3 space-y-2.5 min-h-[120px] max-h-[calc(100vh-260px)] overflow-y-auto">
+      <div ref={scrollRef} className="px-2.5 pb-3 space-y-2.5 min-h-[120px] max-h-[calc(100vh-316px)] overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-7">
             <div className="w-5 h-5 border-2 border-[#DCDCD8] border-t-transparent rounded-full animate-spin" />
