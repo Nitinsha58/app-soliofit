@@ -34,7 +34,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Done |
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Done |
-| VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Pending |
+| VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Done |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
 
 > **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
@@ -60,10 +60,12 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-20 | Orders list scaling | Done |
 | VS-21 | Delete order | Done |
 | VS-22 | Forgot password | Done |
-| VS-23 | Boutique tenant | **Active** |
+| VS-23 | Boutique tenant | Done |
+| VS-17 | Mobile layout | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 tenancy decision recorded in ADR-0007 (Accepted); VS-18 still needs a deployment ADR at its activation._
+_2026-06-09: VS-23 (Boutique tenant) closed — ADR-0007 Accepted, schema on final tenancy foundation. **VS-17 (Mobile layout) is now Active.** Two slices remain to MVP close: VS-17 → VS-18._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -766,6 +768,8 @@ Frontend: `/forgot-password` (zod + native email validation, neutral success cop
 **Frontend:** Minimal/none for MVP — the boutique is implicit (single). Settings already shows the business name; order-settings continue to work against the (now boutique-level) values transparently.
 
 **Review checkpoint:** All existing data belongs to one seeded boutique with nothing lost in backfill (orders keep their numbers); new orders number per boutique; queries are boutique-scoped (cross-boutique isolation asserted per surface); an order can't link another boutique's customer; staff deletion nulls `created_by` without dropping orders; no signup/multi-tenant UI appears; `09-mvp-scope` still lists multi-boutique/SaaS as post-MVP.
+
+**Completion record (2026-06-09):** Backend (Unit 1) `1a0e8f1`; admin/bypass-path fix `73f7f82`. ADR-0007 Accepted + indexed, with two dated amendment notes (pre-acceptance review revisions; implementation-start `User.boutique` null=True for the circular-FK bootstrap). 7 hand-authored migrations (nullable → seed+backfill → enforce); dev DB backfilled to one "Demo Boutique" with all 27 orders + 10 customers + every user attached, zero orphans, order numbers preserved. `created_by` (SET_NULL) attribution split from `boutique` ownership; per-boutique `order_number` via `UniqueConstraint`; same-boutique customer integrity enforced in the serializer queryset; operational settings re-homed to Boutique, `UserSettings` removed, `NotificationPreference` stays per-user. Review [P2] (admin's `UserCreationForm` bypasses `create_user` → tenant-less user) fixed with a model-level `User.save()` insert guard (alias-aware) + boutique surfaced in admin. **160 backend tests pass**; `check` clean; `makemigrations --check` no drift. Deferred: none. Scope notes: frontend unchanged (boutique implicit/single, order-settings shape identical); the "first user created by a raw bypass path on an empty DB" case stays out of scope by design (real first users go through `createsuperuser` → `create_user`).
 
 ---
 
