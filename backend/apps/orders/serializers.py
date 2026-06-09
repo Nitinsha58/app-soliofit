@@ -15,8 +15,11 @@ class OrderSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Scoping the selectable customers to the caller's boutique enforces
+            # same-boutique integrity (ADR-0007): an order can't reference another
+            # boutique's customer — it simply isn't in this queryset.
             self.fields['customer'].queryset = Customer.objects.filter(
-                user=request.user,
+                boutique=request.user.boutique,
                 deleted_at__isnull=True,
             )
 

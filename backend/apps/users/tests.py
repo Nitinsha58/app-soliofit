@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from django.test import TestCase, override_settings
 
-from .models import UserSettings, NotificationPreference
+from .models import Boutique, NotificationPreference
 
 User = get_user_model()
 
@@ -80,21 +80,20 @@ class ChangePasswordTests(_Fixture):
 class OrderSettingsTests(_Fixture):
     url = '/api/auth/order-settings/'
 
-    def test_get_auto_creates_with_defaults(self):
-        self.assertFalse(UserSettings.objects.filter(user=self.user).exists())
+    def test_get_returns_boutique_defaults(self):
+        # Settings live on the boutique now (ADR-0007), created with the user.
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data, {'delivery_buffer_days': 0, 'daily_capacity': 6})
-        self.assertTrue(UserSettings.objects.filter(user=self.user).exists())
 
     def test_patch_persists(self):
         resp = self.client.patch(self.url, {
             'delivery_buffer_days': 2, 'daily_capacity': 10,
         }, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        obj = UserSettings.objects.get(user=self.user)
-        self.assertEqual(obj.delivery_buffer_days, 2)
-        self.assertEqual(obj.daily_capacity, 10)
+        self.user.boutique.refresh_from_db()
+        self.assertEqual(self.user.boutique.delivery_buffer_days, 2)
+        self.assertEqual(self.user.boutique.daily_capacity, 10)
 
     def test_negative_value_rejected(self):
         resp = self.client.patch(self.url, {'daily_capacity': -1}, format='json')
@@ -131,6 +130,25 @@ class NotificationPreferenceTests(_Fixture):
         NotificationPreference.objects.create(user=other, delivery_reminders=False)
         resp = self.client.get(self.url)
         self.assertTrue(resp.data['delivery_reminders'])
+
+
+class BoutiqueBootstrapTests(TestCase):
+    """VS-23 / ADR-0007 — create_user attaches every operator to a boutique."""
+
+    def test_first_user_bootstraps_and_owns_a_boutique(self):
+        u = User.objects.create_user(email='first@test.com', password='x', business_name='Maison')
+        self.assertIsNotNone(u.boutique)
+        self.assertEqual(u.boutique.name, 'Maison')   # named from business_name
+        self.assertEqual(u.boutique.owner_id, u.id)
+
+    def test_first_user_without_business_name_gets_default(self):
+        u = User.objects.create_user(email='first@test.com', password='x')
+        self.assertEqual(u.boutique.name, 'My Boutique')
+
+    def test_second_user_joins_existing_boutique(self):
+        u1 = User.objects.create_user(email='a@test.com', password='x')
+        u2 = User.objects.create_user(email='b@test.com', password='x')
+        self.assertEqual(u1.boutique_id, u2.boutique_id)
 
 
 class PasswordResetRequestTests(TestCase):

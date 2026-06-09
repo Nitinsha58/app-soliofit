@@ -11,8 +11,13 @@ class Order(models.Model):
         DELIVERED        = 'Delivered',        'Delivered'
 
     id            = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order_number  = models.PositiveIntegerField(unique=True, editable=False)
-    user          = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='orders')
+    # order_number is unique per boutique (ADR-0007), not globally.
+    order_number  = models.PositiveIntegerField(editable=False)
+    # Ownership is the boutique; created_by is attribution only (SET_NULL so
+    # removing a staff member never deletes the boutique's orders).
+    boutique      = models.ForeignKey('users.Boutique', on_delete=models.PROTECT, related_name='orders')
+    created_by    = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name='created_orders')
     customer      = models.ForeignKey('customers.Customer', on_delete=models.PROTECT, related_name='orders')
     status        = models.CharField(max_length=20, choices=Status.choices, default=Status.BOOKED)
     delivery_date = models.DateField()
@@ -28,12 +33,24 @@ class Order(models.Model):
 
     class Meta:
         db_table = 'orders'
-        indexes = [
-            models.Index(fields=['user', 'status']),
-            models.Index(fields=['user', 'delivery_date']),
-            models.Index(fields=['customer']),
-            models.Index(fields=['user', 'status', 'delivered_at']),
+        constraints = [
+            models.UniqueConstraint(fields=['boutique', 'order_number'],
+                                    name='uniq_order_number_per_boutique'),
         ]
+        indexes = [
+            models.Index(fields=['boutique', 'status'], name='ord_bq_status_idx'),
+            models.Index(fields=['boutique', 'delivery_date'], name='ord_bq_delivdate_idx'),
+            models.Index(fields=['customer']),  # unchanged — keeps its existing name
+            models.Index(fields=['boutique', 'status', 'delivered_at'], name='ord_bq_st_delv_idx'),
+            models.Index(fields=['boutique', 'order_number'], name='ord_bq_ordnum_idx'),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Default boutique to the creator's so callers that set only created_by
+        # don't have to repeat it. Ownership stays explicit.
+        if self.boutique_id is None and self.created_by_id is not None:
+            self.boutique_id = self.created_by.boutique_id
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'#{self.order_number} — {self.customer.name}'

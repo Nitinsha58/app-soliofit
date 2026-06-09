@@ -27,7 +27,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = (
-            Order.objects.filter(user=self.request.user, deleted_at__isnull=True)
+            Order.objects.filter(boutique=self.request.user.boutique, deleted_at__isnull=True)
             .select_related('customer')
             .order_by('delivery_date', 'created_at')
         )
@@ -86,14 +86,18 @@ class OrderViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        # order_number is a global counter (Max + 1). Two concurrent creates can read
-        # the same max and collide on the unique constraint, so retry on IntegrityError
-        # with a fresh read inside a fresh transaction. Per-boutique numbering: VS-23.
+        # order_number is a per-boutique counter (Max + 1, scoped to the boutique).
+        # Two concurrent creates can read the same max and collide on the
+        # UniqueConstraint(boutique, order_number), so retry on IntegrityError with a
+        # fresh read inside a fresh transaction.
+        boutique = self.request.user.boutique
         for attempt in range(5):
-            max_num = Order.objects.aggregate(Max('order_number'))['order_number__max'] or 0
+            max_num = (Order.objects.filter(boutique=boutique)
+                       .aggregate(Max('order_number'))['order_number__max'] or 0)
             try:
                 with transaction.atomic():
-                    order = serializer.save(user=self.request.user, order_number=max_num + 1)
+                    order = serializer.save(created_by=self.request.user, boutique=boutique,
+                                            order_number=max_num + 1)
                     create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
                 return
             except IntegrityError:
@@ -292,7 +296,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         # Per-status totals (clean base — no per-row annotations to keep GROUP BY simple).
         # `counts` = order count; `value` = summed bill (total_amount) per column.
-        base = Order.objects.filter(user=request.user, deleted_at__isnull=True)
+        base = Order.objects.filter(boutique=request.user.boutique, deleted_at__isnull=True)
         counts = {s: 0 for s in Order.Status.values}
         value = {s: '0.00' for s in Order.Status.values}
         for row in base.order_by().values('status').annotate(c=Count('id'), v=Sum('total_amount')):

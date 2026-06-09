@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from apps.customers.models import Customer
 from apps.orders.models import Order
 from apps.payments.models import Installment
-from apps.users.models import User
+from apps.users.models import User, Boutique
 
 
 def _future():
@@ -20,9 +20,9 @@ class _OrderFixture(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(email='tailor@test.com', password='pass')
-        customer = Customer.objects.create(user=self.user, name='Alice', phone='9999999999')
+        customer = Customer.objects.create(created_by=self.user, name='Alice', phone='9999999999')
         self.order = Order.objects.create(
-            user=self.user,
+            created_by=self.user,
             customer=customer,
             order_number=1,
             delivery_date=date.today() + timedelta(days=30),
@@ -191,7 +191,10 @@ class IsolationTests(_OrderFixture):
             amount=Decimal('5000.00'),
             due_date=date.today() + timedelta(days=30),
         )
+        # `other` belongs to a different boutique → must not see this order.
         other = User.objects.create_user(email='other@test.com', password='pass')
+        other.boutique = Boutique.objects.create(name='Other', owner=other)
+        other.save(update_fields=['boutique'])
         self.other = APIClient()
         self.other.force_authenticate(user=other)
 

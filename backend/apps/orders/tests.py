@@ -13,23 +13,31 @@ from apps.customers.models import Customer
 from apps.media.models import OrderPhoto, VoiceNote
 from apps.orders.models import Order, OrderActivity
 from apps.payments.models import Installment
-from apps.users.models import User
+from apps.users.models import User, Boutique
 
 
 def _future():
     return str(date.today() + timedelta(days=30))
 
 
+def _user_in_new_boutique(email):
+    """A user in their own (separate) boutique — for cross-boutique isolation tests."""
+    u = User.objects.create_user(email=email, password='pass')
+    u.boutique = Boutique.objects.create(name=email, owner=u)
+    u.save(update_fields=['boutique'])
+    return u
+
+
 class _Fixture(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email='tailor@test.com', password='pass')
-        self.customer = Customer.objects.create(user=self.user, name='Alice', phone='9999999999')
+        self.customer = Customer.objects.create(created_by=self.user, name='Alice', phone='9999999999')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
     def _create_order(self):
         return Order.objects.create(
-            user=self.user,
+            created_by=self.user,
             customer=self.customer,
             order_number=1,
             delivery_date=date.today() + timedelta(days=30),
@@ -137,15 +145,15 @@ class OrderDateFilterTests(_Fixture):
         self.today = date.today()
         # Create orders on 3 different dates
         self.o1 = Order.objects.create(
-            user=self.user, customer=self.customer, order_number=10,
+            created_by=self.user, customer=self.customer, order_number=10,
             delivery_date=self.today - timedelta(days=1), total_amount='100',
         )
         self.o2 = Order.objects.create(
-            user=self.user, customer=self.customer, order_number=11,
+            created_by=self.user, customer=self.customer, order_number=11,
             delivery_date=self.today, total_amount='200',
         )
         self.o3 = Order.objects.create(
-            user=self.user, customer=self.customer, order_number=12,
+            created_by=self.user, customer=self.customer, order_number=12,
             delivery_date=self.today + timedelta(days=1), total_amount='300',
         )
 
@@ -217,10 +225,10 @@ class OrderDateFilterTests(_Fixture):
         self.assertTrue(resp.data['has_delayed_installment'])
 
     def test_other_user_orders_excluded(self):
-        other = User.objects.create_user(email='other@test.com', password='pass')
-        c2 = Customer.objects.create(user=other, name='Bob', phone='1111111111')
+        other = _user_in_new_boutique('other@test.com')
+        c2 = Customer.objects.create(created_by=other, name='Bob', phone='1111111111')
         Order.objects.create(
-            user=other, customer=c2, order_number=99,
+            created_by=other, customer=c2, order_number=99,
             delivery_date=self.today, total_amount='999',
         )
         resp = self.client.get(f'/api/orders/?delivery_date_from={self.today}&delivery_date_to={self.today}')
@@ -235,8 +243,10 @@ class OrderNumberRaceTests(_Fixture):
         # Simulate a race: first aggregate read is stale (0 → tries 1 → collides),
         # second read is correct (1 → tries 2 → succeeds). No threading needed.
         from unittest import mock
+        # perform_create now aggregates on a boutique-filtered queryset, so patch
+        # QuerySet.aggregate (stale read first, correct read on the retry).
         with mock.patch(
-            'apps.orders.views.Order.objects.aggregate',
+            'django.db.models.query.QuerySet.aggregate',
             side_effect=[{'order_number__max': 0}, {'order_number__max': 1}],
         ):
             resp = self.client.post('/api/orders/', {
@@ -258,7 +268,7 @@ class CalendarViewTests(_Fixture):
     def _order(self, delivery, status='Booked', user=None):
         self._n += 1
         return Order.objects.create(
-            user=user or self.user,
+            created_by=user or self.user,
             customer=self.customer,
             order_number=self._n,
             delivery_date=delivery,
@@ -336,10 +346,10 @@ class CalendarViewTests(_Fixture):
         self.assertEqual(resp.data, {})
 
     def test_user_isolation(self):
-        other = User.objects.create_user(email='other@test.com', password='pass')
-        other_customer = Customer.objects.create(user=other, name='Bob', phone='8888888888')
+        other = _user_in_new_boutique('other@test.com')
+        other_customer = Customer.objects.create(created_by=other, name='Bob', phone='8888888888')
         Order.objects.create(
-            user=other, customer=other_customer, order_number=999,
+            created_by=other, customer=other_customer, order_number=999,
             delivery_date=self.today.replace(day=15), total_amount=Decimal('1000.00'),
         )
         resp = self._get(self.today.year, self.today.month)
@@ -351,7 +361,7 @@ class PaymentSummaryTests(_Fixture):
 
     def _order(self, num, total='10000.00'):
         return Order.objects.create(
-            user=self.user, customer=self.customer, order_number=num,
+            created_by=self.user, customer=self.customer, order_number=num,
             delivery_date=date.today() + timedelta(days=10),
             total_amount=Decimal(total),
         )
@@ -444,9 +454,9 @@ class PaymentSummaryTests(_Fixture):
 
     def test_delivery_load_count_unaffected_by_payment_annotation(self):
         d = date.today() + timedelta(days=10)
-        o1 = Order.objects.create(user=self.user, customer=self.customer, order_number=1,
+        o1 = Order.objects.create(created_by=self.user, customer=self.customer, order_number=1,
                                   delivery_date=d, total_amount=Decimal('10000.00'))
-        Order.objects.create(user=self.user, customer=self.customer, order_number=2,
+        Order.objects.create(created_by=self.user, customer=self.customer, order_number=2,
                              delivery_date=d, total_amount=Decimal('8000.00'))
         # Differing paid amounts must NOT split the per-date count via GROUP BY.
         self._inst(o1, '5000.00', paid=True)
@@ -517,7 +527,7 @@ class BoardActionTests(_Fixture):
 
     def _order(self, num, status_='Booked', dd_offset=0, delivered_days_ago=None):
         o = Order.objects.create(
-            user=self.user, customer=self.customer, order_number=num, status=status_,
+            created_by=self.user, customer=self.customer, order_number=num, status=status_,
             delivery_date=date.today() + timedelta(days=dd_offset), total_amount=Decimal('1000.00'),
         )
         if delivered_days_ago is not None:
@@ -616,9 +626,9 @@ class BoardActionTests(_Fixture):
 
     def test_board_excludes_other_users(self):
         self._order(1, 'Booked')
-        other = User.objects.create_user(email='x@test.com', password='p')
-        oc = Customer.objects.create(user=other, name='Z', phone='7')
-        Order.objects.create(user=other, customer=oc, order_number=99, status='Booked',
+        other = _user_in_new_boutique('x@test.com')
+        oc = Customer.objects.create(created_by=other, name='Z', phone='7')
+        Order.objects.create(created_by=other, customer=oc, order_number=99, status='Booked',
                              delivery_date=date.today(), total_amount=Decimal('1.00'))
         resp = self.client.get(self.url, {'status': 'Booked'})
         self.assertEqual(len(resp.data['results']), 1)
@@ -705,7 +715,7 @@ class DeleteOrderTests(_Fixture):
 
     def test_other_users_order_cannot_be_deleted(self):
         order = self._create_order()
-        other = User.objects.create_user(email='intruder@test.com', password='p')
+        other = _user_in_new_boutique('intruder@test.com')
         intruder = APIClient(); intruder.force_authenticate(user=other)
         with patch('apps.orders.views.delete_objects') as mock_del:
             resp = intruder.delete(f'/api/orders/{order.id}/')
@@ -725,3 +735,57 @@ class DeleteOrderTests(_Fixture):
                 order=order, activity_type=OrderActivity.Type.ORDER_DELETED).count(),
             1,
         )
+
+
+class BoutiqueTenancyTests(TestCase):
+    """VS-23 / ADR-0007 — per-boutique numbering, same-boutique integrity,
+    created_by attribution, and same-boutique data sharing."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = User.objects.create_user(email='a@test.com', password='pass')
+        self.boutique = self.owner.boutique
+        self.client.force_authenticate(user=self.owner)
+        self.customer = Customer.objects.create(created_by=self.owner, name='A-Cust', phone='1')
+
+    def _post_order(self, client, customer_id):
+        return client.post('/api/orders/', {
+            'customer': str(customer_id),
+            'delivery_date': _future(),
+            'total_amount': '1000.00',
+        })
+
+    def test_order_number_is_per_boutique(self):
+        r1 = self._post_order(self.client, self.customer.id)
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r1.data['order_number'], 1)
+        # A different boutique's first order is also #1 — numbering is per-boutique.
+        other = _user_in_new_boutique('b@test.com')
+        oc = Customer.objects.create(created_by=other, name='B-Cust', phone='2')
+        bclient = APIClient(); bclient.force_authenticate(user=other)
+        r2 = self._post_order(bclient, oc.id)
+        self.assertEqual(r2.status_code, 201)
+        self.assertEqual(r2.data['order_number'], 1)
+
+    def test_cannot_attach_another_boutiques_customer(self):
+        other = _user_in_new_boutique('b@test.com')
+        oc = Customer.objects.create(created_by=other, name='B-Cust', phone='2')
+        resp = self._post_order(self.client, oc.id)  # A points at B's customer
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_staff_in_same_boutique_share_orders(self):
+        r = self._post_order(self.client, self.customer.id)
+        staff = User.objects.create_user(email='staff@test.com', password='pass')
+        self.assertEqual(staff.boutique_id, self.boutique.id)  # joined the same boutique
+        sclient = APIClient(); sclient.force_authenticate(user=staff)
+        nums = {o['order_number'] for o in sclient.get('/api/orders/').data}
+        self.assertIn(r.data['order_number'], nums)
+
+    def test_deleting_staff_nulls_created_by_but_keeps_order(self):
+        staff = User.objects.create_user(email='staff@test.com', password='pass')
+        sclient = APIClient(); sclient.force_authenticate(user=staff)
+        order_id = self._post_order(sclient, self.customer.id).data['id']
+        staff.delete()  # not the owner → allowed; created_by SET_NULL
+        order = Order.objects.get(id=order_id)
+        self.assertIsNone(order.created_by_id)
+        self.assertEqual(order.boutique_id, self.boutique.id)

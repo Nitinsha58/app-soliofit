@@ -9,6 +9,8 @@
 
 _Revised 2026-06-09 (pre-acceptance, from review) before any VS-23 code. Incorporated: `User` is operator/staff identity (not end-customer); operational settings (`delivery_buffer_days`, `daily_capacity`) re-homed to the boutique while notification prefs stay per-user; `Order.user` / `Customer.user` redefined as **attribution** (`created_by`, non-cascading) with **ownership** moving to `boutique`; same-boutique validation on cross-root links; `boutique_id` confined to roots; explicit Non-Goals; `owner` qualified as primary/billing owner; future `BoutiqueMembership`, customer/member portability, and boutique-level subscription noted as shape-only._
 
+_Amended 2026-06-09 (at implementation start, before code): **`User.boutique` is `null=True` at the DB**, application-guaranteed populated by `UserManager.create_user` (which bootstraps the solo boutique for the first user and attaches subsequent users to it). This resolves the circular `Boutique.owner ↔ User.boutique` bootstrap on a fresh deploy, where the first `createsuperuser` predates any boutique. `Order.boutique` and `Customer.boutique` remain **non-null** (always created within a request whose user already has a boutique). No change to the ownership/attribution or roots-only decisions._
+
 ---
 
 ## Context

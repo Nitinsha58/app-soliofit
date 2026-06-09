@@ -54,7 +54,7 @@ class CalendarView(APIView):
         today = timezone.localdate()
 
         orders = Order.objects.filter(
-            user=request.user,
+            boutique=request.user.boutique,
             deleted_at__isnull=True,
             delivery_date__gte=first,
             delivery_date__lte=last,
@@ -71,7 +71,7 @@ class CalendarView(APIView):
         }
 
         installments = Installment.objects.filter(
-            order__user=request.user,
+            order__boutique=request.user.boutique,
             order__deleted_at__isnull=True,
             paid_date__isnull=True,
             due_date__gte=first,

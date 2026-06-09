@@ -28,7 +28,7 @@ class SearchView(APIView):
 
         name_qs = list(
             Customer.objects.filter(
-                user=request.user,
+                boutique=request.user.boutique,
                 deleted_at__isnull=True,
                 name__icontains=q,
             )
@@ -38,7 +38,7 @@ class SearchView(APIView):
         if remaining > 0:
             phone_qs = list(
                 Customer.objects.filter(
-                    user=request.user,
+                    boutique=request.user.boutique,
                     deleted_at__isnull=True,
                     phone__icontains=q,
                 )
@@ -55,7 +55,7 @@ class SearchView(APIView):
             counts = {
                 str(row['customer_id']): row['n']
                 for row in Order.objects.filter(
-                    user=request.user,
+                    boutique=request.user.boutique,
                     customer_id__in=cids,
                     deleted_at__isnull=True,
                 ).values('customer_id').annotate(n=Count('id'))
@@ -67,7 +67,7 @@ class SearchView(APIView):
         if order_num is not None:
             orders = list(
                 Order.objects.filter(
-                    user=request.user,
+                    boutique=request.user.boutique,
                     deleted_at__isnull=True,
                     order_number=order_num,
                 )

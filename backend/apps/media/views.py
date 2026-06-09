@@ -119,7 +119,7 @@ class OrderPhotoListCreateView(APIView):
 
     def _get_order(self, request, order_id):
         try:
-            return Order.objects.get(id=order_id, user=request.user, deleted_at__isnull=True)
+            return Order.objects.get(id=order_id, boutique=request.user.boutique, deleted_at__isnull=True)
         except Order.DoesNotExist:
             return None
 
@@ -153,7 +153,7 @@ class OrderPhotoDetailView(APIView):
             return OrderPhoto.objects.get(
                 id=photo_id,
                 order__id=order_id,
-                order__user=request.user,
+                order__boutique=request.user.boutique,
                 order__deleted_at__isnull=True,
             )
         except OrderPhoto.DoesNotExist:
@@ -174,7 +174,7 @@ class VoiceNoteListCreateView(APIView):
 
     def _get_order(self, request, order_id):
         try:
-            return Order.objects.get(id=order_id, user=request.user, deleted_at__isnull=True)
+            return Order.objects.get(id=order_id, boutique=request.user.boutique, deleted_at__isnull=True)
         except Order.DoesNotExist:
             return None
 
@@ -206,7 +206,7 @@ class VoiceNoteDetailView(APIView):
             return VoiceNote.objects.get(
                 id=note_id,
                 order__id=order_id,
-                order__user=request.user,
+                order__boutique=request.user.boutique,
                 order__deleted_at__isnull=True,
             )
         except VoiceNote.DoesNotExist:

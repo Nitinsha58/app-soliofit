@@ -15,7 +15,7 @@ class _Fixture(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email='tailor@test.com', password='pass')
         self.customer = Customer.objects.create(
-            user=self.user, name='Alice', phone='9999999999',
+            created_by=self.user, name='Alice', phone='9999999999',
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
@@ -24,7 +24,7 @@ class _Fixture(TestCase):
     def _order(self, st=Order.Status.BOOKED, delivered=False):
         s = Order.Status.DELIVERED if delivered else st
         return Order.objects.create(
-            user=self.user, customer=self.customer,
+            created_by=self.user, customer=self.customer,
             order_number=Order.objects.count() + 1,
             delivery_date=date.today() + timedelta(days=30),
             total_amount=Decimal('5000.00'),
@@ -80,11 +80,11 @@ class CustomerPaymentsEndpointTests(_Fixture):
 class CustomerOrdersFilterTests(_Fixture):
     def test_orders_filter_by_customer(self):
         other_customer = Customer.objects.create(
-            user=self.user, name='Bob', phone='8888888888',
+            created_by=self.user, name='Bob', phone='8888888888',
         )
         self._order()
         Order.objects.create(
-            user=self.user, customer=other_customer,
+            created_by=self.user, customer=other_customer,
             order_number=99,
             delivery_date=date.today() + timedelta(days=10),
             total_amount=Decimal('1000.00'),

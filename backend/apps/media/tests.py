@@ -89,9 +89,9 @@ class MediaKeyValidationTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(email='tailor@test.com', password='pass')
-        self.customer = Customer.objects.create(user=self.user, name='Alice', phone='9999999999')
+        self.customer = Customer.objects.create(created_by=self.user, name='Alice', phone='9999999999')
         self.order = Order.objects.create(
-            user=self.user, customer=self.customer, order_number=1,
+            created_by=self.user, customer=self.customer, order_number=1,
             delivery_date=date.today() + timedelta(days=10), total_amount=Decimal('100.00'),
         )
         self.client = APIClient()

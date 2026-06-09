@@ -18,7 +18,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Customer.objects.filter(
-            user=self.request.user,
+            boutique=self.request.user.boutique,
             deleted_at__isnull=True,
         ).order_by('-created_at')
         search = self.request.query_params.get('search', '').strip()
@@ -27,7 +27,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(created_by=self.request.user, boutique=self.request.user.boutique)
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
@@ -42,14 +42,14 @@ class CustomerViewSet(viewsets.ModelViewSet):
             order_agg = {
                 str(row['customer_id']): (row['n'], row['total'] or Decimal('0'))
                 for row in Order.objects.filter(
-                    user=request.user, customer_id__in=cids, deleted_at__isnull=True,
+                    boutique=request.user.boutique, customer_id__in=cids, deleted_at__isnull=True,
                 ).values('customer_id').annotate(n=Count('id'), total=Sum('total_amount'))
             }
             # One query: total paid per customer
             paid_agg = {
                 str(row['order__customer_id']): row['total']
                 for row in Installment.objects.filter(
-                    order__user=request.user,
+                    order__boutique=request.user.boutique,
                     order__customer_id__in=cids,
                     order__deleted_at__isnull=True,
                     paid_date__isnull=False,
@@ -70,7 +70,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
         customer = self.get_object()
         data = CustomerSerializer(customer).data
         orders = Order.objects.filter(
-            user=request.user, customer=customer, deleted_at__isnull=True,
+            boutique=request.user.boutique, customer=customer, deleted_at__isnull=True,
         )
         order_ids = orders.values_list('id', flat=True)
         paid_total = (
@@ -86,7 +86,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         customer = self.get_object()
         active = Order.objects.filter(
-            user=request.user,
+            boutique=request.user.boutique,
             customer=customer,
             deleted_at__isnull=True,
         ).exclude(status=Order.Status.DELIVERED)
@@ -103,7 +103,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def payments(self, request, pk=None):
         customer = self.get_object()
         orders = (
-            Order.objects.filter(user=request.user, customer=customer, deleted_at__isnull=True)
+            Order.objects.filter(boutique=request.user.boutique, customer=customer, deleted_at__isnull=True)
             .prefetch_related('installments')
             .order_by('-delivery_date')
         )
@@ -133,7 +133,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def media(self, request, pk=None):
         customer = self.get_object()
         order_qs = Order.objects.filter(
-            user=request.user, customer=customer, deleted_at__isnull=True,
+            boutique=request.user.boutique, customer=customer, deleted_at__isnull=True,
         ).only('id', 'order_number')
         order_map = {str(o.id): o.order_number for o in order_qs}
         order_ids = list(order_map.keys())

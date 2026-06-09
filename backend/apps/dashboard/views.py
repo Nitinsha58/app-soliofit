@@ -10,7 +10,7 @@ from apps.payments.models import Installment
 
 
 def _unpaid_for_user(user):
-    order_ids = Order.objects.filter(user=user, deleted_at__isnull=True).values_list('id', flat=True)
+    order_ids = Order.objects.filter(boutique=user.boutique, deleted_at__isnull=True).values_list('id', flat=True)
     return Installment.objects.filter(order_id__in=order_ids, paid_date__isnull=True)
 
 
@@ -20,7 +20,7 @@ def summary(request):
     today = date.today()
     user = request.user
 
-    active = Order.objects.filter(user=user, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
+    active = Order.objects.filter(boutique=user.boutique, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
     unpaid = _unpaid_for_user(user)
 
     pending_total = unpaid.aggregate(s=Sum('amount'))['s'] or 0
@@ -42,7 +42,7 @@ def notification_count(request):
     today = date.today()
     user = request.user
 
-    active = Order.objects.filter(user=user, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
+    active = Order.objects.filter(boutique=user.boutique, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
     unpaid = _unpaid_for_user(user)
 
     delivery_due = active.filter(delivery_date=today).count()
@@ -65,7 +65,7 @@ def notifications(request):
     today = date.today()
     user = request.user
 
-    active = Order.objects.filter(user=user, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
+    active = Order.objects.filter(boutique=user.boutique, deleted_at__isnull=True).exclude(status=Order.Status.DELIVERED)
     unpaid = _unpaid_for_user(user)
 
     def order_rows(qs):

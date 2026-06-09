@@ -5,22 +5,27 @@ from rest_framework.test import APIClient
 
 from apps.customers.models import Customer
 from apps.orders.models import Order
+from apps.users.models import Boutique
 
 User = get_user_model()
 
 
 def make_user(email):
-    return User.objects.create_user(email=email, password='pass')
+    # Each test user gets its own boutique so cross-boutique isolation holds.
+    u = User.objects.create_user(email=email, password='pass')
+    u.boutique = Boutique.objects.create(name=email, owner=u)
+    u.save(update_fields=['boutique'])
+    return u
 
 
 def make_customer(user, name='Alice', phone='9876543210'):
-    return Customer.objects.create(user=user, name=name, phone=phone)
+    return Customer.objects.create(created_by=user, name=name, phone=phone)
 
 
 def make_order(user, customer, order_number=1, status='Booked'):
     from datetime import date
     return Order.objects.create(
-        user=user,
+        created_by=user,
         customer=customer,
         order_number=order_number,
         status=status,

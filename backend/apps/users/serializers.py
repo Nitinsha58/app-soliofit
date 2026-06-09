@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
-from .models import User, UserSettings, NotificationPreference
+from .models import User, Boutique, NotificationPreference
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -29,15 +29,15 @@ class ChangePasswordSerializer(serializers.Serializer):
         return value
 
 
-class UserSettingsSerializer(serializers.ModelSerializer):
-    # daily_capacity must be >= 1: a capacity of 0 makes `load < daily_capacity`
-    # unsatisfiable, which would silently hide the Add-Order suggestion. Bounds
-    # mirror the Settings form inputs.
+class BoutiqueSettingsSerializer(serializers.ModelSerializer):
+    # Operational settings now live on the boutique (ADR-0007). daily_capacity
+    # must be >= 1: a capacity of 0 makes `load < daily_capacity` unsatisfiable,
+    # which would silently hide the Add-Order suggestion. Bounds mirror the form.
     delivery_buffer_days = serializers.IntegerField(min_value=0, max_value=60, required=False)
     daily_capacity = serializers.IntegerField(min_value=1, max_value=100, required=False)
 
     class Meta:
-        model = UserSettings
+        model = Boutique
         fields = ['delivery_buffer_days', 'daily_capacity']
 
 

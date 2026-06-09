@@ -59,7 +59,7 @@ def payment_summary(request):
     today = date.today()
     user = request.user
 
-    orders = Order.objects.filter(user=user, deleted_at__isnull=True, total_amount__gt=0)
+    orders = Order.objects.filter(boutique=user.boutique, deleted_at__isnull=True, total_amount__gt=0)
     order_ids = orders.values_list('id', flat=True)
     installments = Installment.objects.filter(order_id__in=order_ids)
 
@@ -98,7 +98,7 @@ def payment_orders(request):
     range_param = request.query_params.get('range', 'all_time')
 
     qs = Order.objects.filter(
-        user=user,
+        boutique=user.boutique,
         deleted_at__isnull=True,
         total_amount__gt=0,
     ).select_related('customer').prefetch_related('installments').order_by('delivery_date')
@@ -121,7 +121,7 @@ def payment_orders(request):
 
 def _get_order(request, order_id):
     try:
-        return Order.objects.get(id=order_id, user=request.user, deleted_at__isnull=True)
+        return Order.objects.get(id=order_id, boutique=request.user.boutique, deleted_at__isnull=True)
     except Order.DoesNotExist:
         return None
 
@@ -176,7 +176,7 @@ class InstallmentDetailView(APIView):
             return Installment.objects.select_related('order').get(
                 id=installment_id,
                 order__id=order_id,
-                order__user=request.user,
+                order__boutique=request.user.boutique,
                 order__deleted_at__isnull=True,
             )
         except Installment.DoesNotExist:
@@ -227,7 +227,7 @@ class InstallmentMarkPaidView(APIView):
             installment = Installment.objects.get(
                 id=installment_id,
                 order__id=order_id,
-                order__user=request.user,
+                order__boutique=request.user.boutique,
                 order__deleted_at__isnull=True,
             )
         except Installment.DoesNotExist:

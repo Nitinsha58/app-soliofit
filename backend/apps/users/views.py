@@ -11,11 +11,11 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from .models import User, UserSettings, NotificationPreference
+from .models import User, NotificationPreference
 from .serializers import (
     UserSerializer,
     ChangePasswordSerializer,
-    UserSettingsSerializer,
+    BoutiqueSettingsSerializer,
     NotificationPreferenceSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
@@ -100,12 +100,13 @@ class OrderSettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        obj, _ = UserSettings.objects.get_or_create(user=request.user)
-        return Response(UserSettingsSerializer(obj).data)
+        # Operational settings are boutique-level now (ADR-0007).
+        boutique = request.user.boutique
+        return Response(BoutiqueSettingsSerializer(boutique).data)
 
     def patch(self, request):
-        obj, _ = UserSettings.objects.get_or_create(user=request.user)
-        serializer = UserSettingsSerializer(obj, data=request.data, partial=True)
+        boutique = request.user.boutique
+        serializer = BoutiqueSettingsSerializer(boutique, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
