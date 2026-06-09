@@ -20,8 +20,9 @@ ADRs capture significant technical choices: what was decided, why, what alternat
 | [ADR-0004](./ADR-0004-frontend-framework.md) | Frontend Framework — Next.js 14 App Router + shadcn/ui | Accepted | VS-00 |
 | [ADR-0005](./ADR-0005-s3-presigned-url-strategy.md) | S3 Presigned URL Strategy with Local Stub Mode | Accepted | VS-07 |
 | [ADR-0006](./ADR-0006-orders-list-scaling.md) | Orders List Scaling via Keyset Cursor Pagination | Accepted | VS-20 |
+| [ADR-0007](./ADR-0007-boutique-tenancy.md) | Boutique Tenancy — Single-Boutique Schema Foundation | Accepted | VS-23 |
 
-_Future ADRs will be added as each slice requires a documented decision. Known upcoming: a VS-23 tenancy ADR and a VS-18 deployment ADR — numbers assigned at activation, not pre-reserved._
+_Future ADRs will be added as each slice requires a documented decision. Known upcoming: a VS-18 deployment ADR — number assigned at activation, not pre-reserved._
 
 ---
 

@@ -63,7 +63,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-23 | Boutique tenant | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
-_Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 still needs a tenancy ADR at its activation; VS-18 needs a deployment ADR at its activation._
+_Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 tenancy decision recorded in ADR-0007 (Accepted); VS-18 still needs a deployment ADR at its activation._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -747,20 +747,25 @@ Frontend: `/forgot-password` (zod + native email validation, neutral success cop
 
 ### VS-23 — Boutique Tenant (schema foundation)
 
-**What:** Introduce a `Boutique` entity that owns all tenant data and per-boutique order numbering — scoped to a **single boutique** for MVP. This is schema future-proofing so staff accounts / multi-boutique can arrive later without a painful FK migration. **Not SaaS:** no signup, billing, staff roles, tenant admin, or multi-boutique onboarding — those stay post-MVP per `09-mvp-scope`.
+**What:** Introduce a `Boutique` entity that **owns** all tenant data, with per-boutique order numbering — scoped to a **single boutique** for MVP. Schema future-proofing so staff accounts / multi-boutique can arrive later without a painful FK migration. **Not SaaS:** no signup, billing, staff roles, tenant admin, or multi-boutique onboarding — post-MVP per `09-mvp-scope`. `User` = boutique operator/staff identity (distinct from `Customer`, which stays non-auth boutique-private data, and from any future Soliofit member account).
 
-**ADR:** Write a tenancy ADR at activation (next sequential ID) — covers the `Boutique` model, the `boutique` FK rollout, the data backfill into one seeded boutique, and the per-boutique `order_number` migration. **Required before implementation.**
+**ADR:** [ADR-0007](../adr/ADR-0007-boutique-tenancy.md) — Boutique Tenancy (single-boutique schema foundation). **Accepted.** Settled: `boutique` FK on **roots only** (User, Order, Customer), not on children; `Order.user`/`Customer.user` become attribution (`created_by`, non-cascading); operational settings re-home to the boutique.
 
-**Backend:**
-- `Boutique` model (name, owning `User`, timestamps); `User` belongs to one boutique.
-- Add a `boutique` FK (or scope via the owning relation — decide in the ADR) to tenant-owned models: orders, customers, installments, media, user settings, notification prefs, activities.
-- Data migration: create one seeded Boutique, backfill all existing rows to it.
-- `order_number` becomes unique **per boutique** — replaces the global `Max(order_number)+1` counter + retry in `OrderViewSet.perform_create`; update the uniqueness constraint and numbering.
-- Querysets scope by the request user's boutique (alongside / instead of `user=`).
+**Backend (per ADR-0007):**
+- `Boutique` model: `name`, `owner` (FK User, PROTECT — **primary/billing owner**, not a permissions model), `delivery_buffer_days`, `daily_capacity`, timestamps. `User.boutique` FK (PROTECT) — every operator belongs to one boutique.
+- `boutique` FK on **tenant roots only** — `User`, `Order`, `Customer` (denormalized on Order/Customer for the per-boutique unique constraint + join-free scoping). Children (installments, media, activities) get **no** `boutique` FK — they stay scoped through their parent, mirroring the soft-delete cascade invariant.
+- **Ownership vs attribution:** rename `Order.user`/`Customer.user` → `created_by` (`SET_NULL, null=True`) — attribution only; deleting/deactivating staff must never cascade-delete boutique data. Ownership is `boutique`.
+- **Operational settings move to `Boutique`:** `delivery_buffer_days` + `daily_capacity` re-homed; `UserSettings` table removed; `/api/auth/order-settings/` reads the caller's boutique. `NotificationPreference` stays per-user.
+- **Same-boutique integrity:** an order's `customer.boutique_id` must equal `order.boutique_id` — enforced in serializer/viewset (boutique injected server-side), with an isolation test.
+- `order_number` unique **per boutique** — drop global `unique=True`, add `UniqueConstraint(boutique, order_number)`; `perform_create` scopes the `Max+1` retry loop by boutique and sets `created_by`.
+- Querysets scope every root filter `user=request.user` → `boutique=request.user.boutique`; children flip the parent predicate (`order__user=` → `order__boutique=`). Surfaces: board + delivery-load, schedule, calendar, payments + installments, dashboard/notifications, search, customer profile.
+- **Migration (nullable → seed+backfill → enforce):** add Boutique + nullable `boutique`; `RenameField` `user`→`created_by`; data-migrate one seeded Boutique (name from `business_name`, owner = earliest user, settings copied from operator's `UserSettings`) and backfill all User/Order/Customer rows; then enforce non-null `boutique`, flip `created_by` to `SET_NULL`, swap the order_number constraint, drop `UserSettings`. **Keep steps split** — the seeded boutique must exist before `User.boutique` goes non-null (circular `Boutique.owner ↔ User.boutique`).
 
-**Frontend:** Minimal/none for MVP — the boutique is implicit (single). Settings already shows the business name.
+**Out of scope (Non-Goals):** customer/member login accounts, cross-boutique customer discovery/portability, staff roles, billing/subscription admin, marketplace. Future shape recorded in the ADR (`BoutiqueMembership`, member portability, boutique-level subscription) — not built now.
 
-**Review checkpoint:** All existing data belongs to one seeded boutique with nothing lost in backfill; new orders number per boutique; queries are boutique-scoped; no signup/multi-tenant UI appears; `09-mvp-scope` still accurately lists multi-boutique/SaaS as post-MVP.
+**Frontend:** Minimal/none for MVP — the boutique is implicit (single). Settings already shows the business name; order-settings continue to work against the (now boutique-level) values transparently.
+
+**Review checkpoint:** All existing data belongs to one seeded boutique with nothing lost in backfill (orders keep their numbers); new orders number per boutique; queries are boutique-scoped (cross-boutique isolation asserted per surface); an order can't link another boutique's customer; staff deletion nulls `created_by` without dropping orders; no signup/multi-tenant UI appears; `09-mvp-scope` still lists multi-boutique/SaaS as post-MVP.
 
 ---
 
