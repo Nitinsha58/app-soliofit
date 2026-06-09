@@ -53,8 +53,8 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-19 | Order payment summary | Complete |
 | VS-20 | Orders list scaling | Complete |
 | VS-21 | Delete order | Complete |
-| VS-22 | Forgot password | Active |
-| VS-23 | Boutique tenant | Pending |
+| VS-22 | Forgot password | Complete |
+| VS-23 | Boutique tenant | Active |
 | VS-17 | Mobile layout | Pending |
 | VS-18 | Production deployment | Pending |
 | VS-08b | Voice format (webm→mp3) | Backlog — Deferred (not in current execution order) |

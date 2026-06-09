@@ -33,7 +33,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Done |
-| VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Pending |
+| VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Done |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Pending |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
 
@@ -59,7 +59,8 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-19 | Order payment summary | Done |
 | VS-20 | Orders list scaling | Done |
 | VS-21 | Delete order | Done |
-| VS-22 | Forgot password | **Active** |
+| VS-22 | Forgot password | Done |
+| VS-23 | Boutique tenant | **Active** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 still needs a tenancy ADR at its activation; VS-18 needs a deployment ADR at its activation._
@@ -735,6 +736,12 @@ Frontend: `DangerZone` at the drawer bottom — two-step (no one-tap): "Delete o
 - "Forgot password?" link on the login page.
 
 **Review checkpoint:** Requesting a reset for a real email delivers a link that lets you set a new password and log in. Unknown email → identical success copy (no enumeration). Expired/garbage token → friendly error. Rate limit blocks rapid repeats.
+
+**Completion record (2026-06-09):** Commits `cb48239` (backend endpoints), `a943e16` (P3 fix: expiry copy), `1137a71` (frontend screens). No new model, no migration. Both units browser-verified. No deferrals.
+
+Backend: `PasswordResetRequestView` (`POST /api/auth/password-reset/`) always returns 200 with neutral copy; emails a signed link to a matching **active** user only; throttled **5/hour per email** (custom `PasswordResetThrottle` keyed on email, IP fallback) via `DEFAULT_THROTTLE_RATES`. `PasswordResetConfirmView` (`POST .../confirm/`) decodes uid + verifies the token with Django's `default_token_generator`, runs `validate_password`, sets the password; the token self-invalidates (hash-based) so it can't be replayed. `_expiry_phrase()` derives the email's "expires in N days/hours" from `PASSWORD_RESET_TIMEOUT` (3 days) so the copy can't drift. Email/SMTP settings added (Gmail-ready, **console backend in dev**, locmem in tests), `FRONTEND_BASE_URL` for the link; all documented in `.env.example`. 13 users-app tests (enumeration-safe request, throttle + per-email isolation, single-use token, bad uid/token, weak password, inactive user, expiry-copy default + override); **151 backend total**. **Throttle caveat:** backed by the default LocMem cache — correct for one process; move to Redis at VS-18 if the backend scales horizontally.
+
+Frontend: `/forgot-password` (zod + native email validation, neutral success copy, no enumeration), `/reset-password` (Suspense-wrapped `useSearchParams`; new+confirm with match check; rejected/expired token → inline error + "Request a new link"; missing uid/token → immediate "Link expired"; success → toast + redirect to `/login`). `ToastHost` mounted in the `(auth)` layout so the reset-success toast survives the client navigation into `/login` (both share the layout). "Forgot password?" link on the login page. `requestPasswordReset` / `confirmPasswordReset` added to the auth API client; reset schemas in `validations/auth.ts`. tsc clean.
 
 ---
 
