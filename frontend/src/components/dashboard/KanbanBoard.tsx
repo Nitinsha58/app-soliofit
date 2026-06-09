@@ -17,6 +17,7 @@ import { useUIStore } from '@/stores/useUIStore'
 import BoardColumn from './BoardColumn'
 import OrderCard from './OrderCard'
 import SummaryStrip, { type ActiveFilter } from './SummaryStrip'
+import MobileBoard from './MobileBoard'
 
 const COLUMNS: { status: Order['status']; label: string; accent: string }[] = [
   { status: 'Booked',           label: 'Booked',           accent: '#60A5FA' },
@@ -178,48 +179,59 @@ export default function KanbanBoard() {
   const isEmpty = counts != null && Object.values(counts).reduce((a, b) => a + b, 0) === 0
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <SummaryStrip activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+    <>
+      {/* Desktop board (drag/drop) */}
+      <div className="hidden lg:block">
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <SummaryStrip activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
-      {isEmpty && !activeFilter && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <svg className="text-[#C8C8C4] mb-3" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="12" y1="18" x2="12" y2="12" />
-            <line x1="9" y1="15" x2="15" y2="15" />
-          </svg>
-          <p className="text-sm font-medium text-[#6B6B67]">No orders yet</p>
-          <p className="text-xs text-[#A0A09C] mt-1">Create your first order to get started</p>
-        </div>
-      )}
+          {isEmpty && !activeFilter && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <svg className="text-[#C8C8C4] mb-3" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <line x1="9" y1="15" x2="15" y2="15" />
+              </svg>
+              <p className="text-sm font-medium text-[#6B6B67]">No orders yet</p>
+              <p className="text-xs text-[#A0A09C] mt-1">Create your first order to get started</p>
+            </div>
+          )}
 
-      <div className="overflow-x-auto pb-4 -mx-6 px-6">
-        <div className="flex gap-4 min-w-max items-start">
-          {COLUMNS.map(({ status, label, accent }) => (
-            <BoardColumn
-              key={status}
-              status={status}
-              title={label}
-              accent={accent}
-              filterFn={filterFn}
-              mutatingIds={mutatingIds}
-              highlightId={highlightId}
-              movedFromMap={movedFromMap}
-              onCounts={onCounts}
-            />
-          ))}
-        </div>
+          <div className="overflow-x-auto pb-4 -mx-6 px-6">
+            <div className="flex gap-4 min-w-max items-start">
+              {COLUMNS.map(({ status, label, accent }) => (
+                <BoardColumn
+                  key={status}
+                  status={status}
+                  title={label}
+                  accent={accent}
+                  filterFn={filterFn}
+                  mutatingIds={mutatingIds}
+                  highlightId={highlightId}
+                  movedFromMap={movedFromMap}
+                  onCounts={onCounts}
+                />
+              ))}
+            </div>
+          </div>
+
+          <DragOverlay dropAnimation={null}>
+            {activeOrder ? (
+              <div className="rotate-1 shadow-2xl opacity-95 w-72">
+                <OrderCard order={activeOrder} />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
-      <DragOverlay dropAnimation={null}>
-        {activeOrder ? (
-          <div className="rotate-1 shadow-2xl opacity-95 w-72">
-            <OrderCard order={activeOrder} />
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* Mobile board (single focused column) */}
+      <div className="lg:hidden">
+        <MobileBoard />
+      </div>
 
+      {/* Undo snackbar (shared) */}
       {lastMove && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg bg-[#1A1A18] px-4 py-2.5 text-[13px] text-white shadow-xl">
           <span className="tabular-nums">
@@ -234,6 +246,6 @@ export default function KanbanBoard() {
           </button>
         </div>
       )}
-    </DndContext>
+    </>
   )
 }
