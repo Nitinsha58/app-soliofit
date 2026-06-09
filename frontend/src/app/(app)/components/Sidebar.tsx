@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { logout as logoutApi } from '@/lib/api/auth'
 import { useAuthStore } from '@/stores/useAuthStore'
-import NotificationBell from '@/components/dashboard/NotificationBell'
 
 function DashboardIcon() {
   return (
@@ -59,15 +58,6 @@ function CalendarIcon() {
   )
 }
 
-function SearchIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  )
-}
-
 function SettingsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,7 +83,6 @@ const navItems = [
   { href: '/payments', label: 'Payments', icon: <PaymentsIcon /> },
   { href: '/customers', label: 'Customers', icon: <CustomersIcon /> },
   { href: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
-  { href: '/search', label: 'Search', icon: <SearchIcon /> },
 ]
 
 function NavLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
@@ -142,7 +131,6 @@ export default function Sidebar() {
             <p className="text-xs text-[#6B6B67] mt-0.5 truncate">{user.business_name}</p>
           )}
         </div>
-        <NotificationBell dropdownSide="left" />
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

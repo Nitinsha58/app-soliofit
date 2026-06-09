@@ -8,6 +8,7 @@ import { getMe } from '@/lib/api/auth'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useUIStore } from '@/stores/useUIStore'
 import Sidebar from './Sidebar'
+import AppHeader from './AppHeader'
 import MobileNav from './MobileNav'
 import ToastHost from './ToastHost'
 import AddOrderFlow from '@/components/orders/AddOrderFlow'
@@ -70,6 +71,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="h-dvh flex flex-col bg-[#FAFAF8] overflow-hidden">
       <Sidebar />
+      <AppHeader />
       {/* flex-1 + overflow-y-auto: content scrolls inside the shell, not the document.
           overscroll-contain allows natural rubber-band within this div on iOS,
           but prevents scroll chaining up to the (non-scrolling) body. */}
