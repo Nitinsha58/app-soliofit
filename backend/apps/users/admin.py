@@ -5,11 +5,12 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['email', 'owner_name', 'business_name', 'is_staff', 'created_at']
+    list_display = ['email', 'owner_name', 'business_name', 'boutique', 'is_staff', 'created_at']
     ordering = ['email']
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Profile', {'fields': ('owner_name', 'business_name', 'phone')}),
+        ('Tenancy', {'fields': ('boutique',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser',
                                     'groups', 'user_permissions')}),
     )

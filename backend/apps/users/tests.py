@@ -150,6 +150,22 @@ class BoutiqueBootstrapTests(TestCase):
         u2 = User.objects.create_user(email='b@test.com', password='x')
         self.assertEqual(u1.boutique_id, u2.boutique_id)
 
+    def test_admin_style_create_attaches_to_existing_boutique(self):
+        # Django admin's UserCreationForm bypasses create_user — it builds the
+        # instance and calls save() directly. The model guard must still attach.
+        existing = User.objects.create_user(email='owner@test.com', password='x')
+        u = User(email='staff@test.com')
+        u.set_password('x')
+        u.save()
+        self.assertIsNotNone(u.boutique_id)
+        self.assertEqual(u.boutique_id, existing.boutique_id)
+
+    def test_objects_create_attaches_to_existing_boutique(self):
+        existing = User.objects.create_user(email='owner@test.com', password='x')
+        u = User.objects.create(email='staff@test.com')
+        self.assertIsNotNone(u.boutique_id)
+        self.assertEqual(u.boutique_id, existing.boutique_id)
+
 
 class PasswordResetRequestTests(TestCase):
     url = '/api/auth/password-reset/'

@@ -56,6 +56,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         db_table = 'users'
 
+    def save(self, *args, **kwargs):
+        # Tenancy safety net for creation paths that bypass create_user
+        # (Django admin's UserCreationForm, User.objects.create, shell). The first
+        # operator is always bootstrapped via create_superuser/create_user, so by
+        # the time any bypass path runs, a boutique already exists to attach to.
+        if self._state.adding and self.boutique_id is None:
+            using = kwargs.get('using') or self._state.db
+            boutique = Boutique.objects.using(using).first()
+            if boutique is not None:
+                self.boutique = boutique
+        super().save(*args, **kwargs)
+
 
 class Boutique(models.Model):
     """The tenant. Owns all boutique data (orders, customers, …) in MVP's
