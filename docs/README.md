@@ -78,3 +78,4 @@ ADRs are written incrementally as each slice requires a documented decision. No 
 | [ADR-0005](./adr/ADR-0005-s3-presigned-url-strategy.md) | S3 Presigned URL Strategy with Local Stub Mode | Accepted | VS-07 |
 | [ADR-0006](./adr/ADR-0006-orders-list-scaling.md) | Orders List Scaling via Keyset Cursor Pagination | Accepted | VS-20 |
 | [ADR-0007](./adr/ADR-0007-boutique-tenancy.md) | Boutique Tenancy — Single-Boutique Schema Foundation | Accepted | VS-23 |
+| [ADR-0008](./adr/ADR-0008-production-deployment.md) | Production Deployment — Single EC2, Docker Compose, GitHub Actions | Accepted | VS-18 |
