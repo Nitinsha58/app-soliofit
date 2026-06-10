@@ -131,7 +131,7 @@ clone first.
    - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
    - `POSTGRES_HOST=postgres`  *(the compose service name in production)*
    - `REDIS_URL=redis://redis:6379/0`
-   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_REGION_NAME`,
+   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`,
      `S3_BUCKET_NAME` *(media uploads)*
    - `BACKUP_BUCKET` *(the section-2 backup bucket)*
    - `EMAIL_*` *(SMTP)*, `FRONTEND_BASE_URL`, `FRONTEND_URL`
