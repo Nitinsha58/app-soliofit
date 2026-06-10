@@ -65,8 +65,10 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 # ── Behind host Nginx terminating TLS (ADR-0008) ──────────────────────────────
 # Nginx sets X-Forwarded-Proto; trust it so Django treats requests as HTTPS.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# Nginx already does the 80→443 redirect; Django redirect off avoids a double loop.
-SECURE_SSL_REDIRECT = False
+# Belt-and-suspenders HTTPS: Django redirects any non-HTTPS request. No loop —
+# SECURE_PROXY_SSL_HEADER is trusted and Nginx forwards X-Forwarded-Proto, and
+# Nginx's port-80 block 301s to 443 (never proxies plain HTTP to Django).
+SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
