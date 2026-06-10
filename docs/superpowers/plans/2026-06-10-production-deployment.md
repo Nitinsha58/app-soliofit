@@ -119,6 +119,39 @@ git commit -m "feat(VS-18): production settings — Redis cache, WhiteNoise stat
 
 ## UNIT 2 — Production images + Compose
 
+### Task 2.0: `.dockerignore` (prevent secret/cruft leak)
+**Files:** Create `backend/.dockerignore`, `frontend/.dockerignore`
+
+> **Why first:** the Dockerfiles use `COPY . .`, and Docker does NOT honor `.gitignore` — without these, the local `backend/.env` (dev secret, AWS/SMTP creds) is baked into the production image.
+
+- [ ] **Step 1: `backend/.dockerignore`**
+```
+# Secrets — never bake into the image (runtime env comes from compose env_file)
+.env
+.env.*
+!.env.example
+# Python / build cruft
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Generated / local data
+staticfiles/
+mediafiles/
+*.sqlite3
+```
+- [ ] **Step 2: `frontend/.dockerignore`**
+```
+# Secrets / local env
+.env.local
+.env*.local
+# Deps / build output (rebuilt inside the image)
+node_modules/
+.next/
+out/
+npm-debug.log*
+```
+- [ ] **Step 3: Verify after the images build (Tasks 2.1/2.2):** `docker run --rm soliofit-backend:plancheck test ! -f /app/.env` → exit 0 (`.env` absent), and `test -f /app/.env.example` → present.
+
 ### Task 2.1: Backend production Dockerfile
 **Files:** Create `backend/Dockerfile`
 

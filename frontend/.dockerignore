@@ -1,0 +1,9 @@
+# Secrets / local env
+.env.local
+.env*.local
+
+# Deps / build output (rebuilt inside the image)
+node_modules/
+.next/
+out/
+npm-debug.log*

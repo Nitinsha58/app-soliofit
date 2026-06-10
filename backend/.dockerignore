@@ -1,0 +1,14 @@
+# Secrets — never bake into the image (runtime env comes from compose env_file)
+.env
+.env.*
+!.env.example
+
+# Python / build cruft
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated / local data
+staticfiles/
+mediafiles/
+*.sqlite3
