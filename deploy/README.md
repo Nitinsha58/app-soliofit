@@ -35,6 +35,11 @@ images, ships them as a tarball over SSH, and runs `docker compose up -d`.
   - `EC2_SSH_KEY` — the **private** key for `ubuntu@` (the matching public key
     goes in the instance's `~/.ssh/authorized_keys`)
 
+> **Two distinct key pairs — don't conflate them.** `EC2_SSH_KEY` authenticates
+> **GitHub Actions → EC2** (the deploy `scp`/`ssh`). It is *separate* from the
+> read-only **deploy key** you create on the box in §4, which authenticates
+> **EC2 → GitHub** for the initial `git clone`.
+
 These two secrets are the *only* secrets GitHub ever sees. All app secrets live
 on the box (section 4).
 
@@ -44,7 +49,18 @@ on the box (section 4).
 
 - Launch EC2 `t3.small`, Ubuntu 22.04, 30 GB gp3, region `ap-south-1`.
 - Allocate an **Elastic IP** and associate it with the instance.
-- **Security group** inbound: `80`, `443`, and `22` (SSH from your IP only).
+- **Security group** inbound:
+  - `80` and `443` from anywhere (`0.0.0.0/0`) — public web traffic + Certbot's
+    HTTP-01 challenge.
+  - `22` (SSH) — needs a decision. The deploy workflow runs on **GitHub-hosted
+    runners**, whose source IPs are ephemeral and span large, frequently-changing
+    ranges. Restricting `22` to your home IP will make the deploy `scp`/`ssh`
+    steps **fail**. For MVP, open `22` to `0.0.0.0/0` **with key-only SSH** — the
+    SSH *key* is the access control, not the source IP. EC2 Ubuntu AMIs already
+    ship with `PasswordAuthentication no`; confirm it in
+    `/etc/ssh/sshd_config` and keep it off. Hardened alternatives (deferred —
+    ADR-0008 Non-Goals): run a **self-hosted GitHub runner on the box** (zero
+    inbound `22` needed for deploy), or use **AWS SSM Session Manager**.
 - Create a **private** S3 bucket for backups. The instance (via instance role or
   an IAM user's `aws configure`) needs `s3:PutObject`, `s3:ListBucket`, and
   `s3:DeleteObject` on it. Note the bucket name for `BACKUP_BUCKET`.
@@ -63,11 +79,24 @@ on the box (section 4).
 Order matters — the setup script reads the repo from `/home/ubuntu/soliofit`, so
 clone first.
 
-1. **Clone the repo to the expected path:**
+1. **Give the box read access to the repo, then clone it to the expected path.**
+   The deploy workflow ships images as tarballs, but the box still needs the repo
+   for the nginx config + scripts during setup. Use a **read-only deploy key**
+   (generate on the box, register the public half in GitHub):
    ```bash
-   git clone git@github.com:<you>/soliofit.git /home/ubuntu/soliofit
+   ssh-keygen -t ed25519 -C "soliofit-ec2-deploy" -f ~/.ssh/soliofit_deploy -N ""
+   cat ~/.ssh/soliofit_deploy.pub
+   ```
+   Add that public key in GitHub → repo **Settings → Deploy keys → Add deploy
+   key** (leave **"Allow write access" unchecked** — read-only). Then clone using
+   that key:
+   ```bash
+   GIT_SSH_COMMAND='ssh -i ~/.ssh/soliofit_deploy' \
+     git clone git@github.com:<you>/soliofit.git /home/ubuntu/soliofit
    cd /home/ubuntu/soliofit
    ```
+   *(A public repo can skip the deploy key and clone over HTTPS. To later pull
+   updates to nginx/scripts on the box, reuse the same `GIT_SSH_COMMAND` prefix.)*
 
 2. **Run the host setup script** (installs Docker, host Nginx, Certbot, awscli;
    installs the Nginx site config + symlink; sets the daily backup cron):
@@ -154,4 +183,5 @@ Once all of the above pass, **VS-18 closes → MVP is in production.**
 | Login fails over HTTPS | `CSRF_TRUSTED_ORIGINS` / `DJANGO_ALLOWED_HOSTS` mismatch in `backend/.env` |
 | Certbot fails | DNS A-record not resolving yet, or port 80 blocked in the security group |
 | Backup is empty (~20 B) | `postgres` container wasn't running at deploy — expected only on the first deploy |
-| Deploy can't SSH | `EC2_HOST` / `EC2_SSH_KEY` secret wrong, or SG doesn't allow GitHub runner IPs on 22 |
+| Deploy can't SSH | `EC2_HOST`/`EC2_SSH_KEY` wrong, or `22` not reachable from GitHub-hosted runners — see the §2 SG note (open `22` + key-only SSH) |
+| `git clone` denied on EC2 | No read access — register the §4 read-only **deploy key** in GitHub repo Deploy keys first |
