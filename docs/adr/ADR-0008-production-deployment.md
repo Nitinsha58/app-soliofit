@@ -94,5 +94,14 @@ CI builds both prod images, `docker save | gzip`, `scp` to EC2, `docker load`, t
 
 **Trade-offs accepted:** single point of failure (one EC2, co-located Postgres); brief deploy downtime; tarball transfer is slower than a registry pull but needs no registry auth. All are appropriate at boutique MVP scale and revisited post-MVP (RDS, GHCR, blue-green, Sentry).
 
+## Alternatives Considered
+
+- **Branch model — direct-push `main`** (push deploys, no PR gate) or **two-branch `master`→`main`**. Rejected: direct-push has no CI gate before production; two-branch adds ceremony without value for a solo dev. PR-gated `main` gives a CI gate with one production branch.
+- **Throttle — Gunicorn `workers=1`** (LocMem becomes process-global) or **accept the ~3× looser throttle**. Rejected: `workers=1` caps concurrency (one slow request blocks all); accepting looseness weakens a security control. Redis is a small container that fixes correctness and adds caching headroom.
+- **Nginx — containerized nginx + certbot sidecar** (all-in-compose, portable). Rejected for MVP: webroot cert renewal in containers is fiddlier than Certbot's `--nginx` host plugin, which auto-renews with no extra wiring on a single box.
+- **Image delivery — GHCR/ECR registry**. Rejected for MVP: adds registry auth on the box for no benefit at one-instance scale; tarball-over-SSH is free and simple. (Deferred, not foreclosed.)
+- **Database — RDS managed Postgres**. Rejected for MVP cost/simplicity; containerized Postgres with daily `pg_dump`→S3 is sufficient at boutique scale. (Deferred.)
+- **Deploy — blue-green / zero-downtime cutover**. Rejected: a few seconds of restart downtime is acceptable for this audience; blue-green is disproportionate complexity now. (Deferred.)
+
 ## Future shape (not built now)
 GHCR image registry · RDS managed Postgres · blue-green/zero-downtime cutover · Sentry error tracking · CloudFront for media · SES for email at volume. None are foreclosed by this design.
