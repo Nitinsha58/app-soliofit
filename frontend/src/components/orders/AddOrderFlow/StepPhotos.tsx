@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import CameraCapture from '../CameraCapture'
 
 interface Props {
@@ -42,6 +42,20 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
   const [showSheet, setShowSheet] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
+  // Escape must close the topmost overlay (camera, then sheet) — not the whole
+  // wizard. Capture phase so this runs before the wizard's bubble-phase listener.
+  useEffect(() => {
+    if (!showSheet && !showCamera) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      if (showCamera) setShowCamera(false)
+      else setShowSheet(false)
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [showSheet, showCamera])
+
   function handleSelect(selected: FileList | null) {
     if (!selected) return
     onFilesChange([...files, ...Array.from(selected)])
@@ -69,6 +83,7 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
                 <img src={url} alt="" className="w-full h-full object-cover" onLoad={() => URL.revokeObjectURL(url)} />
                 <button
                   onClick={() => removeFile(idx)}
+                  aria-label="Remove photo"
                   className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center"
                 >
                   <XIcon />
@@ -78,6 +93,7 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
           })}
           <button
             onClick={() => setShowSheet(true)}
+            aria-label="Add more photos"
             className="w-16 h-16 rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex items-center justify-center text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
