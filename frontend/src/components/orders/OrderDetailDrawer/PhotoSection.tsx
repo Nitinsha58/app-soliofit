@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { OrderPhoto } from '@/lib/api/media'
 import { listPhotos, deletePhoto, uploadPhoto } from '@/lib/api/media'
 import PhotoLightbox from './PhotoLightbox'
-import CameraCapture from './CameraCapture'
+import CameraCapture from '../CameraCapture'
 
 interface Props {
   orderId: string

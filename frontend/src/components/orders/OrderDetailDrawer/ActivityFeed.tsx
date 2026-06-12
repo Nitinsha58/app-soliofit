@@ -31,7 +31,7 @@ function describe(a: Activity): { label: string; iconType: IconType; color: stri
   const m = a.metadata
   switch (a.activity_type) {
     case 'order_created':
-      return { label: 'Order created', iconType: 'plus', color: '#60A5FA' }
+      return { label: 'Order created', iconType: 'plus', color: '#C8952A' }
     case 'status_changed':
       return { label: `Status: ${m.from} → ${m.to}`, iconType: 'arrow', color: '#A0A09C' }
     case 'delivery_marked':

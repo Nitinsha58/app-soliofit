@@ -2,18 +2,11 @@
 
 import type { Order } from '@/lib/api/orders'
 import { paymentMeta, inr } from '@/lib/orderPayment'
+import { STATUS_PILL } from '@/lib/orderStatus'
 
 interface Props {
   order: Order
   onClick: () => void
-}
-
-const STATUS_COLORS: Record<Order['status'], string> = {
-  'Booked':           'bg-blue-50 text-blue-700',
-  'Started':          'bg-violet-50 text-violet-700',
-  'Ready':            'bg-emerald-50 text-emerald-700',
-  'Partial Delivery': 'bg-amber-50 text-amber-700',
-  'Delivered':        'bg-gray-100 text-gray-500',
 }
 
 export default function ScheduleCard({ order, onClick }: Props) {
@@ -40,7 +33,7 @@ export default function ScheduleCard({ order, onClick }: Props) {
         <span className="text-[10px] font-medium text-[#94A3B8] tabular-nums">
           #{String(order.order_number).padStart(4, '0')}
         </span>
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_COLORS[order.status]}`}>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_PILL[order.status]}`}>
           {order.status}
         </span>
         {pay && (

@@ -5,19 +5,12 @@ import { useRouter } from 'next/navigation'
 import type { Order } from '@/lib/api/orders'
 import { ORDER_STATUSES, updateOrder, updateOrderStatus } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
+import { STATUS_PILL_BORDERED } from '@/lib/orderStatus'
 
 interface Props {
   order: Order
   onOrderChange: (updated: Partial<Order>) => void
   onUpdated: () => void
-}
-
-const STATUS_COLORS: Record<Order['status'], string> = {
-  'Booked':           'bg-blue-50 text-blue-700 border-blue-200',
-  'Started':          'bg-violet-50 text-violet-700 border-violet-200',
-  'Ready':            'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Partial Delivery': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Delivered':        'bg-gray-100 text-gray-600 border-gray-200',
 }
 
 function PhoneIcon() {
@@ -123,7 +116,7 @@ export default function OrderHeader({ order, onOrderChange, onUpdated }: Props) 
           value={order.status}
           disabled={statusChanging}
           onChange={(e) => handleStatusChange(e.target.value as Order['status'])}
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer appearance-none pr-6 ${STATUS_COLORS[order.status]} disabled:opacity-60`}
+          className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer appearance-none pr-6 ${STATUS_PILL_BORDERED[order.status]} disabled:opacity-60`}
           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B6B67' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
         >
           {ORDER_STATUSES.map((s) => (

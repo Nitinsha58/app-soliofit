@@ -192,12 +192,12 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
           type="button"
           onClick={() => { setAdding(true); setEditingId(null) }}
           disabled={busy}
-          className="w-6 h-6 rounded-full bg-[#FBF3E3] text-[#C8952A] flex items-center justify-center disabled:opacity-40 hover:bg-[#F5E8C8] transition-colors"
-          aria-label="Add installment"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#A87820] bg-[#FBF3E3] hover:bg-[#F5E8C8] transition-colors disabled:opacity-40"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
+          Add installment
         </button>
       </div>
 
@@ -278,7 +278,7 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
         )}
 
         {installments.length === 0 && !adding && (
-          <p className="text-xs text-[#C8C8C4] py-1">No installments — tap + to split the payment</p>
+          <p className="text-xs text-[#C8C8C4] py-1">No installments — add one to split the payment</p>
         )}
       </div>
     </div>

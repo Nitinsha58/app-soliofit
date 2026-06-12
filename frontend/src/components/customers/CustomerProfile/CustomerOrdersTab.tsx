@@ -1,16 +1,9 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { listOrders } from '@/lib/api/orders'
+import { listOrders, type Order } from '@/lib/api/orders'
 import { useUIStore } from '@/stores/useUIStore'
-
-const STATUS_COLORS: Record<string, string> = {
-  'Booked':           'bg-blue-50 text-blue-700',
-  'Started':          'bg-violet-50 text-violet-700',
-  'Ready':            'bg-emerald-50 text-emerald-700',
-  'Partial Delivery': 'bg-amber-50 text-amber-700',
-  'Delivered':        'bg-gray-100 text-gray-500',
-}
+import { STATUS_PILL } from '@/lib/orderStatus'
 
 function fmtDate(s: string) {
   const [y, m, d] = s.split('-').map(Number)
@@ -75,7 +68,7 @@ export default function CustomerOrdersTab({ customerId }: { customerId: string }
           </div>
           <div className="flex items-center gap-2.5 flex-shrink-0">
             <span className="text-sm font-semibold text-[#1A1A18]">{fmtAmount(order.total_amount)}</span>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status] ?? 'bg-gray-100 text-gray-500'}`}>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[order.status as Order['status']] ?? 'bg-gray-100 text-gray-500'}`}>
               {order.status}
             </span>
           </div>

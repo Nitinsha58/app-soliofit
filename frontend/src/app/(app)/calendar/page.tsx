@@ -214,7 +214,7 @@ export default function CalendarPage() {
           value={String(deliveriesToday)} label="Deliveries due today"
         />
         <SummaryCard
-          icon={<span className="text-[15px] font-bold">₹</span>} boxClass="bg-violet-50 text-violet-600"
+          icon={<span className="text-[15px] font-bold">₹</span>} boxClass="bg-[#FBF3E3] text-[#A87820]"
           value={`₹${fmtMoney(toCollectToday)}`} label="To collect"
         />
         <SummaryCard

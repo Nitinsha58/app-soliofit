@@ -29,7 +29,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-15 | Calendar | Month view with workload coloring, date drill-down | Done |
 | VS-16 | Settings | Profile edit, password change, notification toggles | Done |
 | VS-17 | Mobile layout | Bottom nav, full-screen drawers, responsive Kanban | Done |
-| VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Pending |
+| VS-18 | Production deployment | Push to `main` → deploys to EC2 via GitHub Actions | Done |
 | VS-19 | Order payment summary | Cards show remaining balance + payment state (annotated, no N+1) | Done |
 | VS-20 | Orders list scaling | Per-column lazy-load on scroll; category counts = totals; defer aged Delivered | Done |
 | VS-21 | Delete order | Soft-delete order + cascade installments/media + S3 cleanup, with confirm | Done |
@@ -62,7 +62,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-22 | Forgot password | Done |
 | VS-23 | Boutique tenant | Done |
 | VS-17 | Mobile layout | Done |
-| VS-18 | Production deployment | **Active** |
+| VS-18 | Production deployment | **Done** |
 
 _Window reviewed: 2026-06-07 (post-VS-19 window review): `docs/README.md` status synced; VS-20–VS-23 + VS-08b specs written; ADR-0006 (orders list scaling — keyset cursor) accepted; VS-21/22/23 promoted Backlog → Pending. Next review after VS-18 (MVP close)._
 _Final batch execution order: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. VS-23 tenancy decision recorded in ADR-0007 (Accepted); VS-18 still needs a deployment ADR at its activation._
@@ -71,6 +71,8 @@ _2026-06-09: VS-17 in progress — QuickActions drawer unit landed (`3ce7e75`): 
 _2026-06-09: VS-17 — **Global Search + shared AppHeader** unit landed (6 commits `1de1300`→`68ae8c4`; spec `docs/superpowers/specs/2026-06-09-global-search-appheader-design.md`, plan `docs/superpowers/plans/2026-06-09-global-search-appheader.md`). Bottom nav back to five items (Dashboard·Orders·⊕·Payments·Customers; Search removed; Home→Dashboard). Search is now a global command surface — one engine (`useSearch`+`SearchResults`), three shells (`SearchPage` full route, `SearchSheet` mobile overlay, `SearchDropdown` desktop). New persistent `AppHeader` (title + per-route Add-Order slot + search + notifications + profile) in `AppShell`; sidebar slimmed to sections; per-page title rows removed; Calendar moved into `ProfileMenu` for mobile; Calendar/Orders/BoardColumn full-height math corrected for the 56px header. Tablet icon rail explicitly deferred. Remaining VS-17 units: responsive Kanban (single-column + column selector), full-screen mobile drawers/sheets audit, 375/768 breakpoint sweep._
 _2026-06-09: VS-17 — **Responsive Kanban (mobile single-column)** unit landed (2 commits `4552e66`→`ea0ab6c`; spec `docs/superpowers/specs/2026-06-09-responsive-kanban-design.md`, plan `docs/superpowers/plans/2026-06-09-responsive-kanban.md`). `KanbanBoard` is now a responsive switch: desktop board unchanged (`hidden lg:block`); mobile (`lg:hidden`) renders `MobileBoard` — one focused status column + `ColumnChips` + compact `AttentionRail` (Delayed·Today·Upcoming; Pending/Overdue excluded — Payments domain). `MobileBoard` loads all five columns; smart default focus = status with most delayed loaded rows (ties by column order, else Booked); tapping a date pill applies the cross-board filter, chips show filtered counts, focus auto-jumps to the heaviest status. DnD stays desktop-only; mobile status change via the existing detail-drawer dropdown. Remaining VS-17 units: full-screen mobile drawers/sheets audit, 375/768 breakpoint sweep._
 _2026-06-10: VS-17 (Mobile Layout) **closed — Done.** Five units shipped: QuickActions drawer (`3ce7e75`); Global Search + shared AppHeader (`1de1300`→`68ae8c4`); Responsive Kanban mobile single-column (`4552e66`→`ea0ab6c`); mobile overlay audit — consistent bottom-sheet/full-width patterns (`d90c2fa`); final 375/768 breakpoint sweep (visual + static — no clipping/overflow defects). No ADR required. **Deferred follow-up (tracked, not a blocker):** `PaymentKanban` (the `/payments` board) is still a horizontally-scrolling multi-column board on mobile — functional/contained (scrolls, doesn't clip); giving it the single-column treatment is its own design/unit, out of the responsive-Kanban spec scope. **VS-18 (Production deployment) is now Active — the last MVP slice; needs a deployment ADR at activation.**_
+
+_2026-06-11: **VS-18 (Production deployment) closed — Done. 🎉 MVP is LIVE in production at https://app.soliofit.com.** ADR-0008 Accepted (host Nginx + Certbot, Redis shared cache, WhiteNoise static, PR-gated single `main`, tarball-over-SSH, pre-deploy + daily `pg_dump`). Artifacts: `b91e5cc` prod settings → `2667950` Dockerfiles + compose + `.dockerignore` → `03b0ffd` host nginx + CI/deploy workflow + scripts + env templates → `e4f7b63`/`14be1b5` provisioning runbook (`deploy/README.md`). Provisioned: repo `github.com/Nitinsha58/app-soliofit`, EC2 + Elastic IP, DNS `app.soliofit.com`, S3 `soliofit-prod-media`, IAM keys. HTTPS + CI/CD deploys + health check + S3 uploads/media all verified live. Vault `08-devops-deployment.md` rewritten to as-built (v2.0). **All 19 vertical slices (VS-00 → VS-18) are complete — MVP done.** See the VS-18 completion record below for as-built deviations (public-read media, console email).  Next review: post-MVP planning window._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 ---
@@ -628,6 +630,26 @@ Review deviations addressed before close: workload-dot bands made capacity-relat
 **Note:** Requires EC2 provisioned and SSH key configured as a GitHub secret. Flag before starting this slice.
 
 **Review checkpoint:** Push to `main` → GitHub Actions passes → change visible on live EC2 URL. `curl https://yourdomain.com/api/health/` returns 200.
+
+---
+
+**Status: Done (2026-06-11). 🎉 MVP LIVE at https://app.soliofit.com.** Spec: `docs/adr/ADR-0008-production-deployment.md` (Accepted); plan: `docs/superpowers/plans/2026-06-10-production-deployment.md`; runbook: `deploy/README.md`.
+
+**As-built architecture (ADR-0008):** single EC2 `t3.small` (Ubuntu 22.04, ap-south-1) running Docker Compose (`frontend`, `backend`, `postgres:15-alpine`, `redis:alpine` — **no nginx container**), ports bound to `127.0.0.1` only. **Host** Nginx + Certbot terminate TLS and reverse-proxy (`/api/`,`/admin/`,`/static/`→`:8000`, `/`→`:3000`). PR-gated single `main`; GitHub Actions tests (backend `manage.py test`; frontend type-check+build, **no lint**) then on `main` builds both images → `images.tar.gz` over SSH → pre-deploy `pg_dump` → `docker load` → `docker compose up -d`. Tarball-over-SSH, **no registry**. Redis shared cache (fixes the per-worker password-reset throttle, the VS-22 LocMem caveat). WhiteNoise serves Django static (collectstatic at container start). `.dockerignore` keeps `.env` out of images.
+
+**Units shipped:** `b91e5cc` prod settings (Redis + WhiteNoise + TLS-proxy security, `SECURE_SSL_REDIRECT=True`) → `2667950` prod Dockerfiles + compose + `.dockerignore` (secret-leak fix) → `03b0ffd` host nginx site config + CI/deploy workflow + EC2/backup scripts + env templates (review fixes: concurrency guard, frontend-only security headers, timeouts, idempotent cron, guarded pre-deploy backup) → `e4f7b63` provisioning runbook → `14be1b5` runbook fixes (deploy-SSH SG reality + read-only deploy key).
+
+**Operator-provisioned (live):** repo `github.com/Nitinsha58/app-soliofit`; EC2 + Elastic IP; DNS `app.soliofit.com`; S3 media bucket `soliofit-prod-media`; IAM keys; on-box `backend/.env`; GitHub secrets `EC2_HOST`/`EC2_SSH_KEY` + variable `NEXT_PUBLIC_API_URL`.
+
+**Verified live:** HTTPS + valid TLS; CI/CD deploy on merge to `main`; `/api/health/` 200; secure-cookie login; `/admin/` styled (WhiteNoise); S3 uploads + media display.
+
+**As-built deviations from the original design (intentional, MVP):**
+- **Media access = public-read prefixes, not presigned URLs.** Image `403`s were diagnosed as private-object reads; chose "MVP Option A" — a bucket policy granting public read on `photos/*` and `voice-notes/*` on `soliofit-prod-media`. This **deviates from the presigned-URL model** originally in vault docs 03/04. Acceptable for MVP (media is non-sensitive workout/voice content); revisit if media must be access-controlled. *(Vault 03/04 updated 2026-06-11 to document the as-built public-read model + the private-bucket/presigned-GET hardening target.)* Note: presigned URLs are still used for **upload (PUT)**; only the **read** path is public-read.
+- **Email backend = console (not SMTP) for now**, so a missing/unconfigured mail account can't break the app. Password-reset emails print to the container log until SMTP creds are added to `backend/.env`. The VS-08 password-reset flow is otherwise fully wired.
+- **`backend/.env` lives on the server and is not overwritten by normal deploys** (deploys ship images + compose only) — secret rotation is decoupled from redeploy.
+- Debug note: stale AWS creds required **recreating** the backend container (env changes need a container recreate, not just restart) — captured for ops.
+
+No deferrals block MVP. **All 19 slices (VS-00 → VS-18) complete.**
 
 ---
 

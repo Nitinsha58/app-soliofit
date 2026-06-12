@@ -148,13 +148,17 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
           </button>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress — one segment per step */}
         <div className="px-6 pt-3 pb-1 flex-shrink-0">
-          <div className="h-1 bg-[#E5E5E2] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#C8952A] rounded-full transition-all duration-300"
-              style={{ width: `${(step / STEP_LABELS.length) * 100}%` }}
-            />
+          <div className="flex gap-1">
+            {STEP_LABELS.map((label, i) => (
+              <div
+                key={label}
+                className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                  i < step ? 'bg-[#C8952A]' : 'bg-[#E5E5E2]'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
