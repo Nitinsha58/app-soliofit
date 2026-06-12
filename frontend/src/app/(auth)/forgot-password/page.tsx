@@ -33,31 +33,31 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="w-full max-w-sm px-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Reset password</h1>
+      <div className="bg-white rounded-2xl shadow-sm border border-[#E5E5E2] p-8">
+        <h1 className="text-2xl font-bold text-[#1A1A18] mb-1">Reset password</h1>
 
         {sent ? (
           <>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-[#6B6B67] mb-6">
               If that email is registered, we&rsquo;ve sent a reset link. Check your inbox and
               follow the link to set a new password.
             </p>
             <Link
               href="/login"
-              className="inline-block text-sm font-medium text-gray-900 hover:underline"
+              className="inline-block text-sm font-medium text-[#A87820] hover:underline"
             >
               Back to sign in
             </Link>
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-[#6B6B67] mb-6">
               Enter your account email and we&rsquo;ll send you a link to reset your password.
             </p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-[#1A1A18] mb-1">
                   Email
                 </label>
                 <input
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#E5E5E2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
                   placeholder="you@example.com"
                 />
                 {errors.email && (
@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-2 px-4 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? 'Sending…' : 'Send reset link'}
               </button>
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
               <div className="text-center">
                 <Link
                   href="/login"
-                  className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                  className="text-xs font-medium text-[#6B6B67] hover:text-[#A87820] transition-colors"
                 >
                   Back to sign in
                 </Link>

@@ -12,7 +12,7 @@ import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validatio
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div className="w-full max-w-sm px-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">{children}</div>
+      <div className="bg-white rounded-2xl shadow-sm border border-[#E5E5E2] p-8">{children}</div>
     </div>
   )
 }
@@ -20,13 +20,13 @@ function Card({ children }: { children: React.ReactNode }) {
 function InvalidLink() {
   return (
     <Card>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Link expired</h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <h1 className="text-2xl font-bold text-[#1A1A18] mb-1">Link expired</h1>
+      <p className="text-sm text-[#6B6B67] mb-6">
         This reset link is invalid or has expired. Request a new one to continue.
       </p>
       <Link
         href="/forgot-password"
-        className="inline-block w-full text-center py-2 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+        className="inline-block w-full text-center py-2 px-4 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] transition-colors"
       >
         Request a new link
       </Link>
@@ -72,12 +72,12 @@ function ResetPasswordForm() {
 
   return (
     <Card>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Set a new password</h1>
-      <p className="text-sm text-gray-500 mb-6">Choose a new password for your account.</p>
+      <h1 className="text-2xl font-bold text-[#1A1A18] mb-1">Set a new password</h1>
+      <p className="text-sm text-[#6B6B67] mb-6">Choose a new password for your account.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-[#1A1A18] mb-1">
             New password
           </label>
           <input
@@ -85,7 +85,7 @@ function ResetPasswordForm() {
             id="password"
             type="password"
             autoComplete="new-password"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            className="w-full px-3 py-2 border border-[#E5E5E2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
             placeholder="••••••••"
           />
           {errors.password && (
@@ -94,7 +94,7 @@ function ResetPasswordForm() {
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-[#1A1A18] mb-1">
             Confirm password
           </label>
           <input
@@ -102,7 +102,7 @@ function ResetPasswordForm() {
             id="confirmPassword"
             type="password"
             autoComplete="new-password"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            className="w-full px-3 py-2 border border-[#E5E5E2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
             placeholder="••••••••"
           />
           {errors.confirmPassword && (
@@ -122,7 +122,7 @@ function ResetPasswordForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-2 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full py-2 px-4 bg-[#C8952A] text-white text-sm font-medium rounded-lg hover:bg-[#A87820] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting ? 'Resetting…' : 'Reset password'}
         </button>
@@ -133,7 +133,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<Card><p className="text-sm text-gray-500">Loading…</p></Card>}>
+    <Suspense fallback={<Card><p className="text-sm text-[#6B6B67]">Loading…</p></Card>}>
       <ResetPasswordForm />
     </Suspense>
   )
