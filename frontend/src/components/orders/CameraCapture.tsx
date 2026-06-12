@@ -5,9 +5,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 interface Props {
   onCapture: (file: File) => void
   onClose: () => void
+  /** Batch mode (Add Order intake): stay open after each shot; commit all on Done. */
+  batch?: boolean
+  /** Required when `batch` — receives every captured photo when the user taps Done. */
+  onCaptureMany?: (files: File[]) => void
 }
 
 type Phase = 'preview' | 'captured' | 'denied' | 'unsupported'
+
+interface Shot { file: File; url: string }
 
 function XIcon() {
   return (
@@ -26,19 +32,26 @@ function CameraOffIcon() {
   )
 }
 
-export default function CameraCapture({ onCapture, onClose }: Props) {
+export default function CameraCapture({ onCapture, onClose, batch = false, onCaptureMany }: Props) {
   const [phase, setPhase] = useState<Phase>('preview')
   // True only after loadedmetadata fires with non-zero dimensions — gates the shutter button.
   const [videoReady, setVideoReady] = useState(false)
   const [denialReason, setDenialReason] = useState<'permission' | 'insecure'>('permission')
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null)
+  // Batch mode: photos captured this session, committed only on Done.
+  const [shots, setShots] = useState<Shot[]>([])
 
   const capturedFileRef    = useRef<File | null>(null)
+  const shotsRef           = useRef<Shot[]>([])
   const videoRef           = useRef<HTMLVideoElement>(null)
   const canvasRef          = useRef<HTMLCanvasElement>(null)
   const streamRef          = useRef<MediaStream | null>(null)
   const mountedRef         = useRef(true)
   const nativeFallbackRef  = useRef<HTMLInputElement>(null)
+
+  // Mirror shots into a ref so the unmount cleanup can revoke their object URLs
+  // when the session is dropped (close / Escape) before Done.
+  useEffect(() => { shotsRef.current = shots }, [shots])
 
   // Bug-5 fix: stable applyStream that guards against unmounted use and stream leaks.
   const applyStream = useCallback((stream: MediaStream) => {
@@ -90,7 +103,6 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   useEffect(() => {
     mountedRef.current = true
     // getUserMedia is only available on secure contexts (HTTPS or localhost).
-    // isSecureContext is false on plain HTTP over a LAN IP, which is the common dev scenario.
     if (!window.isSecureContext) {
       setDenialReason('insecure')
       setPhase('denied')
@@ -103,6 +115,8 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       mountedRef.current = false
       streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = null
+      // Discard any uncommitted batch shots (close / Escape before Done).
+      shotsRef.current.forEach((s) => URL.revokeObjectURL(s.url))
     }
   }, [startStream])
 
@@ -127,11 +141,16 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       (blob) => {
         if (!blob || !mountedRef.current) return
         const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })
-        capturedFileRef.current = file
-        setCapturedUrl(URL.createObjectURL(blob))
-        setPhase('captured')
-        streamRef.current?.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
+        if (batch) {
+          // Stay live; append to the in-session strip. Commit happens on Done.
+          setShots((prev) => [...prev, { file, url: URL.createObjectURL(blob) }])
+        } else {
+          capturedFileRef.current = file
+          setCapturedUrl(URL.createObjectURL(blob))
+          setPhase('captured')
+          streamRef.current?.getTracks().forEach((t) => t.stop())
+          streamRef.current = null
+        }
       },
       'image/jpeg',
       0.92,
@@ -156,10 +175,21 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
     onClose()
   }
 
+  // Batch commit: hand all captured photos to the parent, then close.
+  function handleDone() {
+    onCaptureMany?.(shots.map((s) => s.file))
+    shots.forEach((s) => URL.revokeObjectURL(s.url))
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    onClose()
+  }
+
   function handleClose() {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     if (capturedUrl) URL.revokeObjectURL(capturedUrl)
+    // Discard uncommitted batch shots.
+    shots.forEach((s) => URL.revokeObjectURL(s.url))
     onClose()
   }
 
@@ -167,7 +197,8 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
   function handleNativeFallback(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      onCapture(file)
+      if (batch) onCaptureMany?.([file])
+      else onCapture(file)
       onClose()
     }
   }
@@ -182,6 +213,24 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
       body: 'Camera capture is only available over a secure connection. Use your gallery to add a photo.',
     },
   }
+
+  // Shared denied/unsupported fallback (identical in both single-shot and batch).
+  const galleryFallback = (
+    <div className="flex flex-col items-center gap-3">
+      <button
+        onClick={() => nativeFallbackRef.current?.click()}
+        className="text-black text-sm font-semibold px-6 py-2.5 rounded-full bg-white hover:bg-white/90 transition-colors"
+      >
+        Choose from Gallery
+      </button>
+      <button
+        onClick={handleClose}
+        className="text-white/50 text-sm hover:text-white/80 transition-colors"
+      >
+        Cancel
+      </button>
+    </div>
+  )
 
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col">
@@ -237,60 +286,84 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         )}
       </div>
 
-      {/* Controls — Bug-6 fix: safe-area-inset-bottom keeps shutter clear of home bar */}
-      <div
-        className="flex items-center justify-center gap-10 pt-8 pb-10 bg-black"
-        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
-      >
-        {phase === 'preview' && (
-          // Bug-3 fix: shutter disabled and visually dimmed until video dimensions are ready.
-          <button
-            onClick={handleShutter}
-            disabled={!videoReady}
-            className={`w-16 h-16 rounded-full border-4 border-white bg-white/20 transition-all
-              ${videoReady
-                ? 'active:scale-95 hover:bg-white/30 cursor-pointer'
-                : 'opacity-40 cursor-not-allowed'
-              }`}
-            aria-label="Take photo"
-          />
-        )}
+      {/* Controls — batch and single-shot use separate containers so single-shot
+          layout is byte-identical to the proven version. Bug-6 safe-area inset kept. */}
+      {batch ? (
+        <div
+          className="flex flex-col items-center gap-3 pt-6 pb-10 bg-black"
+          style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+        >
+          {phase === 'preview' && (
+            <>
+              {shots.length > 0 && (
+                <div className="w-full flex gap-2 overflow-x-auto px-4 pb-1">
+                  {shots.map((s, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={s.url}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/30"
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="w-full relative flex items-center justify-center">
+                {/* Bug-3 fix: shutter disabled and dimmed until video dimensions are ready. */}
+                <button
+                  onClick={handleShutter}
+                  disabled={!videoReady}
+                  className={`w-16 h-16 rounded-full border-4 border-white bg-white/20 transition-all
+                    ${videoReady ? 'active:scale-95 hover:bg-white/30 cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+                  aria-label="Take photo"
+                />
+                <button
+                  onClick={handleDone}
+                  className="absolute right-6 text-black text-sm font-semibold px-5 py-2.5 rounded-full bg-white hover:bg-white/90 active:scale-95 transition-all"
+                >
+                  Done{shots.length > 0 ? ` (${shots.length})` : ''}
+                </button>
+              </div>
+            </>
+          )}
+          {(phase === 'denied' || phase === 'unsupported') && galleryFallback}
+        </div>
+      ) : (
+        <div
+          className="flex items-center justify-center gap-10 pt-8 pb-10 bg-black"
+          style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+        >
+          {phase === 'preview' && (
+            // Bug-3 fix: shutter disabled and visually dimmed until video dimensions are ready.
+            <button
+              onClick={handleShutter}
+              disabled={!videoReady}
+              className={`w-16 h-16 rounded-full border-4 border-white bg-white/20 transition-all
+                ${videoReady ? 'active:scale-95 hover:bg-white/30 cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+              aria-label="Take photo"
+            />
+          )}
 
-        {phase === 'captured' && (
-          <>
-            <button
-              onClick={handleRetake}
-              className="text-white text-sm font-medium px-5 py-2.5 rounded-full border border-white/40 hover:bg-white/10 transition-colors"
-            >
-              Retake
-            </button>
-            <button
-              onClick={handleUse}
-              className="text-black text-sm font-semibold px-6 py-2.5 rounded-full bg-white hover:bg-white/90 active:scale-95 transition-all"
-            >
-              Use Photo
-            </button>
-          </>
-        )}
+          {phase === 'captured' && (
+            <>
+              <button
+                onClick={handleRetake}
+                className="text-white text-sm font-medium px-5 py-2.5 rounded-full border border-white/40 hover:bg-white/10 transition-colors"
+              >
+                Retake
+              </button>
+              <button
+                onClick={handleUse}
+                className="text-black text-sm font-semibold px-6 py-2.5 rounded-full bg-white hover:bg-white/90 active:scale-95 transition-all"
+              >
+                Use Photo
+              </button>
+            </>
+          )}
 
-        {/* Bug-8 fix: offer gallery escape hatch without closing the overlay. */}
-        {(phase === 'denied' || phase === 'unsupported') && (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={() => nativeFallbackRef.current?.click()}
-              className="text-black text-sm font-semibold px-6 py-2.5 rounded-full bg-white hover:bg-white/90 transition-colors"
-            >
-              Choose from Gallery
-            </button>
-            <button
-              onClick={handleClose}
-              className="text-white/50 text-sm hover:text-white/80 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
+          {(phase === 'denied' || phase === 'unsupported') && galleryFallback}
+        </div>
+      )}
 
       <canvas ref={canvasRef} className="hidden" />
 
