@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import CameraCapture from '../CameraCapture'
 
 interface Props {
-  files: File[]
-  onFilesChange: (files: File[]) => void
+  garmentFiles: File[]
+  onGarmentChange: (files: File[]) => void
+  notesFiles: File[]
+  onNotesChange: (files: File[]) => void
   onNext: () => void
   onBack: () => void
 }
@@ -37,12 +39,23 @@ function XIcon() {
   )
 }
 
-export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Props) {
+interface BucketProps {
+  label: string
+  hint: string
+  addSheetLabel: string
+  files: File[]
+  onFilesChange: (files: File[]) => void
+}
+
+// One photo bucket: thumbnails + camera-first empty CTA + Take Photo / Gallery
+// action sheet + in-app camera. Owns its own overlay state and Escape handling
+// so Garment and Notes each capture independently.
+function PhotoBucket({ label, hint, addSheetLabel, files, onFilesChange }: BucketProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [showSheet, setShowSheet] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
-  // Escape must close the topmost overlay (camera, then sheet) — not the whole
+  // Escape closes the topmost overlay (camera, then sheet) — not the whole
   // wizard. Capture phase so this runs before the wizard's bubble-phase listener.
   useEffect(() => {
     if (!showSheet && !showCamera) return
@@ -66,15 +79,13 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
   }
 
   return (
-    <div className="flex flex-col py-4">
-      <p className="text-sm font-semibold text-[#1A1A18] mb-1">Garment Photos</p>
-      <p className="text-xs text-[#6B6B67] mb-4 leading-relaxed">
-        Add photos of the garment now, or skip and add them from the order details page later.
-      </p>
+    <div>
+      <p className="text-sm font-semibold text-[#1A1A18] mb-1">{label}</p>
+      <p className="text-xs text-[#6B6B67] mb-3 leading-relaxed">{hint}</p>
 
       {/* Thumbnails */}
       {files.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2">
           {files.map((file, idx) => {
             const url = URL.createObjectURL(file)
             return (
@@ -107,7 +118,7 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
       {files.length === 0 && (
         <button
           onClick={() => setShowSheet(true)}
-          className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl border border-dashed border-[#C8952A]/50 bg-[#FBF3E3]/40 text-[#C8952A] hover:bg-[#FBF3E3] transition-colors mb-4"
+          className="w-full flex flex-col items-center justify-center gap-1.5 py-6 rounded-xl border border-dashed border-[#C8952A]/50 bg-[#FBF3E3]/40 text-[#C8952A] hover:bg-[#FBF3E3] transition-colors"
         >
           <CameraIcon />
           <span className="text-sm font-semibold">Add photos</span>
@@ -125,30 +136,6 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
         onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
       />
 
-      <div className="flex gap-2 mt-2">
-        <button
-          onClick={onBack}
-          className="flex-1 py-2.5 text-sm font-medium text-[#6B6B67] border border-[#E5E5E2] rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Back
-        </button>
-        {files.length > 0 ? (
-          <button
-            onClick={onNext}
-            className="flex-1 py-2.5 text-sm font-medium text-white bg-[#C8952A] rounded-lg hover:bg-[#A87820] transition-colors"
-          >
-            Continue ({files.length})
-          </button>
-        ) : (
-          <button
-            onClick={onNext}
-            className="flex-1 py-2.5 text-sm font-medium text-[#6B6B67] border border-[#E5E5E2] rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Skip for now
-          </button>
-        )}
-      </div>
-
       {/* Action sheet — Take Photo / Choose from Gallery (z-60 over the z-50 wizard) */}
       {showSheet && (
         <>
@@ -156,7 +143,7 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
           <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl shadow-2xl px-4 pt-4 pb-8 lg:bottom-auto lg:top-1/2 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-[420px] lg:rounded-2xl lg:pb-4">
             <div className="w-10 h-1 rounded-full bg-[#E5E5E2] mx-auto mb-5 lg:hidden" />
             <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3 px-1">
-              Add Garment Photo
+              {addSheetLabel}
             </p>
             <button
               onClick={() => { setShowSheet(false); setShowCamera(true) }}
@@ -193,6 +180,66 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
           onClose={() => setShowCamera(false)}
         />
       )}
+    </div>
+  )
+}
+
+export default function StepPhotos({
+  garmentFiles,
+  onGarmentChange,
+  notesFiles,
+  onNotesChange,
+  onNext,
+  onBack,
+}: Props) {
+  const total = garmentFiles.length + notesFiles.length
+
+  return (
+    <div className="flex flex-col py-4">
+      <p className="text-xs text-[#6B6B67] mb-4 leading-relaxed">
+        Capture garment reference photos and any measurement or diary notes. You can also add these later from the order details page.
+      </p>
+
+      <div className="flex flex-col gap-5">
+        <PhotoBucket
+          label="Garment Photos"
+          hint="Photos of the garment for reference."
+          addSheetLabel="Add Garment Photo"
+          files={garmentFiles}
+          onFilesChange={onGarmentChange}
+        />
+        <PhotoBucket
+          label="Measurement Notes"
+          hint="Photos of measurement sheets or handwritten notes."
+          addSheetLabel="Add Notes Photo"
+          files={notesFiles}
+          onFilesChange={onNotesChange}
+        />
+      </div>
+
+      <div className="flex gap-2 mt-6">
+        <button
+          onClick={onBack}
+          className="flex-1 py-2.5 text-sm font-medium text-[#6B6B67] border border-[#E5E5E2] rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Back
+        </button>
+        {total > 0 ? (
+          <button
+            onClick={onNext}
+            className="flex-1 py-2.5 text-sm font-medium text-white bg-[#C8952A] rounded-lg hover:bg-[#A87820] transition-colors"
+          >
+            Continue ({total})
+          </button>
+        ) : (
+          <button
+            onClick={onNext}
+            className="flex-1 py-2.5 text-sm font-medium text-[#6B6B67] border border-[#E5E5E2] rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Skip for now
+          </button>
+        )}
+      </div>
     </div>
   )
 }
