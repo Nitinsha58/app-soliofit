@@ -173,10 +173,12 @@ function PhotoBucket({ label, hint, addSheetLabel, files, onFilesChange }: Bucke
         </>
       )}
 
-      {/* In-app camera (z-70) */}
+      {/* In-app camera (z-70) — batch mode: capture many, commit all on Done. */}
       {showCamera && (
         <CameraCapture
+          batch
           onCapture={(file) => onFilesChange([...files, file])}
+          onCaptureMany={(captured) => onFilesChange([...files, ...captured])}
           onClose={() => setShowCamera(false)}
         />
       )}
