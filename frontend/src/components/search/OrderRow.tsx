@@ -2,14 +2,8 @@
 
 import type { SearchOrder } from '@/lib/api/search'
 import { useUIStore } from '@/stores/useUIStore'
-
-const STATUS_COLORS: Record<string, string> = {
-  'Booked':           'bg-blue-50 text-blue-700',
-  'Started':          'bg-violet-50 text-violet-700',
-  'Ready':            'bg-emerald-50 text-emerald-700',
-  'Partial Delivery': 'bg-amber-50 text-amber-700',
-  'Delivered':        'bg-gray-100 text-gray-600',
-}
+import type { Order } from '@/lib/api/orders'
+import { STATUS_PILL } from '@/lib/orderStatus'
 
 export default function OrderRow({ order, onSelect }: { order: SearchOrder; onSelect?: () => void }) {
   const openOrderDetail = useUIStore((s) => s.openOrderDetail)
@@ -25,7 +19,7 @@ export default function OrderRow({ order, onSelect }: { order: SearchOrder; onSe
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[#1A1A18] truncate">{order.customer_name}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_COLORS[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_PILL[order.status as Order['status']] ?? 'bg-gray-100 text-gray-600'}`}>
             {order.status}
           </span>
           {order.delivery_date && (
