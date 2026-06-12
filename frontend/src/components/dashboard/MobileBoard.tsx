@@ -8,8 +8,8 @@ import FocusedColumn from './FocusedColumn'
 import AttentionRail, { type RailFilter } from './AttentionRail'
 
 const CHIPS: Chip[] = [
-  { status: 'Booked',           label: 'Booked',    accent: '#60A5FA' },
-  { status: 'Started',          label: 'Started',   accent: '#A78BFA' },
+  { status: 'Booked',           label: 'Booked',    accent: '#A0A09C' },
+  { status: 'Started',          label: 'Started',   accent: '#C8952A' },
   { status: 'Ready',            label: 'Ready',     accent: '#34D399' },
   { status: 'Partial Delivery', label: 'Partial',   accent: '#FBBF24' },
   { status: 'Delivered',        label: 'Delivered', accent: '#9CA3AF' },

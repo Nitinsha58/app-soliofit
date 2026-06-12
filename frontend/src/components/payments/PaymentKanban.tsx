@@ -13,7 +13,7 @@ const RANGES: { value: DateRange; label: string }[] = [
 ]
 
 const COLUMNS: { key: keyof PaymentOrders; label: string; accent: string; emptyLabel: string }[] = [
-  { key: 'pending',   label: 'Pending',   accent: '#60A5FA', emptyLabel: 'No pending payments' },
+  { key: 'pending',   label: 'Pending',   accent: '#A0A09C', emptyLabel: 'No pending payments' },
   { key: 'partial',   label: 'Partial',   accent: '#FBBF24', emptyLabel: 'No partial payments' },
   { key: 'overdue',   label: 'Overdue',   accent: '#F87171', emptyLabel: 'No overdue payments' },
   { key: 'completed', label: 'Completed', accent: '#34D399', emptyLabel: 'No completed payments' },

@@ -20,8 +20,8 @@ import SummaryStrip, { type ActiveFilter } from './SummaryStrip'
 import MobileBoard from './MobileBoard'
 
 const COLUMNS: { status: Order['status']; label: string; accent: string }[] = [
-  { status: 'Booked',           label: 'Booked',           accent: '#60A5FA' },
-  { status: 'Started',          label: 'Started',          accent: '#A78BFA' },
+  { status: 'Booked',           label: 'Booked',           accent: '#A0A09C' },
+  { status: 'Started',          label: 'Started',          accent: '#C8952A' },
   { status: 'Ready',            label: 'Ready',            accent: '#34D399' },
   { status: 'Partial Delivery', label: 'Partial Delivery', accent: '#FBBF24' },
   // Delivered is a normal column now: recent window shown, older tail behind

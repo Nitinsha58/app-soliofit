@@ -27,8 +27,8 @@ export const ORDER_STATUSES: Order['status'][] = [
 // Per-status accent colour, shared by the board columns and the "From <status>"
 // move-provenance tag so a card's origin reads in its source column's colour.
 export const STATUS_ACCENT: Record<Order['status'], string> = {
-  Booked: '#60A5FA',
-  Started: '#A78BFA',
+  Booked: '#A0A09C',
+  Started: '#C8952A',
   Ready: '#34D399',
   'Partial Delivery': '#FBBF24',
   Delivered: '#9CA3AF',
