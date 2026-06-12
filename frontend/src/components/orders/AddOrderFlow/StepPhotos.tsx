@@ -78,13 +78,13 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
           {files.map((file, idx) => {
             const url = URL.createObjectURL(file)
             return (
-              <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden bg-[#F5F5F3]">
+              <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#F5F5F3]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="w-full h-full object-cover" onLoad={() => URL.revokeObjectURL(url)} />
                 <button
                   onClick={() => removeFile(idx)}
                   aria-label="Remove photo"
-                  className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center"
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center"
                 >
                   <XIcon />
                 </button>
@@ -94,7 +94,7 @@ export default function StepPhotos({ files, onFilesChange, onNext, onBack }: Pro
           <button
             onClick={() => setShowSheet(true)}
             aria-label="Add more photos"
-            className="w-16 h-16 rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex items-center justify-center text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
+            className="w-20 h-20 rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex items-center justify-center text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
