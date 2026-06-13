@@ -22,7 +22,8 @@ interface Draft {
   totalAmount: string
   priority: boolean
   remarks: string
-  pendingPhotos: File[]
+  pendingGarmentPhotos: File[]
+  pendingNotesPhotos: File[]
   pendingVoice: { blob: Blob; duration: number } | null
   pendingInstallments: DraftInstallment[]
 }
@@ -51,7 +52,8 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     totalAmount: '',
     priority: false,
     remarks: '',
-    pendingPhotos: [],
+    pendingGarmentPhotos: [],
+    pendingNotesPhotos: [],
     pendingVoice: null,
     pendingInstallments: [],
   })
@@ -105,11 +107,14 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
           return
         }
       }
-      // Upload staged photos in background — fire and forget
-      if (draft.pendingPhotos.length > 0) {
-        Promise.allSettled(
-          draft.pendingPhotos.map((f) => uploadPhoto(order.id, f, 'garment'))
-        ).catch(() => {})
+      // Upload staged photos in background — fire and forget.
+      // Garment and notes buckets upload with their respective photo_type.
+      const photoUploads = [
+        ...draft.pendingGarmentPhotos.map((f) => uploadPhoto(order.id, f, 'garment')),
+        ...draft.pendingNotesPhotos.map((f) => uploadPhoto(order.id, f, 'notes')),
+      ]
+      if (photoUploads.length > 0) {
+        Promise.allSettled(photoUploads).catch(() => {})
       }
       // Upload staged voice note in background — fire and forget
       if (draft.pendingVoice) {
@@ -172,8 +177,10 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
           )}
           {step === 2 && (
             <StepPhotos
-              files={draft.pendingPhotos}
-              onFilesChange={(f) => patch({ pendingPhotos: f })}
+              garmentFiles={draft.pendingGarmentPhotos}
+              onGarmentChange={(f) => patch({ pendingGarmentPhotos: f })}
+              notesFiles={draft.pendingNotesPhotos}
+              onNotesChange={(f) => patch({ pendingNotesPhotos: f })}
               onNext={next}
               onBack={back}
             />

@@ -36,9 +36,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Done |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Done |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
-| VS-24 | Add Order notes photos | Stage garment + measurement-notes photos separately at intake; each uploads with its correct `photo_type` | Post-MVP — **Pending** |
-| VS-25 | Batch camera capture | One camera session captures many photos (WhatsApp-style) → **Done (n)** adds all to the active bucket | Post-MVP — **Pending** |
-| VS-26 | Media intake polish | Two-bucket + batch intake tuned for 375/768/desktop; Review summarizes garment, notes, and voice | Post-MVP — **Pending** |
+| VS-24 | Add Order notes photos | Stage garment + measurement-notes photos separately at intake; each uploads with its correct `photo_type` | Post-MVP — **Done** |
+| VS-25 | Batch camera capture | One camera session captures many photos (WhatsApp-style) → **Done (n)** adds all to the active bucket | Post-MVP — **Done** |
+| VS-26 | Media intake polish | Two-bucket + batch intake tuned for 375/768/desktop; Review summarizes garment, notes, and voice | Post-MVP — **Done** |
 
 > **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
 > VS-20 and VS-23 each require an ADR at activation. VS-23 (tenant) lands before VS-17/VS-18 so launch is on the final schema. Interim hardening (order_number race-fix, presign validation) ships as `fix` commits ahead of the slices.
@@ -79,6 +79,8 @@ _2026-06-11: **VS-18 (Production deployment) closed — Done. 🎉 MVP is LIVE i
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
 
 _2026-06-13: **Three post-MVP enhancement slices added — VS-24, VS-25, VS-26 (Add Order media intake).** Spun out of the post-launch design review of the order-creation flow. They extend the shipped Add Order camera work (garment photo capture + camera-first capture + Escape-safe overlays + review-step media + palette/auth polish, PR #1 merged 2026-06-13). Status **Pending** (not in an active window); execution order **VS-24 → VS-25 → VS-26** when prioritized. None requires backend/API/schema changes. **No implementation plans written yet** — these are slice specs only, awaiting product-owner review. Specs below._
+
+_2026-06-13: **VS-24 + VS-25 + VS-26 closed — Done.** All three built on branch `feat/vs-24-notes-photos` (no backend/API/schema changes). **VS-24** — Add Order stages garment + measurement-notes photos in two separate buckets, each uploading with its correct `photo_type` (`987cff2`; plan `docs/superpowers/plans/2026-06-13-vs24-notes-photos.md`). Verified via a media round-trip (garment → Garment strip, notes → Notes grid in Order Detail); product owner cleared it. **VS-25** — `CameraCapture` gained an opt-in `batch` mode: one session captures many, commits all on **Done (n)**; close/Escape before Done discards uncommitted shots; the Order Detail drawer stays single-shot (`b23bc84` camera, `e23a087` StepPhotos wiring; plan `docs/superpowers/plans/2026-06-13-vs25-batch-camera.md`). Verified with a fake-camera Playwright pass (Done(3)→Continue(3); notes Done(2)→Continue(5); Escape + close both discarded; drawer single-shot intact; zero console errors). **VS-26** — media-intake polish (`c7c80a6`): removable shots in the batch strip; object-URL lifecycle fixed in `StepPhotos`/`StepReview` (useMemo + revoke-on-change instead of create-on-render); trimmed bucket hints + hairline divider between the two buckets. Type-check clean. Drawer batch-capture decision recorded in the VS-26 spec (do not adopt). VS-26 **passed the product owner's visual pass** (375/768/desktop + remove-a-shot). Also bundled on the branch: `2ec3d5b` — CI `paths-ignore` (`docs/**`, `**/*.md`) on the push trigger so docs-only merges to `main` skip the production deploy. Shipped via PR from branch `feat/vs-24-notes-photos`._
 
 ---
 
@@ -930,7 +932,7 @@ These three slices extend the **shipped** Add Order camera flow (garment photo c
 
 **Review checkpoint:** 375px / 768px / desktop passes; full Add Order flow without accidental test data; no regression to existing garment/notes photo upload, voice staging, or order creation.
 
-**Deferrals / follow-ups:** Order Detail drawer batch-capture adoption — decision documented here; implement as its own slice only if approved.
+**Deferrals / follow-ups:** Order Detail drawer batch-capture adoption — **decision: do not adopt.** The drawer adds photos to an existing order one at a time, where single-shot capture-and-confirm fits the flow; batch capture's value is concentrated at intake (Add Order), which VS-25 already covers. Revisit as its own slice only if boutiques report wanting bulk add from the drawer.
 
 ---
 

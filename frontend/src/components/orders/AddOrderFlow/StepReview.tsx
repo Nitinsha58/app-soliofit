@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { DraftInstallment } from './DraftInstallments'
 
@@ -7,7 +8,8 @@ interface Draft {
   totalAmount: string
   priority: boolean
   remarks: string
-  pendingPhotos: File[]
+  pendingGarmentPhotos: File[]
+  pendingNotesPhotos: File[]
   pendingVoice: { blob: Blob; duration: number } | null
   pendingInstallments: DraftInstallment[]
 }
@@ -47,13 +49,13 @@ function MicIcon() {
 }
 
 function ReviewThumb({ file }: { file: File }) {
-  const url = URL.createObjectURL(file)
+  const url = useMemo(() => URL.createObjectURL(file), [file])
+  useEffect(() => () => URL.revokeObjectURL(url), [url])
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt=""
-      onLoad={() => URL.revokeObjectURL(url)}
       className="w-12 h-12 rounded-lg object-cover bg-[#F5F5F3]"
     />
   )
@@ -111,11 +113,22 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
           </div>
         )}
 
-        {draft.pendingPhotos.length > 0 && (
+        {draft.pendingGarmentPhotos.length > 0 && (
           <div className="pt-3 border-t border-[#E5E5E2]">
-            <p className="text-[10px] font-medium text-[#A0A09C] uppercase tracking-wide mb-1.5">Photos</p>
+            <p className="text-[10px] font-medium text-[#A0A09C] uppercase tracking-wide mb-1.5">Garment Photos</p>
             <div className="flex flex-wrap gap-1.5">
-              {draft.pendingPhotos.map((file, idx) => (
+              {draft.pendingGarmentPhotos.map((file, idx) => (
+                <ReviewThumb key={idx} file={file} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {draft.pendingNotesPhotos.length > 0 && (
+          <div className="pt-3 border-t border-[#E5E5E2]">
+            <p className="text-[10px] font-medium text-[#A0A09C] uppercase tracking-wide mb-1.5">Measurement Notes</p>
+            <div className="flex flex-wrap gap-1.5">
+              {draft.pendingNotesPhotos.map((file, idx) => (
                 <ReviewThumb key={idx} file={file} />
               ))}
             </div>
