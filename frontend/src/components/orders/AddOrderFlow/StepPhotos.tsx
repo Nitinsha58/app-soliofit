@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CameraCapture from '../CameraCapture'
 
 interface Props {
@@ -55,6 +55,11 @@ function PhotoBucket({ label, hint, addSheetLabel, files, onFilesChange }: Bucke
   const [showSheet, setShowSheet] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
+  // Create one object URL per staged file and revoke them when the file list
+  // changes or the bucket unmounts — avoids the create-on-every-render leak.
+  const urls = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files])
+  useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls])
+
   // Escape closes the topmost overlay (camera, then sheet) — not the whole
   // wizard. Capture phase so this runs before the wizard's bubble-phase listener.
   useEffect(() => {
@@ -86,22 +91,19 @@ function PhotoBucket({ label, hint, addSheetLabel, files, onFilesChange }: Bucke
       {/* Thumbnails */}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {files.map((file, idx) => {
-            const url = URL.createObjectURL(file)
-            return (
-              <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#F5F5F3]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="w-full h-full object-cover" onLoad={() => URL.revokeObjectURL(url)} />
-                <button
-                  onClick={() => removeFile(idx)}
-                  aria-label="Remove photo"
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center"
-                >
-                  <XIcon />
-                </button>
-              </div>
-            )
-          })}
+          {files.map((file, idx) => (
+            <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#F5F5F3]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={urls[idx]} alt="" className="w-full h-full object-cover" />
+              <button
+                onClick={() => removeFile(idx)}
+                aria-label="Remove photo"
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center"
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
           <button
             onClick={() => setShowSheet(true)}
             aria-label="Add more photos"
@@ -202,17 +204,18 @@ export default function StepPhotos({
         Capture garment reference photos and any measurement or diary notes. You can also add these later from the order details page.
       </p>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col">
         <PhotoBucket
           label="Garment Photos"
-          hint="Photos of the garment for reference."
+          hint="Reference shots of the garment."
           addSheetLabel="Add Garment Photo"
           files={garmentFiles}
           onFilesChange={onGarmentChange}
         />
+        <div className="my-5 border-t border-[#EFEFEC]" />
         <PhotoBucket
           label="Measurement Notes"
-          hint="Photos of measurement sheets or handwritten notes."
+          hint="Measurement sheets or handwritten notes."
           addSheetLabel="Add Notes Photo"
           files={notesFiles}
           onFilesChange={onNotesChange}

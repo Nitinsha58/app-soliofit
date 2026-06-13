@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { DraftInstallment } from './DraftInstallments'
 
@@ -48,13 +49,13 @@ function MicIcon() {
 }
 
 function ReviewThumb({ file }: { file: File }) {
-  const url = URL.createObjectURL(file)
+  const url = useMemo(() => URL.createObjectURL(file), [file])
+  useEffect(() => () => URL.revokeObjectURL(url), [url])
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt=""
-      onLoad={() => URL.revokeObjectURL(url)}
       className="w-12 h-12 rounded-lg object-cover bg-[#F5F5F3]"
     />
   )

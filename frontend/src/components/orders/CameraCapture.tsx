@@ -175,6 +175,15 @@ export default function CameraCapture({ onCapture, onClose, batch = false, onCap
     onClose()
   }
 
+  // Drop one shot from the in-session strip before Done (mis-tap recovery).
+  function removeShot(idx: number) {
+    setShots((prev) => {
+      const target = prev[idx]
+      if (target) URL.revokeObjectURL(target.url)
+      return prev.filter((_, i) => i !== idx)
+    })
+  }
+
   // Batch commit: hand all captured photos to the parent, then close.
   function handleDone() {
     onCaptureMany?.(shots.map((s) => s.file))
@@ -298,13 +307,23 @@ export default function CameraCapture({ onCapture, onClose, batch = false, onCap
               {shots.length > 0 && (
                 <div className="w-full flex gap-2 overflow-x-auto px-4 pb-1">
                   {shots.map((s, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={i}
-                      src={s.url}
-                      alt=""
-                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/30"
-                    />
+                    <div key={i} className="relative flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={s.url}
+                        alt=""
+                        className="w-12 h-12 rounded-lg object-cover border border-white/30"
+                      />
+                      <button
+                        onClick={() => removeShot(i)}
+                        aria-label="Remove photo"
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center active:scale-90 transition-transform"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
