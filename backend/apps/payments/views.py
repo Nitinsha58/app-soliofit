@@ -148,6 +148,9 @@ class InstallmentListCreateView(APIView):
         return Response(InstallmentSerializer(installments, many=True).data)
 
     def post(self, request, order_id):
+        # DEPRECATED (VS-27.1): single-installment create. Kept functional for the interim
+        # UI; to be removed at the cutover (VS-27.4/27.5) in favour of the atomic
+        # create-with-installments payload and PUT /orders/{id}/billing/.
         order = _get_order(request, order_id)
         if not order:
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -169,6 +172,9 @@ class InstallmentListCreateView(APIView):
 
 
 class InstallmentDetailView(APIView):
+    # DEPRECATED (VS-27.1): single-installment edit/delete. Kept functional for the interim
+    # UI; to be removed at the cutover (VS-27.4/27.5) — the whole unpaid schedule is then
+    # edited atomically via PUT /orders/{id}/billing/.
     permission_classes = [IsAuthenticated]
 
     def _get_installment(self, request, order_id, installment_id):
@@ -224,7 +230,7 @@ class InstallmentMarkPaidView(APIView):
 
     def post(self, request, order_id, installment_id):
         try:
-            installment = Installment.objects.get(
+            installment = Installment.objects.select_related('order').get(
                 id=installment_id,
                 order__id=order_id,
                 order__boutique=request.user.boutique,
@@ -232,9 +238,19 @@ class InstallmentMarkPaidView(APIView):
             )
         except Installment.DoesNotExist:
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-        if installment.paid_date:
-            return Response({'detail': 'Already marked as paid'}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
+            # VS-27.1 — lock the parent order before mutating a child installment. The order
+            # row is the shared serialization point between mark-paid and the atomic billing
+            # replace (PUT /orders/{id}/billing/); locking only the installment row would let
+            # a concurrent billing edit validate against a stale paid-total or delete a row
+            # being marked paid. Re-read under the lock in case billing already removed it.
+            Order.objects.select_for_update().get(pk=installment.order_id)
+            try:
+                installment = Installment.objects.get(pk=installment.id)
+            except Installment.DoesNotExist:
+                return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+            if installment.paid_date:
+                return Response({'detail': 'Already marked as paid'}, status=status.HTTP_400_BAD_REQUEST)
             installment.paid_date = date.today()
             installment.save(update_fields=['paid_date'])
             create_order_activity(installment.order, OrderActivity.Type.INSTALLMENT_PAID, {
