@@ -36,6 +36,9 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-22 | Forgot password | Pre-login email reset link (Gmail SMTP) | Done |
 | VS-23 | Boutique tenant | Introduce Boutique entity; scope all data to it; per-boutique order numbers | Done |
 | VS-08b | Voice format | `.webm`→`.mp3` server-side conversion for iOS playback | Backlog — **Deferred** |
+| VS-24 | Add Order notes photos | Stage garment + measurement-notes photos separately at intake; each uploads with its correct `photo_type` | Post-MVP — **Pending** |
+| VS-25 | Batch camera capture | One camera session captures many photos (WhatsApp-style) → **Done (n)** adds all to the active bucket | Post-MVP — **Pending** |
+| VS-26 | Media intake polish | Two-bucket + batch intake tuned for 375/768/desktop; Review summarizes garment, notes, and voice | Post-MVP — **Pending** |
 
 > **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
 > VS-20 and VS-23 each require an ADR at activation. VS-23 (tenant) lands before VS-17/VS-18 so launch is on the final schema. Interim hardening (order_number race-fix, presign validation) ships as `fix` commits ahead of the slices.
@@ -74,6 +77,8 @@ _2026-06-10: VS-17 (Mobile Layout) **closed — Done.** Five units shipped: Quic
 
 _2026-06-11: **VS-18 (Production deployment) closed — Done. 🎉 MVP is LIVE in production at https://app.soliofit.com.** ADR-0008 Accepted (host Nginx + Certbot, Redis shared cache, WhiteNoise static, PR-gated single `main`, tarball-over-SSH, pre-deploy + daily `pg_dump`). Artifacts: `b91e5cc` prod settings → `2667950` Dockerfiles + compose + `.dockerignore` → `03b0ffd` host nginx + CI/deploy workflow + scripts + env templates → `e4f7b63`/`14be1b5` provisioning runbook (`deploy/README.md`). Provisioned: repo `github.com/Nitinsha58/app-soliofit`, EC2 + Elastic IP, DNS `app.soliofit.com`, S3 `soliofit-prod-media`, IAM keys. HTTPS + CI/CD deploys + health check + S3 uploads/media all verified live. Vault `08-devops-deployment.md` rewritten to as-built (v2.0). **All 19 vertical slices (VS-00 → VS-18) are complete — MVP done.** See the VS-18 completion record below for as-built deviations (public-read media, console email).  Next review: post-MVP planning window._
 _VS-15a (Orders Schedule) added as gap-fix slice after PRD review on 2026-06-03. Inserted before VS-15 in execution order._
+
+_2026-06-13: **Three post-MVP enhancement slices added — VS-24, VS-25, VS-26 (Add Order media intake).** Spun out of the post-launch design review of the order-creation flow. They extend the shipped Add Order camera work (garment photo capture + camera-first capture + Escape-safe overlays + review-step media + palette/auth polish, PR #1 merged 2026-06-13). Status **Pending** (not in an active window); execution order **VS-24 → VS-25 → VS-26** when prioritized. None requires backend/API/schema changes. **No implementation plans written yet** — these are slice specs only, awaiting product-owner review. Specs below._
 
 ---
 
@@ -805,6 +810,127 @@ Frontend: `/forgot-password` (zod + native email validation, neutral success cop
 **Status:** Backlog — **Deferred. Not in the current MVP execution order** (VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18). Tracked for post-MVP; pull in only if iOS playback becomes a launch blocker.
 
 **What (if revived):** Server-side `.webm` → `.mp3` conversion so iOS Safari can play voice notes recorded as WebM/Opus. Recording already works everywhere; the gap is iOS playback of WebM. Would add an FFmpeg conversion step on upload and store an `.mp3` alongside (or in place of) the original.
+
+---
+
+## Post-MVP Enhancement Slices — Add Order Media Intake (VS-24 → VS-26)
+
+These three slices extend the **shipped** Add Order camera flow (garment photo capture, camera-first capture, Escape-safe overlays, review-step staged media, plus the palette/auth polish — PR #1, merged 2026-06-13). They are **post-MVP enhancements, Pending** — promote into an active window when prioritized. Execution order is **VS-24 → VS-25 → VS-26**: A (two photo buckets) and B (batch camera) are independently shippable, and C is the final polish/QA once both exist. **None requires backend, API, or database changes** — the data model (`media/models.py` `PhotoType.GARMENT|NOTES`), media API (`uploadPhoto(..., 'garment'|'notes')`), and Order Detail drawer already support everything; only the create flow lags. **No implementation plans yet — specs only.**
+
+---
+
+### VS-24 (Slice A) — Add Order Notes Photo Support
+
+**Problem statement:** The Add Order wizard stages a single `pendingPhotos` bucket and uploads everything as `photo_type='garment'` (`StepPhotos.tsx`, `index.tsx:111`). The backend (`PhotoType.GARMENT|NOTES`), the media API (`uploadPhoto(..., 'garment'|'notes')`), and the Order Detail drawer (`PhotoSection.tsx` — a Garment strip **and** a Notes grid) already support two photo types — only order creation doesn't. Measurement/diary photos therefore can't be captured at intake.
+
+**User value:** A tailor captures garment reference photos **and** handwritten measurement/diary notes in one intake pass, before the order is created — no "create the order, then reopen the drawer to add notes" round-trip.
+
+**Scope:**
+- Split the wizard draft media state into two buckets: `pendingGarmentPhotos` and `pendingNotesPhotos`.
+- `StepPhotos` renders two labelled sections — **Garment Photos** and **Measurement Notes** — each with the existing action sheet (Take Photo / Choose from Gallery) + camera entry point, reusing the drawer's `PhotoSection` two-section pattern.
+- `handleCreate` uploads the garment bucket as `photo_type='garment'` and the notes bucket as `photo_type='notes'` (both fire-and-forget post-create, as today).
+- `StepReview` shows the two photo groups separately, alongside the existing voice-note row.
+- Camera stays single-shot (batch is VS-25).
+
+**Out of scope:**
+- Any backend, API, or DB change (all already support both types).
+- Batch / multi-capture camera (VS-25).
+- Moving or reordering photos between buckets after staging.
+- Any change to the Order Detail drawer.
+
+**Files likely touched:**
+- `frontend/src/components/orders/AddOrderFlow/StepPhotos.tsx` (two sections)
+- `frontend/src/components/orders/AddOrderFlow/index.tsx` (`Draft` buckets + `handleCreate` upload split + props to StepPhotos)
+- `frontend/src/components/orders/AddOrderFlow/StepReview.tsx` (two photo groups)
+- Reference only, unchanged: `OrderDetailDrawer/PhotoSection.tsx`, `lib/api/media.ts`
+
+**Verification checklist:**
+- [ ] Both sections visible and clearly labelled in StepPhotos.
+- [ ] Garment and notes photos can each be added via gallery and via camera.
+- [ ] Review step shows garment and notes groups separately + voice note.
+- [ ] Created order shows garment photos in the drawer's Garment strip and notes photos in the Notes grid (correct `photo_type`).
+- [ ] `tsc --noEmit` clean; zero console errors.
+- [ ] No regression to existing garment upload, voice staging, or order creation.
+
+**Review checkpoint:** Both sections are visible and clear; staged garment vs notes photos appear separately in Review; the created order displays both groups correctly in Order Detail.
+
+**Deferrals / follow-ups:** Batch capture (VS-25); combined-flow layout/density tuning (VS-26).
+
+---
+
+### VS-25 (Slice B) — Batch Camera Capture
+
+**Problem statement:** `CameraCapture` is single-shot: Take Photo → capture → confirm (Use Photo) → return to the step → reopen the camera for the next shot. Capturing several garment or notes photos at intake means re-opening the camera repeatedly — too slow for real counter use.
+
+**User value:** WhatsApp-style capture — open the camera once, take many photos, watch them accrue as a thumbnail strip, then tap **Done (n)** to add all of them to the active bucket. Far faster multi-photo intake.
+
+**Scope:**
+- Batch mode for the Add Order intake camera: after each shutter press the camera **stays open** and the captured frame appends to an in-session thumbnail strip shown inside the camera view.
+- A **Done (n)** control commits all captured photos to the active bucket (garment or notes) in one action; **n** reflects the in-session count.
+- Closing/backing out (or Escape) before Done discards only the **uncommitted** in-session captures; photos already added to the wizard in earlier sessions are untouched.
+- In-camera thumbnail **remove** (delete a shot from the strip before Done) — **default defer to VS-26 unless it falls out naturally from the batch thumbnail strip.** Not promised scope for this slice.
+- Introduce batch as an **opt-in** mode (e.g. a prop / dedicated `onCaptureMany` callback) so the **Order Detail drawer camera keeps its current single-shot confirm flow unchanged**.
+
+**Out of scope:**
+- Changing the Order Detail drawer camera (stays single-shot unless a later slice opts it in — see VS-26 decision note).
+- Editing / cropping / rotating captured photos.
+- Reordering photos within the strip.
+- Backend / API / DB changes.
+
+**Files likely touched:**
+- `frontend/src/components/orders/CameraCapture.tsx` (batch mode: persistent stream after shutter, in-view thumbnail strip, Done(n), safe cancel)
+- `frontend/src/components/orders/AddOrderFlow/StepPhotos.tsx` (consume the batch callback into the active bucket)
+- Possibly `frontend/src/components/orders/AddOrderFlow/index.tsx` (only if the bucket-append signature changes)
+- Reference only, unchanged: `OrderDetailDrawer/PhotoSection.tsx`
+
+**Verification checklist:**
+- [ ] Multiple garment photos captured in one session → all added on Done.
+- [ ] Multiple notes photos captured in one session → all added on Done.
+- [ ] Cancel/close/Escape before Done discards only the in-session captures; previously-added wizard photos remain.
+- [ ] **Done (n)** count matches the number captured; the bucket receives exactly those files.
+- [ ] Mobile camera layout ergonomic at 375px (shutter, strip, Done reachable; safe-area respected).
+- [ ] Order Detail drawer camera still single-shot (unchanged).
+- [ ] `tsc` clean; zero console errors; no MediaStream leaks on close.
+
+**Review checkpoint:** User can capture multiple garment photos and multiple notes photos, each in one session; cancel/close behaviour is safe and predictable; mobile camera layout is ergonomic at 375px.
+
+**Deferrals / follow-ups:** In-camera thumbnail remove → default to VS-26 unless it falls out naturally from the batch strip here; possible later adoption of batch capture in the Order Detail drawer (its own slice, only if approved in VS-26).
+
+---
+
+### VS-26 (Slice C) — Media Intake Polish / Final Review
+
+**Problem statement:** After VS-24 (two buckets) and VS-25 (batch capture), StepPhotos carries more UI — two sections, each with an action sheet + batch camera. Without a polish pass the step risks feeling heavy, and the Review summary must clearly account for garment photos, notes photos, and the voice note across mobile, tablet, and desktop.
+
+**User value:** The combined media-intake step feels clean and fast rather than cluttered — clear sections, right-sized thumbnails, sensible CTA hierarchy — and Review gives confidence that everything captured will be saved.
+
+**Scope:**
+- Review StepPhotos layout once both buckets and batch capture exist; keep the two sections light (labels, empty states, thumbnail sizing, spacing, CTA hierarchy) so the wizard doesn't feel heavy.
+- Ensure the Review step summarizes garment photos, notes photos, and voice notes clearly and distinctly.
+- Confirm clean presentation at 375px (mobile), 768px (tablet), and desktop.
+- **Decide and document** whether the Order Detail drawer should later adopt batch capture — do **not** implement it here.
+
+**Out of scope:**
+- New capabilities (this is polish/QA over VS-24 + VS-25).
+- Implementing batch capture in the Order Detail drawer (decision recorded here; separate slice if pursued).
+- Backend / API / DB changes.
+
+**Files likely touched:**
+- `frontend/src/components/orders/AddOrderFlow/StepPhotos.tsx`
+- `frontend/src/components/orders/AddOrderFlow/StepReview.tsx`
+- `frontend/src/components/orders/AddOrderFlow/index.tsx` (only for minor wiring tweaks)
+
+**Verification checklist:**
+- [ ] 375px mobile pass — two sections + batch camera ergonomic, no clipping/overflow.
+- [ ] 768px tablet pass.
+- [ ] Desktop pass.
+- [ ] Full Add Order flow pass (no accidental test data unless explicitly intended).
+- [ ] Review summarizes garment, notes, and voice clearly.
+- [ ] No regression to garment-photo upload, notes-photo upload, voice staging, or order creation.
+
+**Review checkpoint:** 375px / 768px / desktop passes; full Add Order flow without accidental test data; no regression to existing garment/notes photo upload, voice staging, or order creation.
+
+**Deferrals / follow-ups:** Order Detail drawer batch-capture adoption — decision documented here; implement as its own slice only if approved.
 
 ---
 

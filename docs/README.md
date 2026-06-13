@@ -56,10 +56,15 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-22 | Forgot password | Complete |
 | VS-23 | Boutique tenant | Complete |
 | VS-17 | Mobile layout | Complete |
-| VS-18 | Production deployment | Active |
+| VS-18 | Production deployment | Complete |
 | VS-08b | Voice format (webm→mp3) | Backlog — Deferred (not in current execution order) |
+| VS-24 | Add Order notes photos | Post-MVP — Pending |
+| VS-25 | Batch camera capture | Post-MVP — Pending |
+| VS-26 | Media intake polish | Post-MVP — Pending |
 
-_Execution order for the final batch: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18._
+_Execution order for the final batch: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. **MVP complete and live** (app.soliofit.com, 2026-06-11)._
+
+_Post-MVP enhancement slices (not active work): **VS-24 → VS-25 → VS-26** (Add Order media intake — notes-photo support, batch camera, intake polish). Pending; promote into an active window when prioritized._
 
 Full specifications: [`/workflow/vertical-slices.md`](./workflow/vertical-slices.md)
 
