@@ -3,6 +3,13 @@ name: CI / Deploy
 on:
   push:
     branches: [main]
+    # Docs-only changes must not trigger CI/Deploy. The deploy job runs only on
+    # push to main, so ignoring docs paths here is enough to keep docs merges
+    # from deploying. (Left off `pull_request` on purpose: skipping PR checks
+    # could block docs PRs if branch protection marks them required.)
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
     branches: [main]
 
