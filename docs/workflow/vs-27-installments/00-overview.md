@@ -78,7 +78,7 @@ No separate billing model is introduced — billing stays an **order attribute**
 |-------|-------|-------|-----------|--------|
 | [27.1](./vs-27.1-backend-strict-billing.md) | Backend strict billing core | Backend | — | **Implemented — in review** |
 | [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | Pending |
-| [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | Pending |
+| [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | **Implemented — in review** |
 | [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | Pending |
 | [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" | Frontend | 27.1, 27.3 | Pending |
 
