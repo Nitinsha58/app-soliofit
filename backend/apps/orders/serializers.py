@@ -12,6 +12,10 @@ class NewInstallmentSerializer(serializers.Serializer):
     amount   = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
     due_date = serializers.DateField()
     remarks  = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+    # VS-29 — advance payments captured at intake. `paid=True` rows are created already
+    # settled (paid_date = today) and log INSTALLMENT_PAID. Only honoured by order-create;
+    # the billing edit (PUT /billing/) ignores it — paid rows are toggled via mark-(un)paid.
+    paid     = serializers.BooleanField(required=False, default=False)
 
 
 class OrderBillingSerializer(serializers.Serializer):

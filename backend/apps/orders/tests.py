@@ -848,6 +848,40 @@ class StrictBillingCreateTests(_Fixture):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(Installment.objects.filter(order_id=resp.data['id']).count(), 0)
 
+    # VS-29 — advance payments captured at intake (paid=True on a create row).
+
+    def test_create_with_paid_installment_sets_paid_date(self):
+        resp = self._post(installments=[
+            {'amount': '4000.00', 'due_date': _future(), 'paid': True},
+            {'amount': '6000.00', 'due_date': _future()},
+        ])
+        self.assertEqual(resp.status_code, 201)
+        rows = Installment.objects.filter(order_id=resp.data['id'])
+        paid = rows.get(amount=Decimal('4000.00'))
+        unpaid = rows.get(amount=Decimal('6000.00'))
+        self.assertEqual(paid.paid_date, date.today())
+        self.assertIsNone(unpaid.paid_date)
+
+    def test_create_with_paid_installment_logs_installment_paid_activity(self):
+        resp = self._post(installments=[
+            {'amount': '4000.00', 'due_date': _future(), 'paid': True},
+            {'amount': '6000.00', 'due_date': _future()},
+        ])
+        self.assertEqual(resp.status_code, 201)
+        paid_acts = OrderActivity.objects.filter(
+            order_id=resp.data['id'], activity_type='installment_paid')
+        self.assertEqual(paid_acts.count(), 1)  # only the one advance-paid row
+        self.assertEqual(paid_acts.first().metadata.get('amount'), '4000.00')
+
+    def test_create_paid_installment_reflected_in_payment_state(self):
+        resp = self._post(installments=[
+            {'amount': '4000.00', 'due_date': _future(), 'paid': True},
+            {'amount': '6000.00', 'due_date': _future()},
+        ])
+        card = self.client.get('/api/orders/').data[0]
+        self.assertEqual(Decimal(card['amount_paid']), Decimal('4000.00'))
+        self.assertEqual(card['payment_state'], 'partial')
+
 
 class BillingEndpointTests(_Fixture):
     """VS-27.1 — PUT /api/orders/{id}/billing/ edits bill + unpaid schedule atomically."""

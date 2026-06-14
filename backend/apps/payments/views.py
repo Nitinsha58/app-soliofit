@@ -172,3 +172,35 @@ class InstallmentMarkPaidView(APIView):
                 'amount': str(installment.amount),
             })
         return Response(InstallmentSerializer(installment).data)
+
+
+class InstallmentMarkUnpaidView(APIView):
+    # VS-29 — revert a paid installment back to unpaid (clears paid_date). Mirrors
+    # mark-paid: a 400 guard (not idempotency) when the row is already unpaid, and the same
+    # parent-order lock so it serializes against a concurrent billing replace / mark-paid.
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id, installment_id):
+        try:
+            installment = Installment.objects.select_related('order').get(
+                id=installment_id,
+                order__id=order_id,
+                order__boutique=request.user.boutique,
+                order__deleted_at__isnull=True,
+            )
+        except Installment.DoesNotExist:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            Order.objects.select_for_update().get(pk=installment.order_id)
+            try:
+                installment = Installment.objects.get(pk=installment.id)
+            except Installment.DoesNotExist:
+                return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+            if not installment.paid_date:
+                return Response({'detail': 'Already marked as unpaid'}, status=status.HTTP_400_BAD_REQUEST)
+            installment.paid_date = None
+            installment.save(update_fields=['paid_date'])
+            create_order_activity(installment.order, OrderActivity.Type.INSTALLMENT_UNPAID, {
+                'amount': str(installment.amount),
+            })
+        return Response(InstallmentSerializer(installment).data)
