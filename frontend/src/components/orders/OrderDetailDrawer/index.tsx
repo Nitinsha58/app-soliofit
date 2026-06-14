@@ -70,7 +70,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
       {/* Drawer — full screen mobile, right panel desktop */}
       <div
         className={`
-          fixed z-50 bg-white flex flex-col
+          fixed z-50 bg-white flex flex-col overflow-hidden max-w-full
           inset-0
           lg:inset-auto lg:right-0 lg:top-0 lg:bottom-0 lg:w-[460px] lg:border-l lg:border-[#E5E5E2] lg:shadow-2xl
           transition-transform duration-200
@@ -111,7 +111,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
             <DrawerIdentity order={order} />
             <DrawerTabs active={tab} onChange={setTab} />
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y">
               {tab === 'overview' && (
                 <OverviewTab
                   order={order}

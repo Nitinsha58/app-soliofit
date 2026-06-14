@@ -38,7 +38,7 @@ export default function MoreDetailsView({ order, onOrderChange, onUpdated, onBac
         <h2 className="text-sm font-semibold text-[#1A1A18]">More details</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y">
         <OrderInfoSection
           order={order}
           onOrderChange={onOrderChange}

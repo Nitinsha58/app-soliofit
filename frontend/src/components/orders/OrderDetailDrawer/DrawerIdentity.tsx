@@ -23,18 +23,18 @@ export default function DrawerIdentity({ order }: { order: Order }) {
       <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-1">
         #{String(order.order_number).padStart(4, '0')}
       </p>
-      <div className="flex items-baseline gap-2 pr-8">
+      <div className="flex items-baseline gap-2 pr-8 min-w-0">
         <button
           type="button"
           onClick={() => { closeOrderDetail(); router.push(`/customers/${order.customer}`) }}
-          className="text-lg font-bold text-[#1A1A18] leading-tight hover:text-[#C8952A] transition-colors text-left truncate"
+          className="min-w-0 flex-1 text-lg font-bold text-[#1A1A18] leading-tight hover:text-[#C8952A] transition-colors text-left truncate"
         >
           {order.customer_name}
         </button>
         {order.customer_phone && (
           <a
             href={`tel:${order.customer_phone}`}
-            className="inline-flex items-center gap-1 text-[12px] text-[#6B6B67] hover:text-[#C8952A] transition-colors shrink-0"
+            className="inline-flex items-center gap-1 text-[12px] text-[#6B6B67] hover:text-[#C8952A] transition-colors shrink-0 max-w-[45%] truncate"
           >
             <PhoneIcon />
             {order.customer_phone}
