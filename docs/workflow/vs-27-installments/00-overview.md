@@ -1,6 +1,6 @@
 # VS-27 — Strict Bill ↔ Installment Plan (Program Overview)
 
-**Status:** In progress — 27.1/27.3/27.4 done, 27.5 implemented (in review, incl. backend cutover); 27.2 backfill pending
+**Status:** In progress — 27.1/27.3/27.4/27.5 verified (cutover proven); only 27.2 legacy backfill remains
 **Created:** 2026-06-14
 **Decision record:** [ADR-0009 — Strict Installment Plan](../../adr/ADR-0009-strict-installment-plan.md)
 
@@ -80,7 +80,7 @@ No separate billing model is introduced — billing stays an **order attribute**
 | [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | Pending |
 | [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | **Implemented — in review** |
 | [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | **Verified** (browser pass) |
-| [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" + backend cutover | Frontend + Backend | 27.1, 27.3 | **Implemented — in review** |
+| [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" + backend cutover | Frontend + Backend | 27.1, 27.3 | **Verified** (browser pass) |
 
 **Execution order:** 27.1 (additive backend) → 27.3 (date input) → 27.4 + 27.5 (frontend)
 **+ cutover** → 27.2 backfill.
@@ -108,6 +108,13 @@ holds across both new and legacy data at the same moment.
 
 ## Completion log
 
+- **2026-06-14 — VS-27.5 verified (browser pass).** Drawer surface confirmed: read-only Bill +
+  paid/outstanding summary + "Edit bill & plan"; no standalone bill field; no old row-write UI;
+  paid row under "Paid · locked"; unpaid row editable with QuickDateInput; clean edit has no save
+  bar; changing an unpaid amount shows the dirty bar with "Remaining ₹50" (Save disabled); bill
+  below paid shows "Bill below paid (₹100 already paid)" (Save disabled); Cancel returns to
+  read-only without saving; no console errors. Cutover behavior proven before touching legacy
+  data. Only **VS-27.2 backfill** remains.
 - **2026-06-14 — VS-27.5 implemented (in review). The cutover release.** On
   `feat/vs-27-cutover`. **Part A (`941f3fb`)** — the order drawer's `PaymentSchedule` is now a
   read-only-by-default whole-plan editor: one dominant "Edit bill & plan" action stages the
