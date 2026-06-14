@@ -9,6 +9,9 @@ interface Props {
   order: Order
   onOrderChange: (updated: Partial<Order>) => void
   onUpdated: () => void
+  // VS-28.1 — the Money tab owns PaymentSchedule; when this section is reused inside
+  // More Details, suppress the embedded payments block so it isn't rendered twice.
+  showPayments?: boolean
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -21,7 +24,7 @@ interface FormState {
   remarks: string
 }
 
-export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Props) {
+export default function OrderInfoSection({ order, onOrderChange, onUpdated, showPayments = true }: Props) {
   const [form, setForm] = useState<FormState>({
     delivery_date: order.delivery_date,
     remarks: order.remarks,
@@ -129,18 +132,20 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated }: Pr
 
         {/* Payments — bill + schedule are one strict, atomic unit edited only inside
             PaymentSchedule's "Edit bill & plan" surface (VS-27.5). The bill is read-only
-            here; it can never drift from the schedule.
-            id anchor = scroll target for the QuickActions "Payment" shortcut. */}
-        <div id="order-payment" className="scroll-mt-3 pt-1">
-          <h4 className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">
-            Payments
-          </h4>
-          <PaymentSchedule
-            order={order}
-            onOrderChange={onOrderChange}
-            onUpdated={onUpdated}
-          />
-        </div>
+            here; it can never drift from the schedule. Suppressed when this section is reused
+            inside More Details (the Money tab owns PaymentSchedule). */}
+        {showPayments && (
+          <div className="pt-1">
+            <h4 className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">
+              Payments
+            </h4>
+            <PaymentSchedule
+              order={order}
+              onOrderChange={onOrderChange}
+              onUpdated={onUpdated}
+            />
+          </div>
+        )}
 
         {/* Customer address (read-only) */}
         {order.customer_address && (
