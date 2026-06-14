@@ -90,12 +90,6 @@ class ActivityOnInstallmentTests(_Fixture):
         self.order = self._create_order()
         self.list_url = f'/api/orders/{self.order.id}/installments/'
 
-    def test_installment_created_activity(self):
-        self.client.post(self.list_url, {'amount': '1000.00', 'due_date': _future()})
-        self.assertTrue(
-            OrderActivity.objects.filter(order=self.order, activity_type='installment_created').exists()
-        )
-
     def test_installment_paid_activity(self):
         inst = Installment.objects.create(
             order=self.order, amount=Decimal('1000.00'),
@@ -106,17 +100,18 @@ class ActivityOnInstallmentTests(_Fixture):
             OrderActivity.objects.filter(order=self.order, activity_type='installment_paid').exists()
         )
 
-    def test_payment_updated_activity(self):
-        inst = Installment.objects.create(
-            order=self.order, amount=Decimal('1000.00'),
-            due_date=date.today() + timedelta(days=10),
+    def test_payment_updated_activity_on_billing_edit(self):
+        # VS-27.5 — editing the bill + schedule via the billing endpoint logs payment_updated
+        # (the single-row create/patch endpoints that used to log it were removed).
+        resp = self.client.put(
+            f'/api/orders/{self.order.id}/billing/',
+            {'total_amount': '2000.00',
+             'installments': [{'amount': '2000.00', 'due_date': _future()}]},
+            format='json',
         )
-        self.client.patch(
-            f'/api/orders/{self.order.id}/installments/{inst.id}/',
-            {'amount': '2000.00'},
-        )
+        self.assertEqual(resp.status_code, 200)
         act = OrderActivity.objects.get(order=self.order, activity_type='payment_updated')
-        self.assertEqual(Decimal(act.metadata['amount']), Decimal('2000.00'))
+        self.assertEqual(Decimal(act.metadata['total_amount']), Decimal('2000.00'))
 
 
 class ActivitiesEndpointTests(_Fixture):
@@ -814,8 +809,21 @@ class StrictBillingCreateTests(_Fixture):
         self.assertEqual(Order.objects.count(), 0)
         self.assertEqual(Installment.objects.count(), 0)
 
-    def test_create_without_installments_unchanged(self):
+    def test_create_without_installments_auto_seeds_default(self):
+        # VS-27.5 cutover — omitting installments on a billed order auto-seeds the mandatory
+        # default installment (= bill, due on the delivery date).
         resp = self._post()
+        self.assertEqual(resp.status_code, 201)
+        rows = Installment.objects.filter(order_id=resp.data['id'])
+        self.assertEqual(rows.count(), 1)
+        default = rows.first()
+        self.assertEqual(default.amount, Decimal('10000.00'))
+        self.assertEqual(default.due_date, date.today() + timedelta(days=30))  # = delivery date
+        self.assertIsNone(default.paid_date)
+
+    def test_create_with_zero_bill_does_not_seed(self):
+        # No bill → nothing to schedule; no auto-default.
+        resp = self._post(total_amount='0.00')
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(Installment.objects.filter(order_id=resp.data['id']).count(), 0)
 
@@ -948,27 +956,57 @@ class MarkPaidLockTests(_Fixture):
         self.assertEqual(resp.status_code, 400)
 
 
-class DeprecatedInstallmentEndpointsTests(_Fixture):
-    """VS-27.1 — old single-row write endpoints stay functional during the interim."""
+class RemovedInstallmentEndpointsTests(_Fixture):
+    """VS-27.5 cutover — the single-row write endpoints are gone; only list (GET) and
+    mark-paid remain. The schedule is writable only via create or PUT /billing/."""
 
     def setUp(self):
         super().setUp()
         self.order = self._create_order()
         self.list_url = f'/api/orders/{self.order.id}/installments/'
 
-    def test_single_create_still_works(self):
-        resp = self.client.post(self.list_url, {'amount': '1000.00', 'due_date': _future()})
-        self.assertEqual(resp.status_code, 201)
+    def test_list_still_works(self):
+        resp = self.client.get(self.list_url)
+        self.assertEqual(resp.status_code, 200)
 
-    def test_single_patch_still_works(self):
+    def test_single_create_removed(self):
+        # POST is no longer an allowed method on the (now read-only) list view → 405.
+        resp = self.client.post(self.list_url, {'amount': '1000.00', 'due_date': _future()})
+        self.assertEqual(resp.status_code, 405)
+
+    def test_single_patch_route_removed(self):
         inst = Installment.objects.create(order=self.order, amount=Decimal('1000.00'),
                                           due_date=date.today() + timedelta(days=5))
         resp = self.client.patch(f'/api/orders/{self.order.id}/installments/{inst.id}/',
                                  {'amount': '2000.00'}, format='json')
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 404)  # route no longer exists
 
-    def test_single_delete_still_works(self):
+    def test_single_delete_route_removed(self):
         inst = Installment.objects.create(order=self.order, amount=Decimal('1000.00'),
                                           due_date=date.today() + timedelta(days=5))
         resp = self.client.delete(f'/api/orders/{self.order.id}/installments/{inst.id}/')
-        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(resp.status_code, 404)
+
+
+class BillReadOnlyTests(_Fixture):
+    """VS-27.5 cutover — total_amount is read-only on the generic PATCH; it changes only
+    through PUT /orders/{id}/billing/ (so the bill can never desync from the schedule)."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()  # total_amount = 10000.00
+
+    def test_patch_total_amount_rejected(self):
+        resp = self.client.patch(f'/api/orders/{self.order.id}/',
+                                 {'total_amount': '5000.00'}, format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal('10000.00'))  # unchanged
+
+    def test_patch_other_fields_still_works(self):
+        new_date = str(date.today() + timedelta(days=45))
+        resp = self.client.patch(f'/api/orders/{self.order.id}/',
+                                 {'delivery_date': new_date}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(str(self.order.delivery_date), new_date)

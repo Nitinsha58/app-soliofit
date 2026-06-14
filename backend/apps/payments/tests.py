@@ -32,121 +32,16 @@ class _OrderFixture(TestCase):
         self.client.force_authenticate(user=self.user)
         self.list_url = f'/api/orders/{self.order.id}/installments/'
 
-    def _detail(self, iid):
-        return f'/api/orders/{self.order.id}/installments/{iid}/'
-
     def _mark_paid(self, iid):
         return f'/api/orders/{self.order.id}/installments/{iid}/mark-paid/'
 
-    def _create(self, amount, due_date=None):
-        return self.client.post(
-            self.list_url,
-            {'amount': str(amount), 'due_date': due_date or _future()},
-        )
 
-
-# ── Bill-limit validation ─────────────────────────────────────────────────────
-
-class BillLimitCreateTests(_OrderFixture):
-    """POST /installments/ enforces sum ≤ bill."""
-
-    def test_within_bill_succeeds(self):
-        self.assertEqual(self._create(5000).status_code, status.HTTP_201_CREATED)
-
-    def test_exactly_at_bill_succeeds(self):
-        self.assertEqual(self._create(10000).status_code, status.HTTP_201_CREATED)
-
-    def test_over_bill_returns_400(self):
-        res = self._create(10001)
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('exceed', res.data['detail'].lower())
-
-    def test_cumulative_over_bill_returns_400(self):
-        self._create(8000)                             # ₹8 000 — OK
-        res = self._create(3000)                       # ₹8 000 + ₹3 000 > ₹10 000
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_cumulative_at_limit_succeeds(self):
-        self._create(6000)
-        res = self._create(4000)                       # exactly ₹10 000
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-
-
-class BillLimitUpdateTests(_OrderFixture):
-    """PATCH /installments/{id}/ enforces sum ≤ bill, excluding the edited row."""
-
-    def setUp(self):
-        super().setUp()
-        # Two installments: ₹5 000 + ₹4 000 = ₹9 000 on a ₹10 000 bill
-        r1 = self._create(5000)
-        r2 = self._create(4000)
-        self.i1_id = r1.data['id']
-        self.i2_id = r2.data['id']
-
-    def test_update_would_exceed_returns_400(self):
-        # ₹7 000 + ₹4 000 = ₹11 000 > ₹10 000
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '7000'})
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('exceed', res.data['detail'].lower())
-
-    def test_update_within_limit_succeeds(self):
-        # ₹6 000 + ₹4 000 = ₹10 000 — exactly at limit
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '6000'})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data['amount'], '6000.00')
-
-    def test_self_exclusion_same_amount_succeeds(self):
-        # Editing an installment to the same value should always pass,
-        # even if total is already at the bill limit.
-        self._create(1000)                             # push to ₹10 000 total
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '5000'})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-    def test_non_amount_patch_skips_validation(self):
-        # Changing only the due date should never trigger bill validation.
-        res = self.client.patch(self._detail(self.i1_id), {'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-
-# ── Paid-row lock ─────────────────────────────────────────────────────────────
-
-class PaidLockTests(_OrderFixture):
-    """Paid installments must be immutable."""
-
-    def setUp(self):
-        super().setUp()
-        self.inst = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('5000.00'),
-            due_date=date.today() + timedelta(days=30),
-            paid_date=date.today(),
-        )
-
-    def test_edit_paid_returns_400(self):
-        res = self.client.patch(self._detail(self.inst.id), {'amount': '6000'})
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_delete_paid_returns_400(self):
-        res = self.client.delete(self._detail(self.inst.id))
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_unpaid_can_be_edited(self):
-        unpaid = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('2000.00'),
-            due_date=date.today() + timedelta(days=30),
-        )
-        res = self.client.patch(self._detail(unpaid.id), {'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-    def test_unpaid_can_be_deleted(self):
-        unpaid = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('2000.00'),
-            due_date=date.today() + timedelta(days=30),
-        )
-        res = self.client.delete(self._detail(unpaid.id))
-        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+# ── Single-row write endpoints removed (VS-27.5 cutover) ──────────────────────
+# The old POST /installments/ and PATCH/DELETE /installments/{id}/ endpoints — and their
+# sum-≤-bill / paid-lock validation — were removed. The schedule is now writable only via
+# the atomic create-with-installments payload and PUT /orders/{id}/billing/, whose strict
+# invariant + paid-row preservation are covered in apps.orders.tests (BillingEndpointTests,
+# RemovedInstallmentEndpointsTests). GET (list) + mark-paid remain (covered below).
 
 
 # ── Mark-paid endpoint ────────────────────────────────────────────────────────
@@ -200,18 +95,6 @@ class IsolationTests(_OrderFixture):
 
     def test_list_returns_404_for_other_user(self):
         res = self.other.get(self.list_url)
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_create_returns_404_for_other_user(self):
-        res = self.other.post(self.list_url, {'amount': '1000', 'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_patch_returns_404_for_other_user(self):
-        res = self.other.patch(self._detail(self.inst.id), {'amount': '1000'})
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_delete_returns_404_for_other_user(self):
-        res = self.other.delete(self._detail(self.inst.id))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_mark_paid_returns_404_for_other_user(self):

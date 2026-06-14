@@ -2,7 +2,7 @@ import base64
 import json
 import uuid
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, DecimalField, Exists, Max, OuterRef, Q, Subquery, Sum, Value
@@ -98,20 +98,28 @@ class OrderViewSet(viewsets.ModelViewSet):
         # UniqueConstraint(boutique, order_number), so retry on IntegrityError with a
         # fresh read inside a fresh transaction.
         boutique = self.request.user.boutique
-        # VS-27.1 — optional initial schedule. Popped before the model save (it is not an
-        # Order field), validated to sum exactly to the bill, then created atomically with
-        # the order so a bad installment can never leave an orphaned order behind.
-        # (Additive: when omitted, behavior is unchanged — no auto-default until cutover.)
+        # VS-27.1/27.5 — the initial schedule. Popped before the model save (it is not an
+        # Order field), then created atomically with the order so a bad installment can never
+        # leave an orphaned order behind.
+        #   • supplied (even as []) → strict-validate Σ == bill (explicit [] on a billed order
+        #     is rejected: Σ 0 != bill).
+        #   • omitted on a billed order (total > 0) → auto-seed the mandatory default
+        #     installment (= bill, due on the delivery date) so every billed order is always
+        #     scheduled. This is the VS-27.5 cutover behavior (was a no-op before).
         installments_data = serializer.validated_data.pop('installments', None)
+        total = Decimal(serializer.validated_data.get('total_amount') or 0).quantize(TWO_PLACES)
         if installments_data is not None:
-            # Supplied (even as []) → strict-validate. An explicit empty schedule on a billed
-            # order must be rejected (Σ 0 != bill); only omission leaves the order unscheduled.
-            total = Decimal(serializer.validated_data.get('total_amount') or 0).quantize(TWO_PLACES)
             scheduled = _schedule_sum(installments_data)
             if scheduled != total:
                 off = (total - scheduled).copy_abs()
                 raise ValidationError(
                     {'installments': f'Installments must sum to the bill (off by ₹{off}).'})
+        elif total > 0:
+            installments_data = [{
+                'amount': total,
+                'due_date': serializer.validated_data.get('delivery_date'),
+                'remarks': '',
+            }]
 
         for attempt in range(5):
             max_num = (Order.objects.filter(boutique=boutique)
@@ -144,20 +152,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'detail': 'Use /status/ to change order status.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # VS-27.5 cutover — the bill is read-only on the generic PATCH. It can only change
+        # together with its schedule, atomically, via PUT /orders/{id}/billing/. This closes
+        # the side-door where a lone bill edit could desync the strict bill == Σ invariant.
         if 'total_amount' in request.data:
-            order = self.get_object()
-            try:
-                new_total = Decimal(str(request.data['total_amount']))
-            except (ValueError, InvalidOperation):
-                pass  # serializer validation will reject non-numeric values
-            else:
-                scheduled = order.installments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-                if new_total < scheduled:
-                    excess = scheduled - new_total
-                    return Response(
-                        {'detail': f'Bill cannot be less than scheduled installments (exceeds by ₹{excess:,.2f}).'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            return Response(
+                {'detail': 'Use /billing/ to change the bill and its schedule together.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
