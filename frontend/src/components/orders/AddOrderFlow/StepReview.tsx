@@ -66,12 +66,18 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
   const scheduledTotal = draft.pendingInstallments.reduce(
     (sum, i) => sum + (parseFloat(i.amount) || 0), 0
   )
+  // VS-29 — advances captured at intake, surfaced so the review reflects what's already collected.
+  const paidAdvanceTotal = draft.pendingInstallments.reduce(
+    (sum, i) => sum + (i.paid ? parseFloat(i.amount) || 0 : 0), 0
+  )
   // VS-27.4 — re-check the strict invariant here too; never rely solely on StepBilling's
   // gate / earlier navigation state. The bill and every installment must be valid money
-  // (≤2 decimals, within the server's DecimalField range) AND the schedule must sum to the bill.
+  // (≤2 decimals, within the server's DecimalField range) with a due date, AND the schedule
+  // must sum to the bill. (due_date is required server-side, so guard it here too — it is no
+  // longer guaranteed by a per-row form since rows became inline-editable.)
   const billAmount = parseFloat(draft.totalAmount) || 0
   const billValid = isValidMoneyInput(draft.totalAmount, { min: 0.01 })
-  const rowsValid = draft.pendingInstallments.every((i) => isValidMoneyInput(i.amount, { min: 0.01 }))
+  const rowsValid = draft.pendingInstallments.every((i) => isValidMoneyInput(i.amount, { min: 0.01 }) && i.due_date !== '')
   const balanced = billValid && rowsValid && Math.abs(scheduledTotal - billAmount) < 0.005
 
   return (
@@ -118,6 +124,11 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
               {draft.pendingInstallments.length} installment{draft.pendingInstallments.length > 1 ? 's' : ''}{' '}
               · ₹{scheduledTotal.toLocaleString('en-IN')} scheduled
             </p>
+            {paidAdvanceTotal > 0 && (
+              <p className="text-xs font-medium text-green-700 mt-0.5">
+                ₹{paidAdvanceTotal.toLocaleString('en-IN')} paid in advance
+              </p>
+            )}
           </div>
         )}
 

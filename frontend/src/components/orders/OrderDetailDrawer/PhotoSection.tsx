@@ -37,15 +37,19 @@ function TrashIcon() {
   )
 }
 
+// Delete affordance (VS-28 option C): destructive, so kept low-emphasis. On hover-capable
+// devices it stays hidden until hover; on touch devices (no hover) it is subtly always visible
+// so mobile users have a real control. Both paths open the Delete/Cancel confirm overlay; the
+// 600ms long-press remains a secondary path.
 function DeleteBadge({ onDelete }: { onDelete: (e: React.MouseEvent) => void }) {
   return (
     <button
       onClick={onDelete}
-      className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+      className="absolute top-1 right-1 z-10 w-6 h-6 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/65 transition-all opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
       aria-label="Delete photo"
     >
-      <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-        <line x1="1" y1="1" x2="9" y2="9" /><line x1="9" y1="1" x2="1" y2="9" />
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6M9 6V4h6v2" />
       </svg>
     </button>
   )
@@ -226,26 +230,27 @@ export default function PhotoSection({ orderId, embedded = false }: Props) {
           </div>
         </div>
 
-        {/* Notes photos — 2-column grid */}
+        {/* Measurement Notes — horizontal strip, sized to match Garment (VS-28 divergence
+            from the older 2-column notes spec; keeps the Work Instructions card calm). */}
         <div>
           <p className="text-xs font-medium text-[#6B6B67] mb-2">Measurement Notes</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {allNotes.map((item) => {
               if ('tempId' in item) {
                 return (
-                  <div key={item.tempId} className="relative aspect-square rounded-lg overflow-hidden bg-[#F5F5F3] border border-[#E5E5E2]">
+                  <div key={item.tempId} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-[#F5F5F3] border border-[#E5E5E2]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.localUrl} alt="" className="w-full h-full object-cover opacity-50" />
                     {item.error ? (
                       <button
                         onClick={() => handleRetry(item)}
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-xs font-semibold"
+                        className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white text-[10px] font-semibold gap-1"
                       >
-                        Retry
+                        <span>Retry</span>
                       </button>
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       </div>
                     )}
                   </div>
@@ -256,7 +261,7 @@ export default function PhotoSection({ orderId, embedded = false }: Props) {
               return (
                 <div
                   key={photo.id}
-                  className="group relative aspect-square rounded-lg overflow-hidden bg-[#F5F5F3] cursor-pointer select-none"
+                  className="group relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-[#F5F5F3] cursor-pointer select-none"
                   onPointerDown={() => startLongPress(photo.id)}
                   onPointerUp={() => cancelLongPress()}
                   onPointerLeave={() => cancelLongPress()}
@@ -291,7 +296,7 @@ export default function PhotoSection({ orderId, embedded = false }: Props) {
             {/* Add button */}
             <button
               onClick={() => setActionSheet('notes')}
-              className="aspect-square rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex flex-col items-center justify-center gap-1 text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
+              className="flex-shrink-0 w-20 h-20 rounded-lg border border-dashed border-[#C8C8C4] bg-[#FAFAF9] flex flex-col items-center justify-center gap-1 text-[#A0A09C] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors"
             >
               <PlusIcon />
               <span className="text-[9px] font-medium">Add</span>

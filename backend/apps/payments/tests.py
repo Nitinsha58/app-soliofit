@@ -37,6 +37,9 @@ class _OrderFixture(TestCase):
     def _mark_paid(self, iid):
         return f'/api/orders/{self.order.id}/installments/{iid}/mark-paid/'
 
+    def _mark_unpaid(self, iid):
+        return f'/api/orders/{self.order.id}/installments/{iid}/mark-unpaid/'
+
 
 # ── Single-row write endpoints removed (VS-27.5 cutover) ──────────────────────
 # The old POST /installments/ and PATCH/DELETE /installments/{id}/ endpoints — and their
@@ -76,6 +79,84 @@ class MarkPaidTests(_OrderFixture):
         self.assertEqual(self.inst.paid_date, date.today())
 
 
+# ── Mark-unpaid endpoint (VS-29) ──────────────────────────────────────────────
+
+class MarkUnpaidTests(_OrderFixture):
+    """POST /installments/{id}/mark-unpaid/ — reverts a paid row back to unpaid."""
+
+    def setUp(self):
+        super().setUp()
+        self.inst = Installment.objects.create(
+            order=self.order,
+            amount=Decimal('5000.00'),
+            due_date=date.today() + timedelta(days=30),
+            paid_date=date.today(),
+        )
+
+    def test_clears_paid_date(self):
+        res = self.client.post(self._mark_unpaid(self.inst.id))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(res.data['paid_date'])
+        self.assertEqual(res.data['status'], 'Pending')  # future due date → Pending, not Delayed
+
+    def test_already_unpaid_returns_400(self):
+        # Guard (not idempotency), mirroring mark-paid's "already paid" 400.
+        self.client.post(self._mark_unpaid(self.inst.id))        # first: OK
+        res = self.client.post(self._mark_unpaid(self.inst.id))  # second: 400
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_db_state_after_mark_unpaid(self):
+        self.client.post(self._mark_unpaid(self.inst.id))
+        self.inst.refresh_from_db()
+        self.assertIsNone(self.inst.paid_date)
+
+    def test_round_trip_paid_unpaid_paid(self):
+        self.client.post(self._mark_unpaid(self.inst.id))
+        res = self.client.post(self._mark_paid(self.inst.id))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['paid_date'], str(date.today()))
+
+
+class MarkUnpaidDerivedStateTests(_OrderFixture):
+    """Unmarking a paid installment must flip the order's derived payment state and the
+    dashboard-facing totals (Completed → Partial) — these read off paid_date, not a cached flag."""
+
+    def setUp(self):
+        super().setUp()
+        # Two future installments that together equal the ₹10 000 bill.
+        self.a = Installment.objects.create(order=self.order, amount=Decimal('5000.00'),
+                                            due_date=_future(), paid_date=date.today())
+        self.b = Installment.objects.create(order=self.order, amount=Decimal('5000.00'),
+                                            due_date=_future(), paid_date=date.today())
+
+    def _state_of_order(self):
+        res = self.client.get('/api/payments/orders/?range=all_time')
+        for state in ('pending', 'partial', 'overdue', 'completed'):
+            if any(o['id'] == str(self.order.id) for o in res.data[state]):
+                return state, res.data[state]
+        return None, []
+
+    def test_completed_becomes_partial_after_unmark(self):
+        state, _ = self._state_of_order()
+        self.assertEqual(state, 'completed')  # both paid → fully settled
+
+        res = self.client.post(self._mark_unpaid(self.a.id))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        state, rows = self._state_of_order()
+        self.assertEqual(state, 'partial')  # ₹5 000 of ₹10 000 still paid
+        row = next(o for o in rows if o['id'] == str(self.order.id))
+        self.assertEqual(Decimal(row['paid_total']), Decimal('5000.00'))
+        self.assertEqual(Decimal(row['remaining']), Decimal('5000.00'))
+
+    def test_summary_receivable_reflects_unmark(self):
+        before = self.client.get('/api/payments/summary/').data
+        self.assertEqual(Decimal(before['total_receivable']), Decimal('0.00'))  # all paid
+        self.client.post(self._mark_unpaid(self.a.id))
+        after = self.client.get('/api/payments/summary/').data
+        self.assertEqual(Decimal(after['total_receivable']), Decimal('5000.00'))
+
+
 # ── Cross-user isolation ──────────────────────────────────────────────────────
 
 class IsolationTests(_OrderFixture):
@@ -101,6 +182,12 @@ class IsolationTests(_OrderFixture):
 
     def test_mark_paid_returns_404_for_other_user(self):
         res = self.other.post(self._mark_paid(self.inst.id))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_mark_unpaid_returns_404_for_other_user(self):
+        self.inst.paid_date = date.today()
+        self.inst.save(update_fields=['paid_date'])
+        res = self.other.post(self._mark_unpaid(self.inst.id))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
 

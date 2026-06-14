@@ -1,7 +1,7 @@
 import base64
 import json
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -130,15 +130,26 @@ class OrderViewSet(viewsets.ModelViewSet):
                                             order_number=max_num + 1)
                     create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
                     if installments_data:
+                        # VS-29 — rows flagged paid at intake are created already settled
+                        # (paid_date = today): an advance payment captured during booking.
+                        today = date.today()
                         Installment.objects.bulk_create([
                             Installment(order=order, amount=i['amount'],
-                                        due_date=i['due_date'], remarks=i.get('remarks', ''))
+                                        due_date=i['due_date'], remarks=i.get('remarks', ''),
+                                        paid_date=today if i.get('paid') else None)
                             for i in installments_data
                         ])
                         create_order_activity(order, OrderActivity.Type.PAYMENT_UPDATED, {
                             'total_amount': str(order.total_amount),
                             'installment_count': len(installments_data),
                         })
+                        # Audit advance payments so Activity records intake collections, not
+                        # only later unpaid→paid toggles.
+                        for i in installments_data:
+                            if i.get('paid'):
+                                create_order_activity(order, OrderActivity.Type.INSTALLMENT_PAID, {
+                                    'amount': str(i['amount']),
+                                })
                 return
             except IntegrityError:
                 if attempt == 4:

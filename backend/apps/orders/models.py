@@ -65,6 +65,7 @@ class OrderActivity(models.Model):
         PARTIAL_DELIVERY    = 'partial_delivery',    'Partial Delivery'
         INSTALLMENT_CREATED = 'installment_created', 'Installment Created'
         INSTALLMENT_PAID    = 'installment_paid',    'Installment Paid'
+        INSTALLMENT_UNPAID  = 'installment_unpaid',  'Installment Marked Unpaid'
         PAYMENT_UPDATED     = 'payment_updated',     'Payment Updated'
 
     id            = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

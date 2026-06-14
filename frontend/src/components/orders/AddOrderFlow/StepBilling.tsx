@@ -9,6 +9,8 @@ interface Props {
   deliveryDate: string
   installments: DraftInstallment[]
   onInstallmentsChange: (list: DraftInstallment[]) => void
+  installmentsTouched: boolean
+  onInstallmentsTouch: () => void
   onNext: () => void
   onBack: () => void
 }
@@ -19,6 +21,8 @@ export default function StepBilling({
   deliveryDate,
   installments,
   onInstallmentsChange,
+  installmentsTouched,
+  onInstallmentsTouch,
   onNext,
   onBack,
 }: Props) {
@@ -29,7 +33,10 @@ export default function StepBilling({
   const billMoneyValid = isValidMoneyInput(totalAmount, { min: 0.01 })
   const billBadPrecision = totalAmount.trim() !== '' && !billMoneyValid
   const balanced = billMoneyValid && Math.abs(scheduled - billAmount) < 0.005
-  const isValid = balanced
+  // Inline-editable rows can sit in invalid intermediate states (blank amount/date), so the gate
+  // now also requires every row to be valid money with a due date — the RowForm used to guarantee this.
+  const rowsValid = installments.every((i) => isValidMoneyInput(i.amount, { min: 0.01 }) && i.due_date !== '')
+  const isValid = balanced && rowsValid
 
   return (
     <div>
@@ -59,6 +66,8 @@ export default function StepBilling({
         deliveryDate={deliveryDate}
         installments={installments}
         onChange={onInstallmentsChange}
+        touched={installmentsTouched}
+        onTouch={onInstallmentsTouch}
       />
 
       <div className="flex gap-2 mt-6">

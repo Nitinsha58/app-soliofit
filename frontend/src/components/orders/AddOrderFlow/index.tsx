@@ -25,6 +25,9 @@ interface Draft {
   pendingNotesPhotos: File[]
   pendingVoice: { blob: Blob; duration: number } | null
   pendingInstallments: DraftInstallment[]
+  // Durable flag: the user has taken manual control of the installment schedule. Held here (not
+  // in StepBilling) so deleting the auto-seeded row sticks across leaving/returning to the step.
+  installmentsTouched: boolean
 }
 
 interface Props {
@@ -55,6 +58,7 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     pendingNotesPhotos: [],
     pendingVoice: null,
     pendingInstallments: [],
+    installmentsTouched: false,
   })
 
   useEffect(() => {
@@ -89,6 +93,7 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
           amount: inst.amount,
           due_date: inst.due_date,
           ...(inst.remarks ? { remarks: inst.remarks } : {}),
+          ...(inst.paid ? { paid: true } : {}),
         })),
       })
       // Upload staged photos in background — fire and forget.
@@ -184,6 +189,8 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
               deliveryDate={draft.deliveryDate}
               installments={draft.pendingInstallments}
               onInstallmentsChange={(list) => patch({ pendingInstallments: list })}
+              installmentsTouched={draft.installmentsTouched}
+              onInstallmentsTouch={() => patch({ installmentsTouched: true })}
               onNext={next}
               onBack={back}
             />

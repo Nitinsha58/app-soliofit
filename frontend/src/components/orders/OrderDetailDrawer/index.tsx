@@ -8,7 +8,7 @@ import DrawerTabs, { type DrawerTab } from './DrawerTabs'
 import OverviewTab from './OverviewTab'
 import MoreDetailsView from './MoreDetailsView'
 import WorkTab from './WorkTab'
-import PaymentSchedule from './PaymentSchedule'
+import MoneyTab from './MoneyTab'
 
 interface Props {
   orderId: string
@@ -58,6 +58,22 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
     setOrder((prev) => prev ? { ...prev, ...updates } : prev)
   }
 
+  // A child mutation changed something the server derives (amount_paid / remaining /
+  // payment_state / status). Re-fetch the drawer's own copy so read-only summaries (Overview
+  // payment snapshot, attention card) reflect it — the mutating tab updates itself, but these
+  // siblings read the order's derived fields. Then refresh the parent board. The mutation has
+  // already persisted server-side, so a failed refetch must not break the drawer; it's caught
+  // here (no unhandled rejection) and we keep showing the last-known order.
+  async function handleUpdated() {
+    try {
+      const fresh = await getOrder(orderId)
+      setOrder(fresh)
+    } catch {
+      // refetch failed — leave the current order in place rather than blanking the drawer
+    }
+    onUpdated()
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -100,7 +116,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
           <MoreDetailsView
             order={order}
             onOrderChange={handleOrderChange}
-            onUpdated={onUpdated}
+            onUpdated={handleUpdated}
             onBack={() => setMoreDetails(false)}
             onClose={onClose}
           />
@@ -115,7 +131,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
                 <OverviewTab
                   order={order}
                   onOrderChange={handleOrderChange}
-                  onUpdated={onUpdated}
+                  onUpdated={handleUpdated}
                   onViewPlan={() => setTab('money')}
                   onViewWork={() => setTab('work')}
                   onMoreDetails={() => setMoreDetails(true)}
@@ -125,15 +141,13 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
               {/* Work — photos + voice as one "Work Instructions" card (VS-28.2) */}
               {tab === 'work' && <WorkTab orderId={order.id} />}
 
-              {/* Money — the VS-27.5 whole-plan editor (refined in 28.3) */}
+              {/* Money — "Payment Plan" card around the VS-27.5 whole-plan editor (VS-28.3) */}
               {tab === 'money' && (
-                <div className="px-5 py-4">
-                  <PaymentSchedule
-                    order={order}
-                    onOrderChange={handleOrderChange}
-                    onUpdated={onUpdated}
-                  />
-                </div>
+                <MoneyTab
+                  order={order}
+                  onOrderChange={handleOrderChange}
+                  onUpdated={handleUpdated}
+                />
               )}
             </div>
           </>

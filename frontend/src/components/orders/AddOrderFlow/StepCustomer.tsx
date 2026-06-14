@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { listCustomers, createCustomer, type Customer } from '@/lib/api/customers'
+import { prefillFromSearch, sanitizePhone } from '@/lib/customerPrefill'
 
 interface Props {
   selected: Customer | null
@@ -45,8 +46,19 @@ export default function StepCustomer({ selected, onSelect }: Props) {
     }, 300)
   }
 
+  const phoneValid = form.phone.length === 10
+  const canCreate = !!form.name.trim() && phoneValid
+
+  function openCreate() {
+    // Seed the new-customer form from whatever was typed in the search box.
+    const { name, phone } = prefillFromSearch(search)
+    setForm({ name, phone, address: '' })
+    setCreateError('')
+    setShowCreate(true)
+  }
+
   async function handleCreate() {
-    if (!form.name.trim() || !form.phone.trim()) return
+    if (!canCreate) return
     setCreating(true)
     setCreateError('')
     try {
@@ -118,7 +130,7 @@ export default function StepCustomer({ selected, onSelect }: Props) {
 
       {!showCreate ? (
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={openCreate}
           className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-[#C8952A] border border-dashed border-[#C8952A]/40 rounded-lg hover:bg-[#FBF3E3] transition-colors"
         >
           <PlusIcon />
@@ -136,11 +148,16 @@ export default function StepCustomer({ selected, onSelect }: Props) {
           />
           <input
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            placeholder="Phone *"
+            onChange={(e) => setForm((f) => ({ ...f, phone: sanitizePhone(e.target.value) }))}
+            placeholder="10-digit phone *"
             className="w-full px-3 py-2 border border-[#E5E5E2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
           />
+          {form.phone.length > 0 && !phoneValid && (
+            <p className="text-[11px] text-[#A0A09C]">Enter a 10-digit number</p>
+          )}
           <input
             type="text"
             value={form.address}
@@ -158,7 +175,7 @@ export default function StepCustomer({ selected, onSelect }: Props) {
             </button>
             <button
               onClick={handleCreate}
-              disabled={creating || !form.name.trim() || !form.phone.trim()}
+              disabled={creating || !canCreate}
               className="flex-1 py-2 text-xs font-medium text-white bg-[#C8952A] rounded-lg hover:bg-[#A87820] transition-colors disabled:opacity-50"
             >
               {creating ? 'Creating…' : 'Create & Select'}

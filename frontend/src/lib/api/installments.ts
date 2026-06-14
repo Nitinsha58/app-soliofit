@@ -39,3 +39,8 @@ export async function replaceSchedule(
 export async function markInstallmentPaid(orderId: string, installmentId: string): Promise<Installment> {
   return apiRequest(`/api/orders/${orderId}/installments/${installmentId}/mark-paid/`, { method: 'POST' })
 }
+
+// VS-29 — revert a paid installment back to unpaid (clears paid_date server-side).
+export async function markInstallmentUnpaid(orderId: string, installmentId: string): Promise<Installment> {
+  return apiRequest(`/api/orders/${orderId}/installments/${installmentId}/mark-unpaid/`, { method: 'POST' })
+}
