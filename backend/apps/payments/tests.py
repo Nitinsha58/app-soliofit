@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 
+from django.core.management import call_command
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -163,3 +165,130 @@ class PaymentOrdersTests(_OrderFixture):
         res = self.client.get('/api/payments/orders/?range=all_time')
         total = sum(len(res.data[s]) for s in ('pending', 'partial', 'overdue', 'completed'))
         self.assertGreaterEqual(total, 1)
+
+
+# ── VS-27.2 legacy backfill command ───────────────────────────────────────────
+
+class BackfillCommandTests(TestCase):
+    """VS-27.2 — idempotent reconciliation of legacy orders to bill == Σ(installments)."""
+
+    REMARK = 'Auto-balanced during VS-27 migration'
+
+    def setUp(self):
+        self.user = User.objects.create_user(email='bf@test.com', password='pass')
+        self.customer = Customer.objects.create(created_by=self.user, name='C', phone='1')
+
+    def _order(self, n, total):
+        return Order.objects.create(
+            created_by=self.user, customer=self.customer, order_number=n,
+            delivery_date=date.today() + timedelta(days=10), total_amount=Decimal(total),
+        )
+
+    def _inst(self, order, amount, paid=False):
+        return Installment.objects.create(
+            order=order, amount=Decimal(amount),
+            due_date=date.today() + timedelta(days=5),
+            paid_date=date.today() if paid else None,
+        )
+
+    def _run(self, **kwargs):
+        out = StringIO()
+        call_command('backfill_installments', stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_unscheduled_creates_default(self):
+        o = self._order(1, '5000.00')
+        self._run(apply=True)
+        rows = Installment.objects.filter(order=o)
+        self.assertEqual(rows.count(), 1)
+        r = rows.first()
+        self.assertEqual(r.amount, Decimal('5000.00'))
+        self.assertEqual(r.due_date, o.delivery_date)  # = delivery date, verbatim
+        self.assertEqual(r.remarks, self.REMARK)
+        self.assertIsNone(r.paid_date)
+
+    def test_partial_adds_balancing_and_keeps_paid(self):
+        o = self._order(1, '10000.00')
+        paid = self._inst(o, '4000.00', paid=True)
+        self._run(apply=True)
+        self.assertTrue(Installment.objects.filter(id=paid.id).exists())  # paid untouched
+        total = sum((i.amount for i in o.installments.all()), Decimal('0'))
+        self.assertEqual(total, Decimal('10000.00'))
+        balancing = o.installments.exclude(id=paid.id).get()
+        self.assertEqual(balancing.amount, Decimal('6000.00'))
+        self.assertEqual(balancing.remarks, self.REMARK)
+        self.assertIsNone(balancing.paid_date)
+
+    def test_balanced_unchanged(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '5000.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+
+    def test_unbilled_unchanged(self):
+        o = self._order(1, '0.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 0)
+
+    def test_over_scheduled_reported_not_modified(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '3000.00')
+        self._inst(o, '4000.00')  # Σ 7000 > 5000, paid 0
+        out = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 2)  # untouched
+        self.assertIn('over-scheduled', out)
+        self.assertIn(str(o.id), out)            # order_id present
+        self.assertIn(str(o.boutique_id), out)   # boutique_id present
+
+    def test_paid_exceeds_bill_reported_not_modified(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '6000.00', paid=True)  # paid 6000 > bill 5000
+        out = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)  # untouched
+        self.assertIn('paid exceeds bill', out)
+        self.assertIn('₹6000.00 vs bill ₹5000.00', out)
+
+    def test_paid_exceeds_takes_precedence_over_over_scheduled(self):
+        # Σ(all) is also over the bill, but paid alone exceeds → must classify as paid-exceeds.
+        o = self._order(1, '5000.00')
+        self._inst(o, '6000.00', paid=True)
+        self._inst(o, '1000.00')  # Σ all 7000 > 5000 too
+        out = self._run(apply=True)
+        self.assertIn('paid_exceeds: 1', out)
+        self.assertIn('over_scheduled: 0', out)
+        self.assertEqual(o.installments.count(), 2)  # untouched
+
+    def test_dry_run_writes_nothing(self):
+        o = self._order(1, '5000.00')
+        out = self._run()  # no --apply
+        self.assertEqual(o.installments.count(), 0)
+        self.assertIn('DRY RUN', out)
+        self.assertIn('Orders to change: 1', out)
+
+    def test_idempotent_second_apply_no_change(self):
+        o = self._order(1, '5000.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+        out2 = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+        self.assertIn('Orders to change: 0', out2)
+
+    def test_boutique_filter_limits_scope(self):
+        mine = self._order(1, '5000.00')
+        # An order in a different boutique must be untouched when --boutique targets ours.
+        other = _user_in_other_boutique()
+        oc = Customer.objects.create(created_by=other, name='O', phone='2')
+        theirs = Order.objects.create(
+            created_by=other, customer=oc, order_number=1,
+            delivery_date=date.today() + timedelta(days=10), total_amount=Decimal('5000.00'),
+        )
+        self._run(apply=True, boutique=str(mine.boutique_id))
+        self.assertEqual(mine.installments.count(), 1)     # fixed
+        self.assertEqual(theirs.installments.count(), 0)   # out of scope, untouched
+
+
+def _user_in_other_boutique():
+    u = User.objects.create_user(email='other-bf@test.com', password='pass')
+    u.boutique = Boutique.objects.create(name='OtherBF', owner=u)
+    u.save(update_fields=['boutique'])
+    return u

@@ -1,6 +1,6 @@
 # VS-27 — Strict Bill ↔ Installment Plan (Program Overview)
 
-**Status:** In progress — 27.1/27.3/27.4/27.5 verified (cutover proven); only 27.2 legacy backfill remains
+**Status:** In progress — 27.1/27.3/27.4/27.5 verified (cutover proven); 27.2 backfill implemented (in review; prod `--apply` run pending)
 **Created:** 2026-06-14
 **Decision record:** [ADR-0009 — Strict Installment Plan](../../adr/ADR-0009-strict-installment-plan.md)
 
@@ -77,7 +77,7 @@ No separate billing model is introduced — billing stays an **order attribute**
 | Slice | Title | Layer | Depends on | Status |
 |-------|-------|-------|-----------|--------|
 | [27.1](./vs-27.1-backend-strict-billing.md) | Backend strict billing core | Backend | — | **Implemented — in review** |
-| [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | Pending |
+| [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | **Implemented — in review** (prod run pending) |
 | [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | **Implemented — in review** |
 | [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | **Verified** (browser pass) |
 | [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" + backend cutover | Frontend + Backend | 27.1, 27.3 | **Verified** (browser pass) |
@@ -108,6 +108,17 @@ holds across both new and legacy data at the same moment.
 
 ## Completion log
 
+- **2026-06-14 — VS-27.2 implemented (in review).** Idempotent `backfill_installments`
+  management command (dry-run by default; `--apply` writes, each order atomic; `--boutique`,
+  `--output` flags). Classifies billed, non-deleted orders with `Σ(paid) > total` checked first
+  (never auto-fixed); unscheduled → default row, partial → balancing row (both `due = delivery`,
+  remark "Auto-balanced during VS-27 migration"); balanced/unbilled unchanged; over-scheduled →
+  manual review. Every report line carries boutique_id + order_id + order_number; no activity
+  rows written. 10 command tests (matrix + idempotency + dry-run + boutique scope); **178 backend
+  tests pass.** Dev dry-run: 26 orders → 6 to change (5 unscheduled, 1 partial), 0 manual review;
+  all six have past due dates → become overdue on `--apply` (expected dashboard movement). The
+  **production `--apply` is a separate, logged run** (dry-run → capture report → apply), coordinated
+  with Nitin.
 - **2026-06-14 — VS-27.5 verified (browser pass).** Drawer surface confirmed: read-only Bill +
   paid/outstanding summary + "Edit bill & plan"; no standalone bill field; no old row-write UI;
   paid row under "Paid · locked"; unpaid row editable with QuickDateInput; clean edit has no save
