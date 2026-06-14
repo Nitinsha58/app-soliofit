@@ -5,7 +5,6 @@ import type { Customer } from '@/lib/api/customers'
 import type { Order } from '@/lib/api/orders'
 import { createOrder } from '@/lib/api/orders'
 import { uploadPhoto, presignUpload, uploadToStorage, saveVoiceNote } from '@/lib/api/media'
-import { createInstallment } from '@/lib/api/installments'
 import StepCustomer from './StepCustomer'
 import StepPhotos from './StepPhotos'
 import StepDelivery from './StepDelivery'
@@ -77,36 +76,21 @@ export default function AddOrderFlow({ onClose, onCreated }: Props) {
     setSubmitting(true)
     setError('')
     try {
+      // VS-27.4 — order + its full schedule are created in ONE atomic request (the server
+      // validates Σ installments == bill). `source` is a client-only marker, stripped here.
+      // No more separate post-create installment POSTs → no partial/orphaned schedules.
       const order = await createOrder({
         customer: draft.customer.id,
         delivery_date: draft.deliveryDate,
         total_amount: parseFloat(draft.totalAmount),
         priority: draft.priority,
         remarks: draft.remarks,
+        installments: draft.pendingInstallments.map((inst) => ({
+          amount: inst.amount,
+          due_date: inst.due_date,
+          ...(inst.remarks ? { remarks: inst.remarks } : {}),
+        })),
       })
-      // Create installments before surfacing the order — money data, block until settled.
-      // allSettled (not all) so every create runs to completion even if one fails.
-      // Inspect results and surface a blocking error rather than silently discarding failures.
-      if (draft.pendingInstallments.length > 0) {
-        const results = await Promise.allSettled(
-          draft.pendingInstallments.map((inst) =>
-            createInstallment(order.id, {
-              amount: inst.amount,
-              due_date: inst.due_date,
-              ...(inst.remarks ? { remarks: inst.remarks } : {}),
-            })
-          )
-        )
-        const failed = results.filter((r) => r.status === 'rejected').length
-        if (failed > 0) {
-          setError(
-            `Order created, but ${failed} installment${failed > 1 ? 's' : ''} could not be saved. ` +
-            'Close this dialog and add them from the order details.'
-          )
-          setSubmitting(false)
-          return
-        }
-      }
       // Upload staged photos in background — fire and forget.
       // Garment and notes buckets upload with their respective photo_type.
       const photoUploads = [

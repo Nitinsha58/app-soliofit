@@ -72,12 +72,21 @@ export async function listOrderColumn(params: {
   return apiRequest<OrderBoardPage>(`/api/orders/board/?${qs.toString()}`)
 }
 
+export interface NewInstallmentInput {
+  amount: string
+  due_date: string
+  remarks?: string
+}
+
 export async function createOrder(data: {
   customer: string
   delivery_date: string
   total_amount: number
   priority: boolean
   remarks: string
+  // VS-27.4 — initial schedule created atomically with the order (must sum to the bill;
+  // server-validated). Omitted/[] = no schedule (only valid when the bill is 0).
+  installments?: NewInstallmentInput[]
 }): Promise<Order> {
   return apiRequest<Order>('/api/orders/', {
     method: 'POST',

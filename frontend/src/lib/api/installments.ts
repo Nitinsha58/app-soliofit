@@ -1,4 +1,5 @@
 import { apiRequest } from './client'
+import type { Order } from './orders'
 
 export interface Installment {
   id: string
@@ -11,33 +12,28 @@ export interface Installment {
   created_at: string
 }
 
+export interface ScheduleInstallmentInput {
+  amount: string
+  due_date: string
+  remarks?: string
+}
+
 export async function listInstallments(orderId: string): Promise<Installment[]> {
   return apiRequest(`/api/orders/${orderId}/installments/`)
 }
 
-export async function createInstallment(
+// VS-27.5 — atomic bill + unpaid-schedule replace (ADR-0009). Replaces the deprecated
+// single-row create/update/delete endpoints: the whole unpaid plan and the bill are sent
+// together and committed in one transaction; paid rows are preserved server-side. Server
+// enforces total >= Σ(paid) and Σ(paid) + Σ(installments) == total. Returns the updated order.
+export async function replaceSchedule(
   orderId: string,
-  data: { amount: string; due_date: string; remarks?: string },
-): Promise<Installment> {
-  return apiRequest(`/api/orders/${orderId}/installments/`, {
-    method: 'POST',
+  data: { total_amount: string; installments: ScheduleInstallmentInput[] },
+): Promise<Order> {
+  return apiRequest(`/api/orders/${orderId}/billing/`, {
+    method: 'PUT',
     body: JSON.stringify(data),
   })
-}
-
-export async function updateInstallment(
-  orderId: string,
-  installmentId: string,
-  data: { amount?: string; due_date?: string; remarks?: string },
-): Promise<Installment> {
-  return apiRequest(`/api/orders/${orderId}/installments/${installmentId}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  })
-}
-
-export async function deleteInstallment(orderId: string, installmentId: string): Promise<void> {
-  return apiRequest(`/api/orders/${orderId}/installments/${installmentId}/`, { method: 'DELETE' })
 }
 
 export async function markInstallmentPaid(orderId: string, installmentId: string): Promise<Installment> {

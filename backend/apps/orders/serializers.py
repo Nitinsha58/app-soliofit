@@ -5,6 +5,23 @@ from apps.customers.models import Customer
 from .models import Order
 
 
+class NewInstallmentSerializer(serializers.Serializer):
+    """Write-only installment item accepted by order-create and the billing edit
+    (VS-27.1). Deliberately not the payments `InstallmentSerializer` — that one
+    carries read-only derived fields (status / days_overdue) we don't want on input."""
+    amount   = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    due_date = serializers.DateField()
+    remarks  = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+
+
+class OrderBillingSerializer(serializers.Serializer):
+    """Payload for PUT /orders/{id}/billing/ (VS-27.1). `total_amount` mirrors the model's
+    DecimalField constraints (max_digits=10, decimal_places=2) so out-of-range / over-precise
+    values fail as a clean 400 instead of a DB error on save."""
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
+    installments = NewInstallmentSerializer(many=True, required=False, default=list)
+
+
 class OrderSerializer(serializers.ModelSerializer):
     customer_name    = serializers.CharField(source='customer.name', read_only=True)
     customer_phone   = serializers.CharField(source='customer.phone', read_only=True)
@@ -24,6 +41,11 @@ class OrderSerializer(serializers.ModelSerializer):
             )
 
     has_delayed_installment = serializers.BooleanField(read_only=True, default=False)
+
+    # VS-27.1 — write-only initial schedule. When present on create, the view validates
+    # `Σ amount == total_amount` and creates these atomically with the order. Never
+    # appears in output (write_only); popped before the model is saved.
+    installments = NewInstallmentSerializer(many=True, write_only=True, required=False)
 
     # VS-19 payment summary — derived from the queryset's `amount_paid` /
     # `has_delayed_installment` annotations (defaults keep freshly-created,
@@ -61,6 +83,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'customer_address', 'status', 'delivery_date', 'total_amount',
             'priority', 'remarks', 'created_at', 'updated_at', 'delivered_at',
             'has_delayed_installment', 'amount_paid', 'remaining', 'payment_state',
+            'installments',
         ]
         # `status` is read-only here: status is a domain event changed only via
         # the /status/ action (sets/clears delivered_at + writes activity).

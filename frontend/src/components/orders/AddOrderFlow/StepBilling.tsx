@@ -1,6 +1,7 @@
 'use client'
 
 import DraftInstallments, { type DraftInstallment } from './DraftInstallments'
+import { isValidMoneyInput } from '@/lib/money'
 
 interface Props {
   totalAmount: string
@@ -23,8 +24,12 @@ export default function StepBilling({
 }: Props) {
   const billAmount = parseFloat(totalAmount) || 0
   const scheduled = installments.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0)
-  const overBill = billAmount > 0 && scheduled > billAmount
-  const isValid = totalAmount.trim() !== '' && billAmount > 0 && !overBill
+  // VS-27.4 strict gate: a positive bill, within the server's DecimalField range (≤2 decimals,
+  // ≤ ₹9,99,99,999.99), fully scheduled (Σ installments == bill to the paisa) before continuing.
+  const billMoneyValid = isValidMoneyInput(totalAmount, { min: 0.01 })
+  const billBadPrecision = totalAmount.trim() !== '' && !billMoneyValid
+  const balanced = billMoneyValid && Math.abs(scheduled - billAmount) < 0.005
+  const isValid = balanced
 
   return (
     <div>
@@ -44,6 +49,10 @@ export default function StepBilling({
           autoFocus
         />
       </div>
+
+      {billBadPrecision && (
+        <p className="text-[11px] text-red-500 mb-2">Enter an amount up to 2 decimals (max ₹9,99,99,999.99)</p>
+      )}
 
       <DraftInstallments
         billAmount={billAmount}

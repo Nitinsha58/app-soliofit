@@ -1,3 +1,45 @@
+<!-- frontend-design-gate -->
+## Frontend Design Gate (MANDATORY)
+
+**Before writing or editing ANY frontend UI, read `07-ux-guidelines.md` § 0 — Design Standards (Mandatory: Attention-First UI) in the product vault (`/Users/nitin/MemoryGraph/Soliofit/Soliofit/`). Non-negotiable.**
+
+An order/feature screen is a **work surface, not a database form.** Apply the Soliofit filter to every feature:
+- **Show** what helps today's work (photos, notes, due date, primary action).
+- **Summarize** what affects money or delay.
+- **Hide** what is only for editing, history, or admin (progressive disclosure).
+
+One dominant action per screen. Rare/destructive actions separated and hidden. Cards each group one meaning. Read-only by default — inputs appear only on edit. Color = status only (green safe / amber attention / red danger / grey info). Run the §0 pre-build checklist; if any answer is "no," redesign before development.
+
+A `PreToolUse` hook reinforces this on every `frontend/**` edit.
+
+---
+
+<!-- task-execution-protocol -->
+## Task Execution Protocol (MANDATORY)
+
+Applies to any request that **changes code, config, or docs, or runs non-trivial commands.** Pure questions, explanations, and read-only exploration are **exempt.** No exceptions for in-scope tasks. A `UserPromptSubmit` hook reinforces this every request.
+
+**Loop: Task Plan → wait for approval → execute → Review Plan → hand off.** Write or run nothing until the Task Plan is explicitly approved.
+
+### 1. Task Plan — before execution (post in chat, then STOP and wait for approval)
+- **Goal** — what this task achieves and why.
+- **Plan** — the concrete steps.
+- **Files** — every file to create / modify / delete.
+- **Outcome** — the observable result when done.
+- **Risks / open questions** — tradeoffs, edge cases, anything needing a decision.
+
+Do not execute until the plan is approved.
+
+### 2. Review Plan — after execution (post in chat, then STOP and hand off)
+- **Implemented** — what was built.
+- **Changes** — what changed, grouped logically.
+- **Files** — every file touched (path + one-line what/why).
+- **Review** — what to check, and **how** (exact commands, browser steps, URLs, test scenarios).
+
+All review is done by Nitin and his automation testing tool. Do not self-verify in browser or create test data unless explicitly delegated.
+
+---
+
 <!-- project-docs-structure -->
 ## Project Documentation Structure
 

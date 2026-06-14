@@ -1,17 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import QuickDateInput from '@/components/common/QuickDateInput'
+import { isValidMoneyInput } from '@/lib/money'
 
 export interface DraftInstallment {
   id: string        // client-only key, never sent to the API
   amount: string
   due_date: string
   remarks: string
+  // VS-27.4 — 'auto' = the system-seeded default row (= bill, due delivery date). It mirrors
+  // the bill/delivery date until the user edits or splits the plan, at which point it flips
+  // to 'user' and is never auto-resynced again. Client-only; stripped before the API call.
+  source: 'auto' | 'user'
 }
 
 interface Props {
   billAmount: number    // live from the amount input above — reactive
-  deliveryDate: string  // default due_date for new rows
+  deliveryDate: string  // default due_date for new rows + the auto row
   installments: DraftInstallment[]
   onChange: (list: DraftInstallment[]) => void
 }
@@ -52,49 +58,49 @@ interface RowFormState {
 
 function RowForm({
   initial,
-  maxAmount,
-  billAmount,
+  deliveryDate,
   onSave,
   onCancel,
 }: {
   initial: RowFormState
-  maxAmount: number      // Infinity when no bill set
-  billAmount: number
+  deliveryDate: string
   onSave: (s: RowFormState) => void
   onCancel: () => void
 }) {
   const [form, setForm] = useState<RowFormState>(initial)
-  const amount = parseFloat(form.amount) || 0
-  const excess = billAmount > 0 && amount > maxAmount ? amount - maxAmount : 0
-  const canSave = form.amount.trim() !== '' && amount > 0 && form.due_date !== '' && excess === 0
+  const amountStr = form.amount.trim()
+  const amountValid = isValidMoneyInput(amountStr, { min: 0.01 })
+  const badPrecision = amountStr !== '' && !amountValid
+  // No per-row cap: a row may temporarily push the schedule over the bill. The summary
+  // shows "Over by ₹X" and the strict Σ == bill gate blocks Next/Create until it balances.
+  const canSave = amountValid && form.due_date !== ''
 
   return (
     <div className="space-y-2 bg-[#FAFAF8] rounded-xl p-3 border border-[#E5E5E2]">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B6B67] pointer-events-none">₹</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={form.amount}
-            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-            placeholder="0"
-            min="0"
-            step="0.01"
-            className="w-full pl-6 pr-2 py-2 text-sm border border-[#E5E5E2] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
-            autoFocus
-          />
-        </div>
+      <div className="relative">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B6B67] pointer-events-none">₹</span>
         <input
-          type="date"
-          value={form.due_date}
-          onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
-          className="flex-1 px-2 py-2 text-sm border border-[#E5E5E2] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
+          type="number"
+          inputMode="decimal"
+          value={form.amount}
+          onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+          placeholder="0"
+          min="0"
+          step="0.01"
+          className="w-full pl-6 pr-2 py-2 text-sm border border-[#E5E5E2] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
+          autoFocus
         />
       </div>
 
-      {excess > 0 && (
-        <p className="text-[11px] text-red-500">Exceeds bill by {fmt(excess)}</p>
+      <QuickDateInput
+        value={form.due_date}
+        onChange={(iso) => setForm((f) => ({ ...f, due_date: iso }))}
+        deliveryDate={deliveryDate}
+        ariaLabel="Installment due date"
+      />
+
+      {badPrecision && (
+        <p className="text-[11px] text-red-500">Enter an amount up to 2 decimals (max ₹9,99,99,999.99)</p>
       )}
 
       {!form.showRemarks ? (
@@ -145,28 +151,43 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
   const overBill = billAmount > 0 && scheduled > billAmount
   const busy = adding || editingId !== null
 
-  function maxForNew() {
-    return billAmount > 0 ? Math.max(0, billAmount - scheduled) : Infinity
-  }
-
-  function maxForEdit(id: string) {
-    const othersSum = installments
-      .filter((i) => i.id !== id)
-      .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0)
-    return billAmount > 0 ? Math.max(0, billAmount - othersSum) : Infinity
-  }
+  // VS-27.4 — seed/resync the default installment. The lone auto row mirrors the bill +
+  // delivery date until the user takes over; a user edit or a split flips it to 'user' and
+  // it is never auto-adjusted again, so a user-edited single-row plan is never overwritten.
+  useEffect(() => {
+    if (billAmount <= 0) {
+      // Bill cleared → drop a lone auto-seeded row (an unbilled order needs no schedule).
+      if (installments.length === 1 && installments[0].source === 'auto') onChange([])
+      return
+    }
+    if (installments.length === 0) {
+      onChange([{ id: crypto.randomUUID(), amount: String(billAmount), due_date: deliveryDate, remarks: '', source: 'auto' }])
+      return
+    }
+    if (installments.length === 1 && installments[0].source === 'auto') {
+      const row = installments[0]
+      if (parseFloat(row.amount) !== billAmount || row.due_date !== deliveryDate) {
+        onChange([{ ...row, amount: String(billAmount), due_date: deliveryDate }])
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billAmount, deliveryDate, installments])
 
   function handleAdd(form: RowFormState) {
+    // Splitting = the user takes manual control: existing rows (incl. the auto default)
+    // become 'user' so they are no longer auto-resynced.
     onChange([
-      ...installments,
-      { id: crypto.randomUUID(), amount: form.amount, due_date: form.due_date, remarks: form.remarks },
+      ...installments.map((i) => ({ ...i, source: 'user' as const })),
+      { id: crypto.randomUUID(), amount: form.amount, due_date: form.due_date, remarks: form.remarks, source: 'user' },
     ])
     setAdding(false)
   }
 
   function handleEdit(id: string, form: RowFormState) {
     onChange(installments.map((i) =>
-      i.id === id ? { ...i, amount: form.amount, due_date: form.due_date, remarks: form.remarks } : i
+      i.id === id
+        ? { ...i, amount: form.amount, due_date: form.due_date, remarks: form.remarks, source: 'user' as const }
+        : i
     ))
     setEditingId(null)
   }
@@ -201,7 +222,7 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
         </button>
       </div>
 
-      {/* Summary */}
+      {/* Summary — strict: the schedule must equal the bill before you can continue. */}
       {(billAmount > 0 || installments.length > 0) && (
         <div className="flex items-center gap-3 mb-3 text-xs">
           <span className="text-[#6B6B67]">
@@ -214,12 +235,11 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
             <>
               <span className="text-[#D5D5D2]">·</span>
               {overBill ? (
-                <span className="font-semibold text-red-500">Exceeds by {fmt(scheduled - billAmount)}</span>
+                <span className="font-semibold text-red-500">Over by {fmt(scheduled - billAmount)}</span>
+              ) : remaining > 0 ? (
+                <span className="font-semibold text-[#C8952A]">Add {fmt(remaining)} to match bill</span>
               ) : (
-                <span className="text-[#6B6B67]">
-                  Remaining{' '}
-                  <span className="font-semibold text-[#1A1A18]">{fmt(remaining)}</span>
-                </span>
+                <span className="font-semibold text-green-600">Matches bill</span>
               )}
             </>
           )}
@@ -233,8 +253,7 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
             <RowForm
               key={inst.id}
               initial={{ amount: inst.amount, due_date: inst.due_date, remarks: inst.remarks, showRemarks: !!inst.remarks }}
-              maxAmount={maxForEdit(inst.id)}
-              billAmount={billAmount}
+              deliveryDate={deliveryDate}
               onSave={(form) => handleEdit(inst.id, form)}
               onCancel={() => setEditingId(null)}
             />
@@ -270,8 +289,7 @@ export default function DraftInstallments({ billAmount, deliveryDate, installmen
         {adding && (
           <RowForm
             initial={{ amount: newRowDefault, due_date: deliveryDate, remarks: '', showRemarks: false }}
-            maxAmount={maxForNew()}
-            billAmount={billAmount}
+            deliveryDate={deliveryDate}
             onSave={handleAdd}
             onCancel={() => setAdding(false)}
           />

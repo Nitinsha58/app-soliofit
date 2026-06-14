@@ -2,7 +2,7 @@ import base64
 import json
 import uuid
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, DecimalField, Exists, Max, OuterRef, Q, Subquery, Sum, Value
@@ -17,8 +17,15 @@ from rest_framework.response import Response
 from apps.media.s3 import delete_objects
 from apps.payments.models import Installment
 from .models import Order, OrderActivity
-from .serializers import OrderSerializer
+from .serializers import OrderBillingSerializer, OrderSerializer
 from .services import create_order_activity
+
+TWO_PLACES = Decimal('0.01')
+
+
+def _schedule_sum(items):
+    """Σ of installment-item amounts, quantized to 2dp (money — exact, no tolerance)."""
+    return sum((i['amount'] for i in items), Decimal('0')).quantize(TWO_PLACES)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -91,6 +98,29 @@ class OrderViewSet(viewsets.ModelViewSet):
         # UniqueConstraint(boutique, order_number), so retry on IntegrityError with a
         # fresh read inside a fresh transaction.
         boutique = self.request.user.boutique
+        # VS-27.1/27.5 — the initial schedule. Popped before the model save (it is not an
+        # Order field), then created atomically with the order so a bad installment can never
+        # leave an orphaned order behind.
+        #   • supplied (even as []) → strict-validate Σ == bill (explicit [] on a billed order
+        #     is rejected: Σ 0 != bill).
+        #   • omitted on a billed order (total > 0) → auto-seed the mandatory default
+        #     installment (= bill, due on the delivery date) so every billed order is always
+        #     scheduled. This is the VS-27.5 cutover behavior (was a no-op before).
+        installments_data = serializer.validated_data.pop('installments', None)
+        total = Decimal(serializer.validated_data.get('total_amount') or 0).quantize(TWO_PLACES)
+        if installments_data is not None:
+            scheduled = _schedule_sum(installments_data)
+            if scheduled != total:
+                off = (total - scheduled).copy_abs()
+                raise ValidationError(
+                    {'installments': f'Installments must sum to the bill (off by ₹{off}).'})
+        elif total > 0:
+            installments_data = [{
+                'amount': total,
+                'due_date': serializer.validated_data.get('delivery_date'),
+                'remarks': '',
+            }]
+
         for attempt in range(5):
             max_num = (Order.objects.filter(boutique=boutique)
                        .aggregate(Max('order_number'))['order_number__max'] or 0)
@@ -99,6 +129,16 @@ class OrderViewSet(viewsets.ModelViewSet):
                     order = serializer.save(created_by=self.request.user, boutique=boutique,
                                             order_number=max_num + 1)
                     create_order_activity(order, OrderActivity.Type.ORDER_CREATED)
+                    if installments_data:
+                        Installment.objects.bulk_create([
+                            Installment(order=order, amount=i['amount'],
+                                        due_date=i['due_date'], remarks=i.get('remarks', ''))
+                            for i in installments_data
+                        ])
+                        create_order_activity(order, OrderActivity.Type.PAYMENT_UPDATED, {
+                            'total_amount': str(order.total_amount),
+                            'installment_count': len(installments_data),
+                        })
                 return
             except IntegrityError:
                 if attempt == 4:
@@ -112,20 +152,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'detail': 'Use /status/ to change order status.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # VS-27.5 cutover — the bill is read-only on the generic PATCH. It can only change
+        # together with its schedule, atomically, via PUT /orders/{id}/billing/. This closes
+        # the side-door where a lone bill edit could desync the strict bill == Σ invariant.
         if 'total_amount' in request.data:
-            order = self.get_object()
-            try:
-                new_total = Decimal(str(request.data['total_amount']))
-            except (ValueError, InvalidOperation):
-                pass  # serializer validation will reject non-numeric values
-            else:
-                scheduled = order.installments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-                if new_total < scheduled:
-                    excess = scheduled - new_total
-                    return Response(
-                        {'detail': f'Bill cannot be less than scheduled installments (exceeds by ₹{excess:,.2f}).'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            return Response(
+                {'detail': 'Use /billing/ to change the bill and its schedule together.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
@@ -192,6 +226,58 @@ class OrderViewSet(viewsets.ModelViewSet):
             'metadata': a.metadata,
             'created_at': a.created_at.isoformat(),
         } for a in acts])
+
+    @action(detail=True, methods=['put'], url_path='billing')
+    def billing(self, request, pk=None):
+        """VS-27.1 — atomically edit the bill and the *unpaid* schedule together
+        (ADR-0009). Payload: { total_amount, installments: [unpaid set] }. Enforces
+        `total_amount >= Σ(paid)` and `Σ(paid) + Σ(new) == total_amount`. Paid rows are
+        never touched. This lives on OrderViewSet (not under apps.payments.urls, which is
+        mounted at .../installments/) so it resolves to /api/orders/{id}/billing/."""
+        payload = OrderBillingSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        # DecimalField already enforced max_digits/decimal_places and >= 0, so no DB-level
+        # surprise on save; quantize only normalises for the exact-equality money checks.
+        total = payload.validated_data['total_amount'].quantize(TWO_PLACES)
+        items = payload.validated_data['installments']
+
+        with transaction.atomic():
+            # Lock the order row: it is the shared serialization point between this billing
+            # replace and a concurrent mark-paid (which now also locks the parent order).
+            order = (Order.objects.select_for_update()
+                     .filter(id=pk, boutique=request.user.boutique, deleted_at__isnull=True)
+                     .first())
+            if order is None:
+                return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            paid_total = (order.installments.filter(paid_date__isnull=False)
+                          .aggregate(s=Sum('amount'))['s'] or Decimal('0')).quantize(TWO_PLACES)
+            if total < paid_total:
+                return Response(
+                    {'detail': f'Bill cannot be less than the amount already paid (₹{paid_total}).'},
+                    status=status.HTTP_400_BAD_REQUEST)
+            scheduled = (paid_total + _schedule_sum(items)).quantize(TWO_PLACES)
+            if scheduled != total:
+                off = (total - scheduled).copy_abs()
+                return Response({'detail': f'Installments must sum to the bill (off by ₹{off}).'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            order.total_amount = total
+            order.save(update_fields=['total_amount', 'updated_at'])
+            order.installments.filter(paid_date__isnull=True).delete()
+            Installment.objects.bulk_create([
+                Installment(order=order, amount=i['amount'], due_date=i['due_date'],
+                            remarks=i.get('remarks', ''))
+                for i in items
+            ])
+            create_order_activity(order, OrderActivity.Type.PAYMENT_UPDATED, {
+                'total_amount': str(total),
+                'installment_count': order.installments.count(),
+            })
+
+        # Re-fetch through the annotated queryset so payment fields are accurate.
+        order = self.get_queryset().get(pk=order.pk)
+        return Response(OrderSerializer(order, context={'request': request}).data)
 
     @action(detail=False, methods=['get'], url_path='delivery-load')
     def delivery_load(self, request):

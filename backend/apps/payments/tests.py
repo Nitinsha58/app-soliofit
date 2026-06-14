@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 
+from django.core.management import call_command
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -32,121 +34,16 @@ class _OrderFixture(TestCase):
         self.client.force_authenticate(user=self.user)
         self.list_url = f'/api/orders/{self.order.id}/installments/'
 
-    def _detail(self, iid):
-        return f'/api/orders/{self.order.id}/installments/{iid}/'
-
     def _mark_paid(self, iid):
         return f'/api/orders/{self.order.id}/installments/{iid}/mark-paid/'
 
-    def _create(self, amount, due_date=None):
-        return self.client.post(
-            self.list_url,
-            {'amount': str(amount), 'due_date': due_date or _future()},
-        )
 
-
-# ── Bill-limit validation ─────────────────────────────────────────────────────
-
-class BillLimitCreateTests(_OrderFixture):
-    """POST /installments/ enforces sum ≤ bill."""
-
-    def test_within_bill_succeeds(self):
-        self.assertEqual(self._create(5000).status_code, status.HTTP_201_CREATED)
-
-    def test_exactly_at_bill_succeeds(self):
-        self.assertEqual(self._create(10000).status_code, status.HTTP_201_CREATED)
-
-    def test_over_bill_returns_400(self):
-        res = self._create(10001)
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('exceed', res.data['detail'].lower())
-
-    def test_cumulative_over_bill_returns_400(self):
-        self._create(8000)                             # ₹8 000 — OK
-        res = self._create(3000)                       # ₹8 000 + ₹3 000 > ₹10 000
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_cumulative_at_limit_succeeds(self):
-        self._create(6000)
-        res = self._create(4000)                       # exactly ₹10 000
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-
-
-class BillLimitUpdateTests(_OrderFixture):
-    """PATCH /installments/{id}/ enforces sum ≤ bill, excluding the edited row."""
-
-    def setUp(self):
-        super().setUp()
-        # Two installments: ₹5 000 + ₹4 000 = ₹9 000 on a ₹10 000 bill
-        r1 = self._create(5000)
-        r2 = self._create(4000)
-        self.i1_id = r1.data['id']
-        self.i2_id = r2.data['id']
-
-    def test_update_would_exceed_returns_400(self):
-        # ₹7 000 + ₹4 000 = ₹11 000 > ₹10 000
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '7000'})
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('exceed', res.data['detail'].lower())
-
-    def test_update_within_limit_succeeds(self):
-        # ₹6 000 + ₹4 000 = ₹10 000 — exactly at limit
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '6000'})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data['amount'], '6000.00')
-
-    def test_self_exclusion_same_amount_succeeds(self):
-        # Editing an installment to the same value should always pass,
-        # even if total is already at the bill limit.
-        self._create(1000)                             # push to ₹10 000 total
-        res = self.client.patch(self._detail(self.i1_id), {'amount': '5000'})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-    def test_non_amount_patch_skips_validation(self):
-        # Changing only the due date should never trigger bill validation.
-        res = self.client.patch(self._detail(self.i1_id), {'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-
-# ── Paid-row lock ─────────────────────────────────────────────────────────────
-
-class PaidLockTests(_OrderFixture):
-    """Paid installments must be immutable."""
-
-    def setUp(self):
-        super().setUp()
-        self.inst = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('5000.00'),
-            due_date=date.today() + timedelta(days=30),
-            paid_date=date.today(),
-        )
-
-    def test_edit_paid_returns_400(self):
-        res = self.client.patch(self._detail(self.inst.id), {'amount': '6000'})
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_delete_paid_returns_400(self):
-        res = self.client.delete(self._detail(self.inst.id))
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_unpaid_can_be_edited(self):
-        unpaid = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('2000.00'),
-            due_date=date.today() + timedelta(days=30),
-        )
-        res = self.client.patch(self._detail(unpaid.id), {'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-
-    def test_unpaid_can_be_deleted(self):
-        unpaid = Installment.objects.create(
-            order=self.order,
-            amount=Decimal('2000.00'),
-            due_date=date.today() + timedelta(days=30),
-        )
-        res = self.client.delete(self._detail(unpaid.id))
-        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+# ── Single-row write endpoints removed (VS-27.5 cutover) ──────────────────────
+# The old POST /installments/ and PATCH/DELETE /installments/{id}/ endpoints — and their
+# sum-≤-bill / paid-lock validation — were removed. The schedule is now writable only via
+# the atomic create-with-installments payload and PUT /orders/{id}/billing/, whose strict
+# invariant + paid-row preservation are covered in apps.orders.tests (BillingEndpointTests,
+# RemovedInstallmentEndpointsTests). GET (list) + mark-paid remain (covered below).
 
 
 # ── Mark-paid endpoint ────────────────────────────────────────────────────────
@@ -200,18 +97,6 @@ class IsolationTests(_OrderFixture):
 
     def test_list_returns_404_for_other_user(self):
         res = self.other.get(self.list_url)
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_create_returns_404_for_other_user(self):
-        res = self.other.post(self.list_url, {'amount': '1000', 'due_date': _future()})
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_patch_returns_404_for_other_user(self):
-        res = self.other.patch(self._detail(self.inst.id), {'amount': '1000'})
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_delete_returns_404_for_other_user(self):
-        res = self.other.delete(self._detail(self.inst.id))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_mark_paid_returns_404_for_other_user(self):
@@ -280,3 +165,130 @@ class PaymentOrdersTests(_OrderFixture):
         res = self.client.get('/api/payments/orders/?range=all_time')
         total = sum(len(res.data[s]) for s in ('pending', 'partial', 'overdue', 'completed'))
         self.assertGreaterEqual(total, 1)
+
+
+# ── VS-27.2 legacy backfill command ───────────────────────────────────────────
+
+class BackfillCommandTests(TestCase):
+    """VS-27.2 — idempotent reconciliation of legacy orders to bill == Σ(installments)."""
+
+    REMARK = 'Auto-balanced during VS-27 migration'
+
+    def setUp(self):
+        self.user = User.objects.create_user(email='bf@test.com', password='pass')
+        self.customer = Customer.objects.create(created_by=self.user, name='C', phone='1')
+
+    def _order(self, n, total):
+        return Order.objects.create(
+            created_by=self.user, customer=self.customer, order_number=n,
+            delivery_date=date.today() + timedelta(days=10), total_amount=Decimal(total),
+        )
+
+    def _inst(self, order, amount, paid=False):
+        return Installment.objects.create(
+            order=order, amount=Decimal(amount),
+            due_date=date.today() + timedelta(days=5),
+            paid_date=date.today() if paid else None,
+        )
+
+    def _run(self, **kwargs):
+        out = StringIO()
+        call_command('backfill_installments', stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_unscheduled_creates_default(self):
+        o = self._order(1, '5000.00')
+        self._run(apply=True)
+        rows = Installment.objects.filter(order=o)
+        self.assertEqual(rows.count(), 1)
+        r = rows.first()
+        self.assertEqual(r.amount, Decimal('5000.00'))
+        self.assertEqual(r.due_date, o.delivery_date)  # = delivery date, verbatim
+        self.assertEqual(r.remarks, self.REMARK)
+        self.assertIsNone(r.paid_date)
+
+    def test_partial_adds_balancing_and_keeps_paid(self):
+        o = self._order(1, '10000.00')
+        paid = self._inst(o, '4000.00', paid=True)
+        self._run(apply=True)
+        self.assertTrue(Installment.objects.filter(id=paid.id).exists())  # paid untouched
+        total = sum((i.amount for i in o.installments.all()), Decimal('0'))
+        self.assertEqual(total, Decimal('10000.00'))
+        balancing = o.installments.exclude(id=paid.id).get()
+        self.assertEqual(balancing.amount, Decimal('6000.00'))
+        self.assertEqual(balancing.remarks, self.REMARK)
+        self.assertIsNone(balancing.paid_date)
+
+    def test_balanced_unchanged(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '5000.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+
+    def test_unbilled_unchanged(self):
+        o = self._order(1, '0.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 0)
+
+    def test_over_scheduled_reported_not_modified(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '3000.00')
+        self._inst(o, '4000.00')  # Σ 7000 > 5000, paid 0
+        out = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 2)  # untouched
+        self.assertIn('over-scheduled', out)
+        self.assertIn(str(o.id), out)            # order_id present
+        self.assertIn(str(o.boutique_id), out)   # boutique_id present
+
+    def test_paid_exceeds_bill_reported_not_modified(self):
+        o = self._order(1, '5000.00')
+        self._inst(o, '6000.00', paid=True)  # paid 6000 > bill 5000
+        out = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)  # untouched
+        self.assertIn('paid exceeds bill', out)
+        self.assertIn('₹6000.00 vs bill ₹5000.00', out)
+
+    def test_paid_exceeds_takes_precedence_over_over_scheduled(self):
+        # Σ(all) is also over the bill, but paid alone exceeds → must classify as paid-exceeds.
+        o = self._order(1, '5000.00')
+        self._inst(o, '6000.00', paid=True)
+        self._inst(o, '1000.00')  # Σ all 7000 > 5000 too
+        out = self._run(apply=True)
+        self.assertIn('paid_exceeds: 1', out)
+        self.assertIn('over_scheduled: 0', out)
+        self.assertEqual(o.installments.count(), 2)  # untouched
+
+    def test_dry_run_writes_nothing(self):
+        o = self._order(1, '5000.00')
+        out = self._run()  # no --apply
+        self.assertEqual(o.installments.count(), 0)
+        self.assertIn('DRY RUN', out)
+        self.assertIn('Orders to change: 1', out)
+
+    def test_idempotent_second_apply_no_change(self):
+        o = self._order(1, '5000.00')
+        self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+        out2 = self._run(apply=True)
+        self.assertEqual(o.installments.count(), 1)
+        self.assertIn('Orders to change: 0', out2)
+
+    def test_boutique_filter_limits_scope(self):
+        mine = self._order(1, '5000.00')
+        # An order in a different boutique must be untouched when --boutique targets ours.
+        other = _user_in_other_boutique()
+        oc = Customer.objects.create(created_by=other, name='O', phone='2')
+        theirs = Order.objects.create(
+            created_by=other, customer=oc, order_number=1,
+            delivery_date=date.today() + timedelta(days=10), total_amount=Decimal('5000.00'),
+        )
+        self._run(apply=True, boutique=str(mine.boutique_id))
+        self.assertEqual(mine.installments.count(), 1)     # fixed
+        self.assertEqual(theirs.installments.count(), 0)   # out of scope, untouched
+
+
+def _user_in_other_boutique():
+    u = User.objects.create_user(email='other-bf@test.com', password='pass')
+    u.boutique = Boutique.objects.create(name='OtherBF', owner=u)
+    u.save(update_fields=['boutique'])
+    return u

@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { Customer } from '@/lib/api/customers'
 import type { DraftInstallment } from './DraftInstallments'
+import { isValidMoneyInput } from '@/lib/money'
 
 interface Draft {
   customer: Customer | null
@@ -65,6 +66,13 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
   const scheduledTotal = draft.pendingInstallments.reduce(
     (sum, i) => sum + (parseFloat(i.amount) || 0), 0
   )
+  // VS-27.4 — re-check the strict invariant here too; never rely solely on StepBilling's
+  // gate / earlier navigation state. The bill and every installment must be valid money
+  // (≤2 decimals, within the server's DecimalField range) AND the schedule must sum to the bill.
+  const billAmount = parseFloat(draft.totalAmount) || 0
+  const billValid = isValidMoneyInput(draft.totalAmount, { min: 0.01 })
+  const rowsValid = draft.pendingInstallments.every((i) => isValidMoneyInput(i.amount, { min: 0.01 }))
+  const balanced = billValid && rowsValid && Math.abs(scheduledTotal - billAmount) < 0.005
 
   return (
     <div>
@@ -155,6 +163,11 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
       {error && (
         <p className="mt-3 text-xs text-red-600 text-center">{error}</p>
       )}
+      {!balanced && !error && (
+        <p className="mt-3 text-xs text-amber-700 text-center">
+          Installments must total the bill before creating. Go back to Billing to adjust.
+        </p>
+      )}
 
       <div className="flex gap-2 mt-5">
         <button
@@ -166,8 +179,8 @@ export default function StepReview({ draft, submitting, error, onCreate, onBack 
         </button>
         <button
           onClick={onCreate}
-          disabled={submitting}
-          className="flex-1 py-2.5 text-sm font-medium text-white bg-[#C8952A] rounded-lg hover:bg-[#A87820] transition-colors disabled:opacity-50"
+          disabled={submitting || !balanced}
+          className="flex-1 py-2.5 text-sm font-medium text-white bg-[#C8952A] rounded-lg hover:bg-[#A87820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? 'Creating…' : 'Create Order'}
         </button>

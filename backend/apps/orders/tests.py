@@ -90,12 +90,6 @@ class ActivityOnInstallmentTests(_Fixture):
         self.order = self._create_order()
         self.list_url = f'/api/orders/{self.order.id}/installments/'
 
-    def test_installment_created_activity(self):
-        self.client.post(self.list_url, {'amount': '1000.00', 'due_date': _future()})
-        self.assertTrue(
-            OrderActivity.objects.filter(order=self.order, activity_type='installment_created').exists()
-        )
-
     def test_installment_paid_activity(self):
         inst = Installment.objects.create(
             order=self.order, amount=Decimal('1000.00'),
@@ -106,17 +100,18 @@ class ActivityOnInstallmentTests(_Fixture):
             OrderActivity.objects.filter(order=self.order, activity_type='installment_paid').exists()
         )
 
-    def test_payment_updated_activity(self):
-        inst = Installment.objects.create(
-            order=self.order, amount=Decimal('1000.00'),
-            due_date=date.today() + timedelta(days=10),
+    def test_payment_updated_activity_on_billing_edit(self):
+        # VS-27.5 — editing the bill + schedule via the billing endpoint logs payment_updated
+        # (the single-row create/patch endpoints that used to log it were removed).
+        resp = self.client.put(
+            f'/api/orders/{self.order.id}/billing/',
+            {'total_amount': '2000.00',
+             'installments': [{'amount': '2000.00', 'due_date': _future()}]},
+            format='json',
         )
-        self.client.patch(
-            f'/api/orders/{self.order.id}/installments/{inst.id}/',
-            {'amount': '2000.00'},
-        )
+        self.assertEqual(resp.status_code, 200)
         act = OrderActivity.objects.get(order=self.order, activity_type='payment_updated')
-        self.assertEqual(Decimal(act.metadata['amount']), Decimal('2000.00'))
+        self.assertEqual(Decimal(act.metadata['total_amount']), Decimal('2000.00'))
 
 
 class ActivitiesEndpointTests(_Fixture):
@@ -789,3 +784,229 @@ class BoutiqueTenancyTests(TestCase):
         order = Order.objects.get(id=order_id)
         self.assertIsNone(order.created_by_id)
         self.assertEqual(order.boutique_id, self.boutique.id)
+
+
+class StrictBillingCreateTests(_Fixture):
+    """VS-27.1 — atomic order create with an optional initial schedule (ADR-0009)."""
+
+    def _post(self, **extra):
+        body = {'customer': str(self.customer.id), 'delivery_date': _future(),
+                'total_amount': '10000.00'}
+        body.update(extra)
+        return self.client.post('/api/orders/', body, format='json')
+
+    def test_create_with_balanced_installments(self):
+        resp = self._post(installments=[
+            {'amount': '4000.00', 'due_date': _future()},
+            {'amount': '6000.00', 'due_date': _future()},
+        ])
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(Installment.objects.filter(order_id=resp.data['id']).count(), 2)
+
+    def test_create_rejects_unbalanced_and_persists_nothing(self):
+        resp = self._post(installments=[{'amount': '4000.00', 'due_date': _future()}])
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertEqual(Installment.objects.count(), 0)
+
+    def test_create_without_installments_auto_seeds_default(self):
+        # VS-27.5 cutover — omitting installments on a billed order auto-seeds the mandatory
+        # default installment (= bill, due on the delivery date).
+        resp = self._post()
+        self.assertEqual(resp.status_code, 201)
+        rows = Installment.objects.filter(order_id=resp.data['id'])
+        self.assertEqual(rows.count(), 1)
+        default = rows.first()
+        self.assertEqual(default.amount, Decimal('10000.00'))
+        self.assertEqual(default.due_date, date.today() + timedelta(days=30))  # = delivery date
+        self.assertIsNone(default.paid_date)
+
+    def test_create_with_zero_bill_does_not_seed(self):
+        # No bill → nothing to schedule; no auto-default.
+        resp = self._post(total_amount='0.00')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(Installment.objects.filter(order_id=resp.data['id']).count(), 0)
+
+    def test_invalid_installment_rolls_back_order(self):
+        resp = self._post(installments=[{'amount': '10000.00', 'due_date': 'not-a-date'}])
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_installments_not_echoed_in_response(self):
+        resp = self._post(installments=[{'amount': '10000.00', 'due_date': _future()}])
+        self.assertEqual(resp.status_code, 201)
+        self.assertNotIn('installments', resp.data)
+
+    def test_explicit_empty_installments_rejected_when_billed(self):
+        # `installments: []` is *supplied* (not omitted) → strict: Σ 0 != 10000 → 400.
+        resp = self._post(installments=[])
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_explicit_empty_installments_ok_when_bill_zero(self):
+        resp = self._post(total_amount='0.00', installments=[])
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(Installment.objects.filter(order_id=resp.data['id']).count(), 0)
+
+
+class BillingEndpointTests(_Fixture):
+    """VS-27.1 — PUT /api/orders/{id}/billing/ edits bill + unpaid schedule atomically."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()  # total_amount = 10000.00
+        self.url = f'/api/orders/{self.order.id}/billing/'
+
+    def _paid(self, amount):
+        return Installment.objects.create(order=self.order, amount=Decimal(amount),
+                                          due_date=date.today(), paid_date=date.today())
+
+    def _unpaid(self, amount):
+        return Installment.objects.create(order=self.order, amount=Decimal(amount),
+                                          due_date=date.today() + timedelta(days=10))
+
+    def _put(self, total, items):
+        return self.client.put(self.url, {'total_amount': total, 'installments': items},
+                               format='json')
+
+    def test_resolves_on_order_path_not_installments_path(self):
+        # Exists at /orders/{id}/billing/, not .../installments/billing/.
+        resp = self._put('10000.00', [{'amount': '10000.00', 'due_date': _future()}])
+        self.assertEqual(resp.status_code, 200)
+
+    def test_replaces_unpaid_and_preserves_paid(self):
+        paid = self._paid('4000.00')
+        old_unpaid = self._unpaid('6000.00')
+        resp = self._put('10000.00', [
+            {'amount': '3000.00', 'due_date': _future()},
+            {'amount': '3000.00', 'due_date': _future()},
+        ])
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Installment.objects.filter(id=paid.id).exists())       # paid untouched
+        self.assertFalse(Installment.objects.filter(id=old_unpaid.id).exists())  # unpaid replaced
+        unpaid = Installment.objects.filter(order=self.order, paid_date__isnull=True)
+        self.assertEqual(unpaid.count(), 2)
+        self.assertEqual(sum((i.amount for i in unpaid), Decimal('0')), Decimal('6000.00'))
+
+    def test_rejects_total_below_paid(self):
+        self._paid('4000.00')
+        resp = self._put('3000.00', [])
+        self.assertEqual(resp.status_code, 400)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal('10000.00'))  # unchanged
+
+    def test_rejects_imbalance(self):
+        self._paid('4000.00')
+        resp = self._put('10000.00', [{'amount': '5000.00', 'due_date': _future()}])  # 4000+5000
+        self.assertEqual(resp.status_code, 400)
+
+    def test_empty_unpaid_allowed_when_paid_equals_total(self):
+        self._paid('10000.00')
+        resp = self._put('10000.00', [])
+        self.assertEqual(resp.status_code, 200)
+
+    def test_updates_total_amount(self):
+        self._paid('4000.00')
+        resp = self._put('12000.00', [{'amount': '8000.00', 'due_date': _future()}])  # 4000+8000
+        self.assertEqual(resp.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal('12000.00'))
+
+    def test_other_boutique_cannot_edit(self):
+        other = _user_in_new_boutique('intruder@test.com')
+        oc = APIClient(); oc.force_authenticate(user=other)
+        resp = oc.put(self.url, {'total_amount': '10000.00',
+                      'installments': [{'amount': '10000.00', 'due_date': _future()}]},
+                      format='json')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_rejects_out_of_range_total(self):
+        # 12 integer digits exceeds max_digits=10 → clean 400 (not a DB 500 on save).
+        resp = self._put('100000000000.00', [{'amount': '1.00', 'due_date': _future()}])
+        self.assertEqual(resp.status_code, 400)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal('10000.00'))  # unchanged
+
+    def test_rejects_negative_total(self):
+        resp = self._put('-100.00', [])
+        self.assertEqual(resp.status_code, 400)
+
+
+class MarkPaidLockTests(_Fixture):
+    """VS-27.1 — mark-paid keeps working and serializes against strict billing."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()
+
+    def test_mark_paid_still_works(self):
+        inst = Installment.objects.create(order=self.order, amount=Decimal('5000.00'),
+                                          due_date=date.today() + timedelta(days=5))
+        resp = self.client.post(f'/api/orders/{self.order.id}/installments/{inst.id}/mark-paid/')
+        self.assertEqual(resp.status_code, 200)
+        inst.refresh_from_db()
+        self.assertIsNotNone(inst.paid_date)
+
+    def test_billing_cannot_reduce_below_marked_paid(self):
+        inst = Installment.objects.create(order=self.order, amount=Decimal('6000.00'),
+                                          due_date=date.today() + timedelta(days=5))
+        self.client.post(f'/api/orders/{self.order.id}/installments/{inst.id}/mark-paid/')
+        resp = self.client.put(f'/api/orders/{self.order.id}/billing/',
+                               {'total_amount': '5000.00', 'installments': []}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+
+class RemovedInstallmentEndpointsTests(_Fixture):
+    """VS-27.5 cutover — the single-row write endpoints are gone; only list (GET) and
+    mark-paid remain. The schedule is writable only via create or PUT /billing/."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()
+        self.list_url = f'/api/orders/{self.order.id}/installments/'
+
+    def test_list_still_works(self):
+        resp = self.client.get(self.list_url)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_single_create_removed(self):
+        # POST is no longer an allowed method on the (now read-only) list view → 405.
+        resp = self.client.post(self.list_url, {'amount': '1000.00', 'due_date': _future()})
+        self.assertEqual(resp.status_code, 405)
+
+    def test_single_patch_route_removed(self):
+        inst = Installment.objects.create(order=self.order, amount=Decimal('1000.00'),
+                                          due_date=date.today() + timedelta(days=5))
+        resp = self.client.patch(f'/api/orders/{self.order.id}/installments/{inst.id}/',
+                                 {'amount': '2000.00'}, format='json')
+        self.assertEqual(resp.status_code, 404)  # route no longer exists
+
+    def test_single_delete_route_removed(self):
+        inst = Installment.objects.create(order=self.order, amount=Decimal('1000.00'),
+                                          due_date=date.today() + timedelta(days=5))
+        resp = self.client.delete(f'/api/orders/{self.order.id}/installments/{inst.id}/')
+        self.assertEqual(resp.status_code, 404)
+
+
+class BillReadOnlyTests(_Fixture):
+    """VS-27.5 cutover — total_amount is read-only on the generic PATCH; it changes only
+    through PUT /orders/{id}/billing/ (so the bill can never desync from the schedule)."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()  # total_amount = 10000.00
+
+    def test_patch_total_amount_rejected(self):
+        resp = self.client.patch(f'/api/orders/{self.order.id}/',
+                                 {'total_amount': '5000.00'}, format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal('10000.00'))  # unchanged
+
+    def test_patch_other_fields_still_works(self):
+        new_date = str(date.today() + timedelta(days=45))
+        resp = self.client.patch(f'/api/orders/{self.order.id}/',
+                                 {'delivery_date': new_date}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(str(self.order.delivery_date), new_date)
