@@ -76,6 +76,8 @@ export interface NewInstallmentInput {
   amount: string
   due_date: string
   remarks?: string
+  // VS-29 — true = advance payment captured at intake (created already settled, paid_date=today).
+  paid?: boolean
 }
 
 export async function createOrder(data: {

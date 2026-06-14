@@ -9,8 +9,8 @@ import VoiceSection from './VoiceSection'
 // playback behavior, only their standalone headers + margins are dropped.
 export default function WorkTab({ orderId }: { orderId: string }) {
   return (
-    <div className="px-5 py-4">
-      <div className="rounded-xl border border-[#E5E5E2] bg-white p-4">
+    <div className="px-4 lg:px-5 py-4">
+      <div className="rounded-xl border border-[#E5E5E2] bg-white p-3 lg:p-4">
         <h3 className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">
           Work Instructions
         </h3>

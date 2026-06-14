@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { listCustomers, type Customer } from '@/lib/api/customers'
+import { prefillFromSearch } from '@/lib/customerPrefill'
 import CustomerCard from '@/components/customers/CustomerCard'
 import CreateCustomerModal from '@/components/customers/CreateCustomerModal'
 
@@ -68,6 +69,8 @@ export default function CustomersPage() {
     : search
     ? `${customers.length} result${customers.length === 1 ? '' : 's'}`
     : `${total} customer${total === 1 ? '' : 's'}`
+
+  const prefill = prefillFromSearch(search)
 
   return (
     <div className="p-6">
@@ -138,6 +141,8 @@ export default function CustomersPage() {
         <CreateCustomerModal
           onClose={() => setShowCreate(false)}
           onCreated={handleCreated}
+          initialName={prefill.name}
+          initialPhone={prefill.phone}
         />
       )}
     </div>

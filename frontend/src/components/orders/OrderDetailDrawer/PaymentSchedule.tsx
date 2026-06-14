@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Order } from '@/lib/api/orders'
 import type { Installment } from '@/lib/api/installments'
-import { listInstallments, replaceSchedule, markInstallmentPaid } from '@/lib/api/installments'
+import { listInstallments, replaceSchedule, markInstallmentPaid, markInstallmentUnpaid } from '@/lib/api/installments'
 import { isValidMoneyInput } from '@/lib/money'
 import QuickDateInput from '@/components/common/QuickDateInput'
 
@@ -64,6 +64,15 @@ function LockIcon() {
   )
 }
 
+// Undo affordance on a paid row — signals the green pill is tappable to revert to unpaid.
+function UndoIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7v6h6" /><path d="M3 13a9 9 0 1 0 3-7.7L3 8" />
+    </svg>
+  )
+}
+
 function StatusBadge({ status, daysOverdue }: { status: Installment['status']; daysOverdue: number }) {
   if (status === 'Paid')
     return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 whitespace-nowrap">Paid</span>
@@ -82,6 +91,8 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
   const [error, setError] = useState('')
   const [confirmPaidId, setConfirmPaidId] = useState<string | null>(null)
   const [markingId, setMarkingId] = useState<string | null>(null)
+  const [confirmUnpaidId, setConfirmUnpaidId] = useState<string | null>(null)
+  const [unmarkingId, setUnmarkingId] = useState<string | null>(null)
   const snapshotRef = useRef('')
   const mountedRef = useRef(true)
 
@@ -101,6 +112,10 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
   const billNum = parseFloat(order.total_amount) || 0
   const outstanding = billNum - paidTotal
   const progress = billNum > 0 ? Math.min(100, (paidTotal / billNum) * 100) : 0
+  // Payment-state language so the lead figure reads as status, not a bare number (§0.3/§0.10).
+  const settled = billNum > 0 && outstanding <= 0.005
+  const hasOverdue = installments.some((i) => i.status === 'Delayed')
+  const overdue = !settled && hasOverdue && outstanding > 0.005
 
   // ── Edit-mode balance math (strict: paid + staged unpaid must equal the bill) ─
   const draftScheduled = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
@@ -194,6 +209,20 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
     }
   }
 
+  async function handleMarkUnpaid(id: string) {
+    setUnmarkingId(id)
+    try {
+      await markInstallmentUnpaid(order.id, id)
+      const fresh = await listInstallments(order.id)
+      if (mountedRef.current) setInstallments(fresh)
+      onUpdated()
+    } catch {
+      // keep the confirm open on failure; user can retry or cancel
+    } finally {
+      if (mountedRef.current) { setUnmarkingId(null); setConfirmUnpaidId(null) }
+    }
+  }
+
   if (loading) {
     return (
       <div className="py-2 flex items-center gap-1.5 text-xs text-[#A0A09C]">
@@ -264,9 +293,11 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
           ) : (
             <div className="space-y-2">
               {rows.map((r) => (
-                <div key={r.key} className="rounded-lg border border-[#E5E5E2] bg-white p-2 space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="relative w-28 shrink-0">
+                <div key={r.key} className="rounded-lg border border-[#E5E5E2] bg-white p-2.5 space-y-2">
+                  {/* Row 1 — amount + a visible delete (VS-28 mobile density; no longer
+                      a tiny icon crammed beside the date controls) */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-[#6B6B67]">₹</span>
                       <input
                         type="number"
@@ -279,22 +310,24 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
                         className="w-full pl-5 pr-2 py-1.5 text-sm border border-[#E5E5E2] rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-[#C8952A]/20 focus:border-[#C8952A]"
                       />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <QuickDateInput
-                        value={r.due_date}
-                        onChange={(iso) => updateRow(r.key, { due_date: iso })}
-                        deliveryDate={order.delivery_date}
-                        ariaLabel="Installment due date"
-                      />
-                    </div>
                     <button
                       onClick={() => removeRow(r.key)}
-                      className="text-[#D0D0CC] hover:text-red-400 transition-colors p-1 shrink-0"
+                      className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-[#E5E5E2] text-[#A0A09C] hover:text-red-500 hover:border-red-200 transition-colors"
                       aria-label="Remove installment"
                     >
                       <TrashIcon />
                     </button>
                   </div>
+                  {/* Row 2 — date controls on their own line */}
+                  <div>
+                    <QuickDateInput
+                      value={r.due_date}
+                      onChange={(iso) => updateRow(r.key, { due_date: iso })}
+                      deliveryDate={order.delivery_date}
+                      ariaLabel="Installment due date"
+                    />
+                  </div>
+                  {/* Note — full width */}
                   <input
                     type="text"
                     value={r.remarks}
@@ -332,34 +365,38 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
   // ── View mode (read-only by default) ─────────────────────────────────────────
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-[#6B6B67]">Bill</span>
-          <span className="text-sm font-semibold text-[#1A1A18] tabular-nums">{fmt(billNum)}</span>
-        </div>
-        <span className="text-[10px] font-semibold bg-[#EDEDE9] text-[#6B6B67] rounded-full px-1.5 py-0.5 leading-none tabular-nums">
-          {installments.length}
-        </span>
-      </div>
-
-      {billNum > 0 && (
+      {billNum > 0 ? (
         <div className="mb-3">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#6B6B67] mb-1.5">
-            <span>Paid <span className="font-medium text-green-700">{fmt(paidTotal)}</span></span>
-            <span className="text-[#D0D0CC]">·</span>
-            <span>
-              Outstanding{' '}
-              <span className={`font-medium ${outstanding > 0.005 ? 'text-[#C8952A]' : 'text-green-700'}`}>
-                {fmt(Math.max(0, outstanding))}
-              </span>
+          {/* Dominant money fact: outstanding read as status language (§0.3 urgency) */}
+          <div className="flex items-start justify-between mb-1.5">
+            {settled ? (
+              <p className="text-lg font-bold text-green-700 leading-tight">Paid in full</p>
+            ) : (
+              <p className={`text-2xl font-bold tabular-nums leading-tight ${overdue ? 'text-red-600' : 'text-[#C8952A]'}`}>
+                {fmt(Math.max(0, outstanding))}{' '}
+                <span className="text-xs font-semibold">{overdue ? 'overdue' : 'outstanding'}</span>
+              </p>
+            )}
+            <span className="text-[10px] font-semibold bg-[#EDEDE9] text-[#6B6B67] rounded-full px-1.5 py-0.5 leading-none tabular-nums mt-1 shrink-0">
+              {installments.length}
             </span>
           </div>
+
+          {/* Secondary context: bill + paid */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#6B6B67] mb-1.5">
+            <span>Bill <span className="font-medium text-[#1A1A18] tabular-nums">{fmt(billNum)}</span></span>
+            <span className="text-[#D0D0CC]">·</span>
+            <span>Paid <span className="font-medium text-green-700 tabular-nums">{fmt(paidTotal)}</span></span>
+          </div>
+
           {installments.length > 0 && (
             <div className="h-1 bg-[#EDEDE9] rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-green-500 transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
           )}
         </div>
+      ) : (
+        <p className="text-xs font-medium text-[#6B6B67] mb-3">No bill set yet</p>
       )}
 
       {installments.length > 0 ? (
@@ -367,6 +404,7 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
           {installments.map((i) => {
             const isPaid = i.status === 'Paid'
             const confirming = confirmPaidId === i.id
+            const confirmingUnpaid = confirmUnpaidId === i.id
             return (
               <div key={i.id} className="flex items-center gap-2 px-2 py-2 rounded-lg border border-[#E5E5E2] bg-white">
                 <span className="text-sm font-semibold text-[#1A1A18] w-[68px] shrink-0">{fmt(parseFloat(i.amount))}</span>
@@ -387,8 +425,29 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
                       </button>
                       <button onClick={() => setConfirmPaidId(null)} className="text-[11px] text-[#6B6B67] hover:text-[#1A1A18]">No</button>
                     </>
+                  ) : confirmingUnpaid ? (
+                    <>
+                      <span className="text-[11px] text-[#6B6B67]">Mark unpaid?</span>
+                      <button
+                        onClick={() => handleMarkUnpaid(i.id)}
+                        disabled={unmarkingId === i.id}
+                        className="text-[11px] font-semibold text-white bg-[#6B6B67] rounded px-2 py-0.5 disabled:opacity-50"
+                      >
+                        {unmarkingId === i.id ? '…' : 'Yes'}
+                      </button>
+                      <button onClick={() => setConfirmUnpaidId(null)} className="text-[11px] text-[#6B6B67] hover:text-[#1A1A18]">No</button>
+                    </>
                   ) : isPaid ? (
-                    <StatusBadge status={i.status} daysOverdue={i.days_overdue} />
+                    // Paid pill is an explicit button (with an undo glyph) so reverting reads as
+                    // an action, not a passive label. Reverting collection is admin-ish but reversible.
+                    <button
+                      onClick={() => setConfirmUnpaidId(i.id)}
+                      aria-label="Mark as unpaid"
+                      className="group flex items-center gap-1 rounded-full hover:bg-[#F5F5F3] pr-1 transition-colors"
+                    >
+                      <StatusBadge status={i.status} daysOverdue={i.days_overdue} />
+                      <span className="text-[#A0A09C] group-hover:text-[#6B6B67]"><UndoIcon /></span>
+                    </button>
                   ) : (
                     <button onClick={() => setConfirmPaidId(i.id)} aria-label="Mark as paid">
                       <StatusBadge status={i.status} daysOverdue={i.days_overdue} />
@@ -403,9 +462,11 @@ export default function PaymentSchedule({ order, onOrderChange, onUpdated }: Pro
         <p className="text-xs text-[#A0A09C]">No payment plan yet</p>
       )}
 
+      {/* Secondary action — editing the plan is admin (§0.7): bordered, not the dominant
+          fill, but still a clear button (bill/date/split changes are common in shop use). */}
       <button
         onClick={startEdit}
-        className="mt-3 w-full py-2 text-xs font-semibold text-[#A87820] bg-[#FBF3E3] hover:bg-[#F5E8C8] rounded-lg transition-colors"
+        className="mt-3 w-full py-2 text-xs font-semibold text-[#A87820] bg-white border border-[#E5D3A8] hover:bg-[#FBF3E3] rounded-lg transition-colors"
       >
         Edit bill &amp; plan
       </button>

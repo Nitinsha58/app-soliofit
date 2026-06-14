@@ -1,24 +1,37 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { customerSchema, type CustomerFormData } from '@/lib/validations/customer'
+import { sanitizePhone } from '@/lib/customerPrefill'
 import { createCustomer, type Customer } from '@/lib/api/customers'
 
 interface Props {
   onClose: () => void
   onCreated: (customer: Customer) => void
+  // Prefill seeded from the page's search box (phone-like → phone, else name).
+  initialName?: string
+  initialPhone?: string
 }
 
-export default function CreateCustomerModal({ onClose, onCreated }: Props) {
+export default function CreateCustomerModal({ onClose, onCreated, initialName = '', initialPhone = '' }: Props) {
   const {
     register,
     handleSubmit,
+    reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { address: '' },
+    defaultValues: { name: initialName, phone: initialPhone, address: '' },
   })
+
+  // defaultValues only apply on first mount; if the modal stays mounted and the prefill changes
+  // (or it reopens with a new search), reset the fields to the new seed.
+  useEffect(() => {
+    reset({ name: initialName, phone: initialPhone, address: '' })
+  }, [initialName, initialPhone, reset])
 
   async function onSubmit(data: CustomerFormData) {
     const customer = await createCustomer(data)
@@ -68,10 +81,17 @@ export default function CreateCustomerModal({ onClose, onCreated }: Props) {
             </label>
             <input
               {...register('phone')}
+              // Sanitize via setValue so RHF/zod store the cleaned digits — not just the DOM.
+              // (Mutating e.target.value inside register's onChange can leave RHF with the raw
+              // typed/pasted value, e.g. "+91 9876543210" failing validation while the field
+              // shows "9876543210".)
+              onChange={(e) => setValue('phone', sanitizePhone(e.target.value), { shouldValidate: true })}
               id="phone"
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
               className="w-full px-3 py-2.5 border border-[#E5E5E2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8952A]/25 focus:border-[#C8952A]"
-              placeholder="Phone number"
+              placeholder="10-digit phone number"
             />
             {errors.phone && (
               <p className="mt-1 text-xs text-[#B91C1C]">{errors.phone.message}</p>

@@ -98,7 +98,7 @@ export default function OrderInfoSection({ order, onOrderChange, onUpdated, show
   }
 
   return (
-    <div className="px-5 py-4">
+    <div className="px-4 lg:px-5 py-4">
       {/* Section header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest">

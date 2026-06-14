@@ -36,7 +36,7 @@ function ChevronIcon() {
 // money snapshot → note → secondary (More Details). Read-only; deeper edits live in their tabs.
 export default function OverviewTab({ order, onOrderChange, onUpdated, onViewPlan, onViewWork, onMoreDetails }: Props) {
   return (
-    <div className="px-5 py-4 space-y-4">
+    <div className="px-4 lg:px-5 py-4 space-y-4">
       <StatusPriorityPills order={order} onOrderChange={onOrderChange} onUpdated={onUpdated} />
 
       <AttentionSummaryCard order={order} />

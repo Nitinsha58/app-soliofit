@@ -63,7 +63,7 @@ The current drawer shows everything as one long editable scroll; VS-28 replaces 
 |-------|-------|-------|--------|
 | [28.1](./vs-28.1-shell-overview.md) | Tab shell + Overview core (identity, attention card, stage-aware primary, read-only payment snapshot) | Frontend | **Implemented — in review** |
 | [28.2](./vs-28.2-work-tab.md) | Work tab — merge photos + voice into one "Work Instructions" card | Frontend | **Implemented — in review** |
-| [28.3](./vs-28.3-money-tab.md) | Money tab — payment snapshot ↔ full plan editor (reuse VS-27.5) | Frontend | Pending |
+| [28.3](./vs-28.3-money-tab.md) | Money tab — attention-first pass over the VS-27.5 plan editor | Frontend | **Implemented — in review** |
 | [28.4](./vs-28.4-more-details.md) | More Details pushed screen — customer/order details, remarks, activity, danger zone | Frontend | Pending |
 
 **Execution order:** 28.1 (shell) → 28.2 / 28.3 / 28.4 (refine each tab/screen). 28.1 mounts the
@@ -81,6 +81,15 @@ existing sections as **interim** content under the new tabs so nothing regresses
 
 ## Completion log
 
+- **2026-06-14 — VS-28.3 implemented (in review).** On `feat/vs-28-order-detail`. Money tab
+  presentation pass over the already-complete VS-27.5 editor (no billing logic/math/endpoint/locking
+  change). New `MoneyTab.tsx` frames `PaymentSchedule` in one **Payment Plan** card (parallels
+  WorkTab). `PaymentSchedule` view mode now leads with **Outstanding as state language**
+  (`₹X outstanding` / `₹X overdue` / `Paid in full`), Bill+Paid demoted to context, and the
+  **"Edit bill & plan"** button demoted from amber-fill to a bordered text-gold secondary (still a
+  clear button per Nitin — bill/date/split edits are common). Edit mode, mark-paid, dirty/save, and
+  the strict invariant untouched. Overview installments preview deferred (kept lean). Type-check
+  clean. No backend changes.
 - **2026-06-14 — VS-28.2 implemented (in review).** On `feat/vs-28-order-detail`. Work tab is now
   one **Work Instructions** card (`WorkTab.tsx`) grouping garment photos, **Measurement Notes**
   photos, and voice into the tailor's single instruction packet; `PhotoSection`/`VoiceSection`

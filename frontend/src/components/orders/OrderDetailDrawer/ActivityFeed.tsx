@@ -46,12 +46,18 @@ function describe(a: Activity): { label: string; iconType: IconType; color: stri
       }
     case 'installment_paid':
       return { label: `Payment ${fmtAmount(m.amount)} received`, iconType: 'check', color: '#34D399' }
-    case 'payment_updated':
+    case 'installment_unpaid':
+      return { label: `Payment ${fmtAmount(m.amount)} marked unpaid`, iconType: 'arrow', color: '#A0A09C' }
+    case 'payment_updated': {
+      // Schedule-level event (order-create + billing edit) — metadata is
+      // { total_amount, installment_count }, NOT a single installment's amount/due_date.
+      const count = Number(m.installment_count) || 0
       return {
-        label: `Installment updated to ${fmtAmount(m.amount)} · due ${fmtDate(m.due_date)}`,
+        label: `Payment plan updated · ${count} installment${count === 1 ? '' : 's'} · ${fmtAmount(m.total_amount)}`,
         iconType: 'edit',
         color: '#A0A09C',
       }
+    }
     default:
       return { label: a.activity_type.replace(/_/g, ' '), iconType: 'dot', color: '#A0A09C' }
   }

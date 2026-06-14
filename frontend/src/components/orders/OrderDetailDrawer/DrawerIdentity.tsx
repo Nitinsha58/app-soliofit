@@ -19,7 +19,7 @@ export default function DrawerIdentity({ order }: { order: Order }) {
   const closeOrderDetail = useUIStore((s) => s.closeOrderDetail)
 
   return (
-    <div className="px-5 pt-5 pb-3">
+    <div className="px-4 lg:px-5 pt-5 pb-3">
       <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-1">
         #{String(order.order_number).padStart(4, '0')}
       </p>
