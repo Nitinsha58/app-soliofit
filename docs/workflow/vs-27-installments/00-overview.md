@@ -79,7 +79,7 @@ No separate billing model is introduced — billing stays an **order attribute**
 | [27.1](./vs-27.1-backend-strict-billing.md) | Backend strict billing core | Backend | — | **Implemented — in review** |
 | [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | Pending |
 | [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | **Implemented — in review** |
-| [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | Pending |
+| [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | **Verified** (browser pass) |
 | [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" | Frontend | 27.1, 27.3 | Pending |
 
 **Execution order:** 27.1 (additive backend) → 27.3 (date input) → 27.4 + 27.5 (frontend)
@@ -108,6 +108,25 @@ holds across both new and legacy data at the same moment.
 
 ## Completion log
 
+- **2026-06-14 — VS-27.4 verified (browser pass).** Review-fix pass applied and confirmed:
+  removed the artificial per-row cap (the `Σ == bill` gate is the single structural source of
+  truth — Add stays usable from a fully-scheduled default); added a shared `lib/money.ts`
+  (`isValidMoneyInput` + `MAX_MONEY = 99999999.99`) mirroring the server `DecimalField(10,2)`
+  and wired it into **all three** gates (StepBilling `Next`, StepReview `Create`, plus row
+  amounts) so the client never green-lights a value the server would 400. Browser pass: bill
+  `100000000` and `100.999` blocked with the max hint; `2000.00` seeds the default and enables
+  Next; split → "Over by ₹1,000" disables Next; rebalance → "Matches bill" re-enables; Review
+  shows "2 installments · ₹2,000 scheduled"; no overlays, no console errors. The StepPhotos
+  HMR overlay seen mid-review was a stale hot-reload artifact, not a code defect.
+- **2026-06-14 — VS-27.4 implemented (in review).** On `feat/vs-27-cutover` (= 27.1 + 27.3
+  merged). Add Order now seeds a default installment (= bill, due delivery date), splitting is
+  optional but must balance, and order + schedule are created in one atomic `createOrder`
+  (the post-create `Promise.allSettled` loop is gone). `DraftInstallment` gained a client-only
+  `source: 'auto' | 'user'` marker (stripped before the API call) so the lone auto row mirrors
+  bill/delivery date until edited/split, then detaches. `QuickDateInput` wired into the row
+  form. Strict balance gate at **both** StepBilling `Next` and StepReview `Create`. Backend
+  unchanged this slice (cutover bits land in 27.5). Type-check clean. Backend cutover
+  (auto-default-on-omit, single-row endpoint removal, bill read-only) still pending in 27.5.
 - **2026-06-14 — VS-27.1 implemented (in review, not yet committed).** Additive backend
   foundation. Order create accepts an optional write-only `installments[]` (validated
   `Σ == total_amount`, created atomically with the order; omitted = unchanged). New
