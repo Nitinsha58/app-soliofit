@@ -7,8 +7,7 @@ import DrawerIdentity from './DrawerIdentity'
 import DrawerTabs, { type DrawerTab } from './DrawerTabs'
 import OverviewTab from './OverviewTab'
 import MoreDetailsView from './MoreDetailsView'
-import PhotoSection from './PhotoSection'
-import VoiceSection from './VoiceSection'
+import WorkTab from './WorkTab'
 import PaymentSchedule from './PaymentSchedule'
 
 interface Props {
@@ -118,17 +117,13 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
                   onOrderChange={handleOrderChange}
                   onUpdated={onUpdated}
                   onViewPlan={() => setTab('money')}
+                  onViewWork={() => setTab('work')}
                   onMoreDetails={() => setMoreDetails(true)}
                 />
               )}
 
-              {/* Work — interim: existing photo + voice sections (merged into one card in 28.2) */}
-              {tab === 'work' && (
-                <div>
-                  <PhotoSection orderId={order.id} />
-                  <VoiceSection orderId={order.id} />
-                </div>
-              )}
+              {/* Work — photos + voice as one "Work Instructions" card (VS-28.2) */}
+              {tab === 'work' && <WorkTab orderId={order.id} />}
 
               {/* Money — the VS-27.5 whole-plan editor (refined in 28.3) */}
               {tab === 'money' && (

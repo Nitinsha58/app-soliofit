@@ -4,6 +4,7 @@ import type { Order } from '@/lib/api/orders'
 import StatusPriorityPills from './StatusPriorityPills'
 import AttentionSummaryCard from './AttentionSummaryCard'
 import PrimaryAction from './PrimaryAction'
+import OverviewWorkCard from './OverviewWorkCard'
 import OverviewPaymentCard from './OverviewPaymentCard'
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
   onOrderChange: (updated: Partial<Order>) => void
   onUpdated: () => void
   onViewPlan: () => void
+  onViewWork: () => void
   onMoreDetails: () => void
 }
 
@@ -32,7 +34,7 @@ function ChevronIcon() {
 
 // Overview = the command screen (VS-28). §0.3 hierarchy: status → urgency → primary action →
 // money snapshot → note → secondary (More Details). Read-only; deeper edits live in their tabs.
-export default function OverviewTab({ order, onOrderChange, onUpdated, onViewPlan, onMoreDetails }: Props) {
+export default function OverviewTab({ order, onOrderChange, onUpdated, onViewPlan, onViewWork, onMoreDetails }: Props) {
   return (
     <div className="px-5 py-4 space-y-4">
       <StatusPriorityPills order={order} onOrderChange={onOrderChange} onUpdated={onUpdated} />
@@ -40,6 +42,9 @@ export default function OverviewTab({ order, onOrderChange, onUpdated, onViewPla
       <AttentionSummaryCard order={order} />
 
       <PrimaryAction order={order} onOrderChange={onOrderChange} onUpdated={onUpdated} />
+
+      {/* Main work content sits above the business summary (§0.3 hierarchy) */}
+      <OverviewWorkCard orderId={order.id} onViewWork={onViewWork} />
 
       <OverviewPaymentCard order={order} onViewPlan={onViewPlan} />
 

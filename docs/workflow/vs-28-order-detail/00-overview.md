@@ -62,7 +62,7 @@ The current drawer shows everything as one long editable scroll; VS-28 replaces 
 | Slice | Title | Layer | Status |
 |-------|-------|-------|--------|
 | [28.1](./vs-28.1-shell-overview.md) | Tab shell + Overview core (identity, attention card, stage-aware primary, read-only payment snapshot) | Frontend | **Implemented — in review** |
-| [28.2](./vs-28.2-work-tab.md) | Work tab — merge photos + voice into one "Work Instructions" card | Frontend | Pending |
+| [28.2](./vs-28.2-work-tab.md) | Work tab — merge photos + voice into one "Work Instructions" card | Frontend | **Implemented — in review** |
 | [28.3](./vs-28.3-money-tab.md) | Money tab — payment snapshot ↔ full plan editor (reuse VS-27.5) | Frontend | Pending |
 | [28.4](./vs-28.4-more-details.md) | More Details pushed screen — customer/order details, remarks, activity, danger zone | Frontend | Pending |
 
@@ -81,6 +81,14 @@ existing sections as **interim** content under the new tabs so nothing regresses
 
 ## Completion log
 
+- **2026-06-14 — VS-28.2 implemented (in review).** On `feat/vs-28-order-detail`. Work tab is now
+  one **Work Instructions** card (`WorkTab.tsx`) grouping garment photos, **Measurement Notes**
+  photos, and voice into the tailor's single instruction packet; `PhotoSection`/`VoiceSection`
+  gained a boring `embedded` prop (margins/header only — no second code path). Overview gains a
+  compact, read-only `OverviewWorkCard` (counts + ≤3 tiny thumbnails) placed above the payment
+  summary (§0.3) that taps through to the Work tab. Read-only preview re-fetches media APIs
+  (duplicate reads accepted for now; consolidation left open). Type-check clean. No backend changes.
+  Earlier same-day: drawer mobile scroll/overflow containment fix (`5fb8a60`).
 - **2026-06-14 — VS-28.1 implemented (in review).** On `feat/vs-28-order-detail` (off `main`,
   post VS-27 merge). Tabbed shell (Overview · Work · Money) + persistent identity strip replaces
   the long editable scroll; `QuickActions` scroll-shortcuts retired. Overview command screen:
