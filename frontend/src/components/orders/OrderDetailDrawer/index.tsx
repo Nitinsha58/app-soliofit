@@ -3,13 +3,12 @@
 import { useState, useEffect } from 'react'
 import type { Order } from '@/lib/api/orders'
 import { getOrder } from '@/lib/api/orders'
-import OrderHeader from './OrderHeader'
-import QuickActions from './QuickActions'
-import OrderInfoSection from './OrderInfoSection'
-import PhotoSection from './PhotoSection'
-import VoiceSection from './VoiceSection'
-import ActivityFeed from './ActivityFeed'
-import DangerZone from './DangerZone'
+import DrawerIdentity from './DrawerIdentity'
+import DrawerTabs, { type DrawerTab } from './DrawerTabs'
+import OverviewTab from './OverviewTab'
+import MoreDetailsView from './MoreDetailsView'
+import WorkTab from './WorkTab'
+import PaymentSchedule from './PaymentSchedule'
 
 interface Props {
   orderId: string
@@ -31,6 +30,8 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
+  const [tab, setTab] = useState<DrawerTab>('overview')
+  const [moreDetails, setMoreDetails] = useState(false)
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setVisible(true))
@@ -68,7 +69,7 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
       {/* Drawer — full screen mobile, right panel desktop */}
       <div
         className={`
-          fixed z-50 bg-white flex flex-col
+          fixed z-50 bg-white flex flex-col overflow-hidden max-w-full
           inset-0
           lg:inset-auto lg:right-0 lg:top-0 lg:bottom-0 lg:w-[460px] lg:border-l lg:border-[#E5E5E2] lg:shadow-2xl
           transition-transform duration-200
@@ -94,38 +95,48 @@ export default function OrderDetailDrawer({ orderId, onClose, onUpdated }: Props
           <div className="flex-1 flex items-center justify-center">
             <p className="text-sm text-[#A0A09C]">Order not found</p>
           </div>
+        ) : moreDetails ? (
+          // Pushed secondary screen (VS-28 §0.4 progressive disclosure)
+          <MoreDetailsView
+            order={order}
+            onOrderChange={handleOrderChange}
+            onUpdated={onUpdated}
+            onBack={() => setMoreDetails(false)}
+            onClose={onClose}
+          />
         ) : (
-          <div className="flex-1 overflow-y-auto">
-            <OrderHeader
-              order={order}
-              onOrderChange={handleOrderChange}
-              onUpdated={onUpdated}
-            />
-            <QuickActions
-              order={order}
-              onOrderChange={handleOrderChange}
-              onUpdated={onUpdated}
-            />
-            <OrderInfoSection
-              order={order}
-              onOrderChange={handleOrderChange}
-              onUpdated={onUpdated}
-            />
+          <>
+            {/* Persistent identity + tabs (VS-28 command screen) */}
+            <DrawerIdentity order={order} />
+            <DrawerTabs active={tab} onChange={setTab} />
 
-            {/* Deferred sections. id anchors are the scroll targets for the
-                QuickActions shortcuts; scroll-mt gives a little breathing room. */}
-            <div className="pt-1">
-              <div id="order-photos" className="scroll-mt-3">
-                <PhotoSection orderId={order.id} />
-              </div>
-              <div id="order-voice" className="scroll-mt-3">
-                <VoiceSection orderId={order.id} />
-              </div>
-              <ActivityFeed orderId={order.id} />
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y">
+              {tab === 'overview' && (
+                <OverviewTab
+                  order={order}
+                  onOrderChange={handleOrderChange}
+                  onUpdated={onUpdated}
+                  onViewPlan={() => setTab('money')}
+                  onViewWork={() => setTab('work')}
+                  onMoreDetails={() => setMoreDetails(true)}
+                />
+              )}
+
+              {/* Work — photos + voice as one "Work Instructions" card (VS-28.2) */}
+              {tab === 'work' && <WorkTab orderId={order.id} />}
+
+              {/* Money — the VS-27.5 whole-plan editor (refined in 28.3) */}
+              {tab === 'money' && (
+                <div className="px-5 py-4">
+                  <PaymentSchedule
+                    order={order}
+                    onOrderChange={handleOrderChange}
+                    onUpdated={onUpdated}
+                  />
+                </div>
+              )}
             </div>
-
-            <DangerZone order={order} onUpdated={onUpdated} onClose={onClose} />
-          </div>
+          </>
         )}
       </div>
     </>

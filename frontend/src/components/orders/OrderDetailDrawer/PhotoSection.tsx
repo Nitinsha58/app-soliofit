@@ -8,6 +8,9 @@ import CameraCapture from '../CameraCapture'
 
 interface Props {
   orderId: string
+  // VS-28.2 — when mounted inside the Work Instructions card, drop the standalone
+  // header + outer margins so it reads as one group. Behavior is unchanged.
+  embedded?: boolean
 }
 
 interface PendingUpload {
@@ -48,7 +51,7 @@ function DeleteBadge({ onDelete }: { onDelete: (e: React.MouseEvent) => void }) 
   )
 }
 
-export default function PhotoSection({ orderId }: Props) {
+export default function PhotoSection({ orderId, embedded = false }: Props) {
   const [photos, setPhotos] = useState<OrderPhoto[]>([])
   const [pending, setPending] = useState<PendingUpload[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +140,7 @@ export default function PhotoSection({ orderId }: Props) {
 
   if (loading) {
     return (
-      <div className="mx-5 mb-4 py-4 flex items-center justify-center">
+      <div className={`${embedded ? '' : 'mx-5 mb-4'} py-4 flex items-center justify-center`}>
         <div className="w-4 h-4 border border-[#A0A09C] border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -145,9 +148,11 @@ export default function PhotoSection({ orderId }: Props) {
 
   return (
     <>
-      <div className="mx-5 mb-4">
-        {/* Section header */}
-        <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">Photos</p>
+      <div className={embedded ? '' : 'mx-5 mb-4'}>
+        {/* Section header — suppressed when embedded in the Work Instructions card (VS-28.2) */}
+        {!embedded && (
+          <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">Photos</p>
+        )}
 
         {/* Garment photos — horizontal strip */}
         <div className="mb-4">
@@ -223,7 +228,7 @@ export default function PhotoSection({ orderId }: Props) {
 
         {/* Notes photos — 2-column grid */}
         <div>
-          <p className="text-xs font-medium text-[#6B6B67] mb-2">Notes</p>
+          <p className="text-xs font-medium text-[#6B6B67] mb-2">Measurement Notes</p>
           <div className="grid grid-cols-2 gap-2">
             {allNotes.map((item) => {
               if ('tempId' in item) {
@@ -335,7 +340,7 @@ export default function PhotoSection({ orderId }: Props) {
           <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-2xl shadow-2xl px-4 pt-4 pb-8 lg:left-auto lg:right-0 lg:w-[460px]">
             <div className="w-10 h-1 rounded-full bg-[#E5E5E2] mx-auto mb-5" />
             <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3 px-1">
-              Add {actionSheet === 'garment' ? 'Garment' : 'Notes'} Photo
+              Add {actionSheet === 'garment' ? 'Garment' : 'Measurement Notes'} Photo
             </p>
             <button
               onClick={() => {

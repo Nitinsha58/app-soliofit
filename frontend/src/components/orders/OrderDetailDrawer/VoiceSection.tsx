@@ -7,6 +7,10 @@ import MicButton from './MicButton'
 
 interface Props {
   orderId: string
+  // VS-28.2 — when mounted inside the Work Instructions card, drop the standalone
+  // uppercase header + outer margins and use a "Voice" sub-label matching the photo
+  // sub-groups. Recording/playback behavior is unchanged.
+  embedded?: boolean
 }
 
 // Stable pseudo-random waveform seeded from note ID
@@ -192,7 +196,7 @@ function VoiceNoteCard({ note, onDelete }: { note: VoiceNote; onDelete: (id: str
   )
 }
 
-export default function VoiceSection({ orderId }: Props) {
+export default function VoiceSection({ orderId, embedded = false }: Props) {
   const [notes, setNotes] = useState<VoiceNote[]>([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
@@ -218,15 +222,21 @@ export default function VoiceSection({ orderId }: Props) {
 
   if (loading) {
     return (
-      <div className="mx-5 mb-4 py-4 flex items-center justify-center">
+      <div className={`${embedded ? '' : 'mx-5 mb-4'} py-4 flex items-center justify-center`}>
         <div className="w-4 h-4 border border-[#A0A09C] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="mx-5 mb-4">
-      <p className="text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3">Voice Notes</p>
+    <div className={embedded ? '' : 'mx-5 mb-4'}>
+      {/* In the Work Instructions card a compact "Voice" sub-label matches the photo
+          sub-groups; standalone it keeps the uppercase section header (VS-28.2). */}
+      <p className={embedded
+        ? 'text-xs font-medium text-[#6B6B67] mb-2'
+        : 'text-[11px] font-semibold text-[#A0A09C] uppercase tracking-widest mb-3'}>
+        {embedded ? 'Voice' : 'Voice Notes'}
+      </p>
 
       <MicButton orderId={orderId} onNoteAdded={handleNoteAdded} />
 
