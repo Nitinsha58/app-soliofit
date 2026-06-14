@@ -1,6 +1,6 @@
 # VS-27 — Strict Bill ↔ Installment Plan (Program Overview)
 
-**Status:** In progress — 27.1 implemented (in review); 27.2–27.5 pending
+**Status:** In progress — 27.1/27.3/27.4 done, 27.5 implemented (in review, incl. backend cutover); 27.2 backfill pending
 **Created:** 2026-06-14
 **Decision record:** [ADR-0009 — Strict Installment Plan](../../adr/ADR-0009-strict-installment-plan.md)
 
@@ -80,7 +80,7 @@ No separate billing model is introduced — billing stays an **order attribute**
 | [27.2](./vs-27.2-legacy-audit-backfill.md) | Legacy audit + backfill | Backend (data) | 27.1 | Pending |
 | [27.3](./vs-27.3-quick-date-input.md) | QuickDateInput component | Frontend | — | **Implemented — in review** |
 | [27.4](./vs-27.4-add-order-plan.md) | Add Order strict plan | Frontend | 27.1, 27.3 | **Verified** (browser pass) |
-| [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" | Frontend | 27.1, 27.3 | Pending |
+| [27.5](./vs-27.5-drawer-edit-bill-and-plan.md) | Drawer "Edit bill & plan" + backend cutover | Frontend + Backend | 27.1, 27.3 | **Implemented — in review** |
 
 **Execution order:** 27.1 (additive backend) → 27.3 (date input) → 27.4 + 27.5 (frontend)
 **+ cutover** → 27.2 backfill.
@@ -108,6 +108,17 @@ holds across both new and legacy data at the same moment.
 
 ## Completion log
 
+- **2026-06-14 — VS-27.5 implemented (in review). The cutover release.** On
+  `feat/vs-27-cutover`. **Part A (`941f3fb`)** — the order drawer's `PaymentSchedule` is now a
+  read-only-by-default whole-plan editor: one dominant "Edit bill & plan" action stages the
+  bill + unpaid rows together and commits one atomic `PUT /orders/{id}/billing/`
+  (`replaceSchedule`); paid rows are locked; sticky save bar only when dirty. The bill is
+  read-only in `OrderInfoSection` (autosave bill field removed). Dead `InstallmentSection.tsx`
+  deleted; deprecated single-row write API clients removed. **Part B (`b5b048f`)** — backend
+  cutover: auto-default-on-omit, `total_amount` read-only on the generic PATCH, and removal of
+  the single-row write endpoints (`POST /installments/`, `PATCH/DELETE /installments/{id}/`).
+  Part A committed before Part B so the UI was never calling a removed endpoint. Frontend
+  type-check clean; **168 backend tests pass.** Only **VS-27.2 backfill** remains open.
 - **2026-06-14 — VS-27.4 verified (browser pass).** Review-fix pass applied and confirmed:
   removed the artificial per-row cap (the `Σ == bill` gate is the single structural source of
   truth — Add stays usable from a fully-scheduled default); added a shared `lib/money.ts`
