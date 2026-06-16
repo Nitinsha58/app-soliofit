@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { logout as logoutApi } from '@/lib/api/auth'
 import { useAuthStore, type AuthUser } from '@/stores/useAuthStore'
@@ -18,6 +18,24 @@ function initials(user: AuthUser | null): string {
   const email = user?.email?.trim()
   if (email) return email.charAt(0).toUpperCase()
   return 'S'
+}
+
+function PaymentsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  )
+}
+
+function CustomersIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
 }
 
 function CalendarIcon() {
@@ -48,8 +66,38 @@ function LogoutIcon() {
   )
 }
 
+function NavItem({
+  href,
+  icon,
+  label,
+  pathname,
+  onClose,
+}: {
+  href: string
+  icon: React.ReactNode
+  label: string
+  pathname: string
+  onClose: () => void
+}) {
+  const active = pathname === href || pathname.startsWith(href + '/')
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      onClick={onClose}
+      className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors ${
+        active ? 'bg-[#FBF3E3] text-[#C8952A]' : 'text-[#1A1A18] hover:bg-gray-50'
+      }`}
+    >
+      <span className={active ? 'text-[#C8952A]' : 'text-[#A0A09C]'}>{icon}</span>
+      {label}
+    </Link>
+  )
+}
+
 export default function ProfileMenu() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, logout: storeLogout } = useAuthStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -86,6 +134,7 @@ export default function ProfileMenu() {
           role="menu"
           className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-[#E5E5E2] shadow-lg py-1 z-50"
         >
+          {/* Identity */}
           <div className="px-3 py-2 border-b border-[#F0F0EE]">
             <p className="text-sm font-semibold text-[#1A1A18] truncate leading-tight">
               {user?.business_name || 'My Boutique'}
@@ -94,24 +143,17 @@ export default function ProfileMenu() {
               <p className="text-xs text-[#6B6B67] truncate mt-0.5">{user.owner_name}</p>
             )}
           </div>
-          <Link
-            href="/calendar"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#1A1A18] hover:bg-gray-50 transition-colors"
-          >
-            <span className="text-[#A0A09C]"><CalendarIcon /></span>
-            Calendar
-          </Link>
-          <Link
-            href="/settings"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#1A1A18] hover:bg-gray-50 transition-colors"
-          >
-            <span className="text-[#A0A09C]"><SettingsIcon /></span>
-            Settings
-          </Link>
+
+          {/* Primary nav — routes moved off bottom nav */}
+          <NavItem href="/payments" icon={<PaymentsIcon />} label="Payments" pathname={pathname} onClose={() => setOpen(false)} />
+          <NavItem href="/customers" icon={<CustomersIcon />} label="Customers" pathname={pathname} onClose={() => setOpen(false)} />
+          <NavItem href="/calendar" icon={<CalendarIcon />} label="Calendar" pathname={pathname} onClose={() => setOpen(false)} />
+
+          {/* Divider — separates nav from account actions */}
+          <div className="my-1 border-t border-[#F0F0EE]" />
+
+          {/* Account actions */}
+          <NavItem href="/settings" icon={<SettingsIcon />} label="Settings" pathname={pathname} onClose={() => setOpen(false)} />
           <button
             role="menuitem"
             onClick={handleLogout}

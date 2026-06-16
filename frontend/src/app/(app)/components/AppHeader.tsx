@@ -58,7 +58,9 @@ export default function AppHeader() {
           </button>
 
           <NotificationBell dropdownSide="right" />
-          <ProfileMenu />
+          <div className="lg:hidden">
+            <ProfileMenu />
+          </div>
         </div>
       </div>
     </header>

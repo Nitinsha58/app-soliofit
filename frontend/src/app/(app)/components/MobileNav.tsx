@@ -26,29 +26,9 @@ function OrdersIcon() {
   )
 }
 
-function PaymentsIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
-    </svg>
-  )
-}
-
-function CustomersIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  )
-}
-
 const tabs = [
   { href: '/dashboard', label: 'Dashboard', icon: <HomeIcon /> },
   { href: '/orders', label: 'Orders', icon: <OrdersIcon /> },
-  { href: '/payments', label: 'Payments', icon: <PaymentsIcon /> },
-  { href: '/customers', label: 'Customers', icon: <CustomersIcon /> },
 ]
 
 export default function MobileNav() {
@@ -62,8 +42,8 @@ export default function MobileNav() {
     <nav className="lg:hidden flex-shrink-0 bg-white border-t border-[#E5E5E2]"
          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="h-14 flex items-center justify-around w-full px-2">
-        {/* First 2 tabs */}
-        {tabs.slice(0, 2).map((tab) => {
+        {/* Dashboard */}
+        {tabs.slice(0, 1).map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
           return (
             <Link
@@ -91,8 +71,8 @@ export default function MobileNav() {
           </svg>
         </button>
 
-        {/* Last 2 tabs */}
-        {tabs.slice(2).map((tab) => {
+        {/* Orders */}
+        {tabs.slice(1).map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
           return (
             <Link
