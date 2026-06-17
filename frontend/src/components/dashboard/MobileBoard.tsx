@@ -10,14 +10,24 @@ import { useUIStore } from '@/stores/useUIStore'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-type Mode = 'urgent' | 'all'
+type Mode = 'urgent' | 'all' | 'payments'
 type ColumnQuery = ReturnType<typeof useColumnQuery>
+type PaymentState = Order['payment_state']
 
 // Urgent = work that still needs tailoring attention. Ready (work done) and
 // Delivered (closed) are intentionally excluded so they don't compete for focus.
 const URGENT_STATUSES: Order['status'][] = ['Booked', 'Started', 'Partial Delivery']
 // Canonical workflow order for the All Orders status grouping.
 const STATUS_ORDER: Order['status'][] = ['Booked', 'Started', 'Ready', 'Partial Delivery', 'Delivered']
+
+// Payments view sources work-progressed statuses where money may still be owed.
+// (Booked/Started are still the delivery lens — they live in Urgent, not here.)
+const PAYMENT_STATUSES: Order['status'][] = ['Ready', 'Partial Delivery', 'Delivered']
+
+// Within a date group, surface the most-urgent payment first.
+const PAYMENT_PRIORITY: Record<PaymentState, number> = {
+  overdue: 0, partial: 1, pending: 2, completed: 3, unbilled: 4,
+}
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -63,6 +73,11 @@ const URGENCY_TEXT: Record<Urgency, string> = {
 // Σ order value (total_amount) over a set of orders (per-day total in Urgent).
 function sumValue(orders: Order[]): number {
   return orders.reduce((s, o) => s + (Number(o.total_amount) || 0), 0)
+}
+
+// Σ outstanding balance (remaining) over a set of orders (per-group total in Payments).
+function sumRemaining(orders: Order[]): number {
+  return orders.reduce((s, o) => s + (Number(o.remaining) || 0), 0)
 }
 
 function flatRows(q: ColumnQuery): Order[] {
@@ -113,11 +128,15 @@ export default function MobileBoard() {
       <Segmented<Mode>
         value={mode}
         onChange={setMode}
-        options={[{ value: 'urgent', label: 'Urgent' }, { value: 'all', label: 'All Orders' }]}
+        options={[
+          { value: 'urgent', label: 'Urgent' },
+          { value: 'all', label: 'All Orders' },
+          { value: 'payments', label: 'Payments' },
+        ]}
       />
-      {mode === 'urgent'
-        ? <UrgentView onOrderClick={openOrderDetail} />
-        : <AllOrdersView onOrderClick={openOrderDetail} />}
+      {mode === 'urgent' && <UrgentView onOrderClick={openOrderDetail} />}
+      {mode === 'all' && <AllOrdersView onOrderClick={openOrderDetail} />}
+      {mode === 'payments' && <PaymentsView onOrderClick={openOrderDetail} />}
     </div>
   )
 }
@@ -135,7 +154,7 @@ function Segmented<T extends string>({
           <button
             key={o.value}
             onClick={() => onChange(o.value)}
-            className={`px-4 py-1.5 text-[13px] font-semibold rounded-lg transition-colors ${
+            className={`px-3 py-1.5 text-[13px] font-semibold rounded-lg transition-colors ${
               active
                 ? 'bg-[#1A1A18] text-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
                 : 'text-[#6B6B67] hover:text-[#1A1A18]'
@@ -245,6 +264,112 @@ function DateGroup({
       </div>
       <div className="space-y-2.5">{children}</div>
     </section>
+  )
+}
+
+// ── Payments view — the collection lens, date-grouped, lazy-loaded on scroll ──
+// Work-progressed orders (Ready / Partial Delivery / Delivered) that still owe
+// money. Grouped by delivery date, overdue dates first (same layout as Urgent).
+// The header shows ₹ still to collect from that date + count of orders.
+// Within each date group, orders are sorted by payment urgency (overdue → partial
+// → pending) so the most urgent collection surfaces at the top of the group.
+function PaymentsView({ onOrderClick }: { onOrderClick: (id: string) => void }) {
+  const ready = useColumnQuery('Ready', false)
+  const partial = useColumnQuery('Partial Delivery', false)
+  // A delivered order with a balance can be old, so load the recent window then
+  // chain the older tail — otherwise long-settled-but-unpaid orders never surface.
+  const deliveredRecent = useColumnQuery('Delivered', false)
+  const recentExhausted =
+    !deliveredRecent.hasNextPage && !deliveredRecent.isFetchingNextPage &&
+    (deliveredRecent.data?.pages.length ?? 0) > 0
+  const deliveredOlder = useColumnQuery('Delivered', true, recentExhausted)
+  const sources = [ready, partial, deliveredRecent, deliveredOlder]
+
+  const today = ymd(new Date())
+  const tomorrow = ymd(addDays(new Date(), 1))
+
+  // Keep only orders with an outstanding balance; dedupe by id (the delivered
+  // recent/older windows are keyset-disjoint, but ids must stay unique).
+  const seen = new Set<string>()
+  const outstanding = sources.flatMap(flatRows).filter((o) => {
+    if (seen.has(o.id)) return false
+    seen.add(o.id)
+    return o.payment_state === 'overdue' || o.payment_state === 'partial' || o.payment_state === 'pending'
+  })
+
+  // Bucket by delivery date; orders missing a date go to a trailing group.
+  const byDate = new Map<string, Order[]>()
+  const undated: Order[] = []
+  for (const o of outstanding) {
+    if (!o.delivery_date) { undated.push(o); continue }
+    const list = byDate.get(o.delivery_date)
+    if (list) list.push(o)
+    else byDate.set(o.delivery_date, [o])
+  }
+  const dateKeys = Array.from(byDate.keys()).sort()
+
+  const initialLoading = ready.isLoading || partial.isLoading || deliveredRecent.isLoading
+  const hasMore =
+    !!ready.hasNextPage || !!partial.hasNextPage || !!deliveredRecent.hasNextPage ||
+    (recentExhausted && !!deliveredOlder.hasNextPage)
+  const busy = sources.some((q) => q.isFetchingNextPage)
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useLoadMoreOnScroll(sentinelRef, true, hasMore, busy, () => {
+    if (ready.hasNextPage && !ready.isFetchingNextPage) ready.fetchNextPage()
+    if (partial.hasNextPage && !partial.isFetchingNextPage) partial.fetchNextPage()
+    if (deliveredRecent.hasNextPage && !deliveredRecent.isFetchingNextPage) deliveredRecent.fetchNextPage()
+    else if (recentExhausted && deliveredOlder.hasNextPage && !deliveredOlder.isFetchingNextPage) deliveredOlder.fetchNextPage()
+  })
+
+  if (initialLoading && outstanding.length === 0) return <Spinner />
+
+  return (
+    <div className="space-y-4">
+      {dateKeys.map((dateStr) => {
+        const urgency = dayUrgency(dateStr, today, tomorrow)
+        const groupOrders = [...byDate.get(dateStr)!].sort((a, b) => {
+          const ps = PAYMENT_PRIORITY[a.payment_state] - PAYMENT_PRIORITY[b.payment_state]
+          return ps !== 0 ? ps : a.order_number - b.order_number
+        })
+        return (
+          <DateGroup
+            key={dateStr}
+            label={dayLabel(dateStr, today, tomorrow)}
+            count={groupOrders.length}
+            value={sumRemaining(groupOrders)}
+            labelClass={URGENCY_TEXT[urgency]}
+          >
+            {groupOrders.map((o) => (
+              <OrderCard key={o.id} order={o} showStatus onClick={() => onOrderClick(o.id)} />
+            ))}
+          </DateGroup>
+        )
+      })}
+
+      {undated.length > 0 && (
+        <DateGroup label="No delivery date" count={undated.length} value={sumRemaining(undated)} labelClass="text-[#6B6B67]">
+          {[...undated]
+            .sort((a, b) => {
+              const ps = PAYMENT_PRIORITY[a.payment_state] - PAYMENT_PRIORITY[b.payment_state]
+              return ps !== 0 ? ps : a.order_number - b.order_number
+            })
+            .map((o) => (
+              <OrderCard key={o.id} order={o} showStatus onClick={() => onOrderClick(o.id)} />
+            ))}
+        </DateGroup>
+      )}
+
+      {outstanding.length === 0 && !hasMore && !busy && (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-sm font-medium text-[#6B6B67]">No payments to collect</p>
+          <p className="text-xs text-[#A0A09C] mt-1">Ready &amp; delivered orders are all paid up</p>
+        </div>
+      )}
+
+      {(busy || (hasMore && outstanding.length === 0)) && <Spinner small />}
+      <div ref={sentinelRef} className="h-px" />
+    </div>
   )
 }
 
