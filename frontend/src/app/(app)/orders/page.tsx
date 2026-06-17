@@ -3,8 +3,9 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useQueries } from '@tanstack/react-query'
-import { listOrders, type Order } from '@/lib/api/orders'
+import { listOrders, type Order, STATUS_ACCENT } from '@/lib/api/orders'
 import { compactInr } from '@/lib/orderPayment'
+import { STATUS_PILL } from '@/lib/orderStatus'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
 
@@ -15,6 +16,8 @@ const COLUMN_GAP    = 10
 const COLUMN_STEP   = COLUMN_WIDTH + COLUMN_GAP   // 270
 const MAX_WEEKS     = 9
 const INIT_PREV_WEEKS = 1                          // weeks preloaded to the left on init
+
+const STATUS_ORDER: Order['status'][] = ['Booked', 'Started', 'Ready', 'Partial Delivery', 'Delivered']
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -91,12 +94,19 @@ interface DayColumnProps {
 }
 
 function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
-  const dateStr  = toDateStr(date)
-  const isToday  = dateStr === todayStr
-  const sorted   = sortByPriority(orders, dateStr, todayStr)
-  const count    = orders.length
-  const total    = orders.reduce((s, o) => s + Number(o.total_amount), 0)
+  const dateStr   = toDateStr(date)
+  const isToday   = dateStr === todayStr
+  const count     = orders.length
+  const total     = orders.reduce((s, o) => s + Number(o.total_amount), 0)
   const collected = orders.reduce((s, o) => s + Number(o.amount_paid), 0)
+
+  // Group by status in canonical order; sort within each group by urgency
+  const groups = STATUS_ORDER
+    .map(status => ({
+      status,
+      orders: sortByPriority(orders.filter(o => o.status === status), dateStr, todayStr),
+    }))
+    .filter(g => g.orders.length > 0)
 
   return (
     <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
@@ -123,22 +133,42 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
         )}
       </div>
 
-      {/* Cards — independently scrollable */}
+      {/* Groups — independently scrollable */}
       <div
         className="flex flex-col gap-2 overflow-y-auto pb-3"
         style={{ maxHeight: 'calc(100dvh - 192px)' }}
       >
-        {sorted.length === 0 ? (
+        {count === 0 ? (
           <div className="flex items-center justify-center py-5">
             <span className="text-[#C8CDD9] text-base select-none">—</span>
           </div>
-        ) : sorted.map((order) => (
-          <ScheduleCard
-            key={order.id}
-            order={order}
-            onClick={() => onOrderClick(order.id)}
-          />
-        ))}
+        ) : groups.map(({ status, orders: groupOrders }) => {
+          const accent = STATUS_ACCENT[status]
+          return (
+            <div
+              key={status}
+              className="rounded-lg border border-dashed p-1.5 flex flex-col gap-1.5"
+              style={{ backgroundColor: `${accent}12`, borderColor: `${accent}60` }}
+            >
+              {/* Group header: status pill + count */}
+              <div className="flex items-center justify-between px-0.5">
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_PILL[status]}`}>
+                  {status}
+                </span>
+                <span className="text-[10px] font-bold tabular-nums" style={{ color: accent }}>
+                  {groupOrders.length}
+                </span>
+              </div>
+              {groupOrders.map(order => (
+                <ScheduleCard
+                  key={order.id}
+                  order={order}
+                  onClick={() => onOrderClick(order.id)}
+                />
+              ))}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
