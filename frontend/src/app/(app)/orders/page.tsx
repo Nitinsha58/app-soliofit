@@ -100,31 +100,25 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
 
   return (
     <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
-      {/* Header */}
-      <div className={`px-2.5 pt-2 pb-2 rounded-sm mb-2 flex-shrink-0 ${
+      {/* Header — single row: date label · collected/total · count */}
+      <div className={`flex items-center gap-2 px-2.5 py-2 rounded-sm mb-2 flex-shrink-0 ${
         isToday
           ? 'bg-[#FBF3E3] border border-[#F0D9A8] border-t-[3px] border-t-[#C8952A]'
           : 'bg-[#F7F7F5] border border-[#E5E5E2] border-t-[3px] border-t-[#DCDCD8]'
       }`}>
-        {/* Row 1: date label + count badge */}
-        <div className="flex items-center justify-between gap-1">
-          <span className={`text-[11.5px] font-bold truncate ${isToday ? 'text-[#C8952A]' : 'text-[#1A1A18]'}`}>
-            {dayHeaderLabel(date)}
-          </span>
-          {count > 0 && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums flex-shrink-0 ${
+        <span className={`text-[11.5px] font-bold truncate flex-1 min-w-0 ${isToday ? 'text-[#C8952A]' : 'text-[#1A1A18]'}`}>
+          {dayHeaderLabel(date)}
+        </span>
+        {count > 0 && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span className="text-[10.5px] font-bold text-emerald-600 tabular-nums">{compactInr(collected)}</span>
+            <span className="text-[10px] text-[#B0B0AC]">/</span>
+            <span className="text-[10.5px] font-bold text-[#1A1A18] tabular-nums">{compactInr(total)}</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${
               isToday ? 'bg-[#C8952A28] text-[#C8952A]' : 'bg-[#DCDCD844] text-[#6B6B67]'
             }`}>
               {count}
             </span>
-          )}
-        </div>
-        {/* Row 2: collected (green) / total (dark) */}
-        {count > 0 && (
-          <div className="flex items-center gap-1 mt-1">
-            <span className="text-[11px] font-bold text-emerald-600 tabular-nums">{compactInr(collected)}</span>
-            <span className="text-[10px] font-medium text-[#B0B0AC]">/</span>
-            <span className="text-[11px] font-bold text-[#1A1A18] tabular-nums">{compactInr(total)}</span>
           </div>
         )}
       </div>
