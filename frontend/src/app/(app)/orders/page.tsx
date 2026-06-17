@@ -109,12 +109,15 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
     .filter(g => g.orders.length > 0)
 
   return (
-    <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
+    <div
+      className="flex-shrink-0 flex flex-col rounded-xl bg-[#F7F7F5] overflow-hidden"
+      style={{ width: `${COLUMN_WIDTH}px`, boxShadow: 'inset 0 0 0 1px #E5E5E2' }}
+    >
       {/* Header — single row: date label · collected/total · count */}
-      <div className={`flex items-center gap-2 px-2.5 py-2 rounded-sm mb-2 flex-shrink-0 ${
+      <div className={`flex items-center gap-2 px-2.5 py-2 flex-shrink-0 ${
         isToday
-          ? 'bg-[#FBF3E3] border border-[#F0D9A8] border-t-[3px] border-t-[#C8952A]'
-          : 'bg-[#F7F7F5] border border-[#E5E5E2] border-t-[3px] border-t-[#DCDCD8]'
+          ? 'bg-[#FBF3E3] border-b border-[#F0D9A8] border-t-[3px] border-t-[#C8952A]'
+          : 'border-b border-[#E5E5E2] border-t-[3px] border-t-[#DCDCD8]'
       }`}>
         <span className={`text-[11.5px] font-bold truncate flex-1 min-w-0 ${isToday ? 'text-[#C8952A]' : 'text-[#1A1A18]'}`}>
           {dayHeaderLabel(date)}
@@ -135,7 +138,7 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
 
       {/* Groups — independently scrollable */}
       <div
-        className="flex flex-col gap-2 overflow-y-auto pb-3"
+        className="flex flex-col gap-2 overflow-y-auto p-2"
         style={{ maxHeight: 'calc(100dvh - 192px)' }}
       >
         {count === 0 ? (
