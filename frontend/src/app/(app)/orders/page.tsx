@@ -4,14 +4,15 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react
 import Link from 'next/link'
 import { useQueries } from '@tanstack/react-query'
 import { listOrders, type Order } from '@/lib/api/orders'
+import { compactInr } from '@/lib/orderPayment'
 import { useUIStore } from '@/stores/useUIStore'
 import ScheduleCard from '@/components/orders/ScheduleView/ScheduleCard'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
-const COLUMN_WIDTH  = 200
+const COLUMN_WIDTH  = 260
 const COLUMN_GAP    = 10
-const COLUMN_STEP   = COLUMN_WIDTH + COLUMN_GAP   // 210
+const COLUMN_STEP   = COLUMN_WIDTH + COLUMN_GAP   // 270
 const MAX_WEEKS     = 9
 const INIT_PREV_WEEKS = 1                          // weeks preloaded to the left on init
 
@@ -90,25 +91,48 @@ interface DayColumnProps {
 }
 
 function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
-  const dateStr = toDateStr(date)
-  const isToday = dateStr === todayStr
-  const sorted  = sortByPriority(orders, dateStr, todayStr)
+  const dateStr  = toDateStr(date)
+  const isToday  = dateStr === todayStr
+  const sorted   = sortByPriority(orders, dateStr, todayStr)
+  const count    = orders.length
+  const total    = orders.reduce((s, o) => s + Number(o.total_amount), 0)
+  const collected = orders.reduce((s, o) => s + Number(o.amount_paid), 0)
 
   return (
     <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
-      {/* Header — fixed height, uniform across all columns */}
-      <div className={`flex items-center h-8 px-2.5 rounded-sm text-[11px] font-semibold mb-2 flex-shrink-0 ${
+      {/* Header */}
+      <div className={`px-2.5 pt-2 pb-2 rounded-sm mb-2 flex-shrink-0 ${
         isToday
-          ? 'bg-[#FBF3E3] border border-[#F0D9A8] border-t-2 border-t-[#C8952A] text-[#C8952A]'
-          : 'bg-[#F7F7F5] border border-[#E5E5E2] text-[#6B6B67]'
+          ? 'bg-[#FBF3E3] border border-[#F0D9A8] border-t-[3px] border-t-[#C8952A]'
+          : 'bg-[#F7F7F5] border border-[#E5E5E2] border-t-[3px] border-t-[#DCDCD8]'
       }`}>
-        {dayHeaderLabel(date)}
+        {/* Row 1: date label + count badge */}
+        <div className="flex items-center justify-between gap-1">
+          <span className={`text-[11.5px] font-bold truncate ${isToday ? 'text-[#C8952A]' : 'text-[#1A1A18]'}`}>
+            {dayHeaderLabel(date)}
+          </span>
+          {count > 0 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums flex-shrink-0 ${
+              isToday ? 'bg-[#C8952A28] text-[#C8952A]' : 'bg-[#DCDCD844] text-[#6B6B67]'
+            }`}>
+              {count}
+            </span>
+          )}
+        </div>
+        {/* Row 2: collected (green) / total (dark) */}
+        {count > 0 && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-[11px] font-bold text-emerald-600 tabular-nums">{compactInr(collected)}</span>
+            <span className="text-[10px] font-medium text-[#B0B0AC]">/</span>
+            <span className="text-[11px] font-bold text-[#1A1A18] tabular-nums">{compactInr(total)}</span>
+          </div>
+        )}
       </div>
 
       {/* Cards — independently scrollable */}
       <div
         className="flex flex-col gap-2 overflow-y-auto pb-3"
-        style={{ maxHeight: 'calc(100dvh - 166px)' }}
+        style={{ maxHeight: 'calc(100dvh - 192px)' }}
       >
         {sorted.length === 0 ? (
           <div className="flex items-center justify-center py-5">
