@@ -2,12 +2,22 @@
 
 import { STATUS_ACCENT, type Order } from '@/lib/api/orders'
 import { paymentMeta, inr, lastChanged, paidColorClass } from '@/lib/orderPayment'
+import { STATUS_PILL } from '@/lib/orderStatus'
 
 interface Props {
   order: Order
   onClick?: () => void
   /** Previous status, shown as "From <status>" briefly after a drag move. */
   movedFrom?: Order['status']
+  /**
+   * Card-level urgency treatment (mobile Urgent view). Drives the whole card frame —
+   * red for overdue, amber for due today/tomorrow, neutral for upcoming. When set,
+   * `priority` deepens the same colour instead of showing the gold accent border.
+   * Omitted = default desktop appearance (gold border for priority, neutral otherwise).
+   */
+  urgency?: 'overdue' | 'soon' | 'upcoming'
+  /** Show the order's current status as a pill left of the order number (mobile lists). */
+  showStatus?: boolean
 }
 
 function formatDate(dateStr: string): string {
@@ -15,7 +25,26 @@ function formatDate(dateStr: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export default function OrderCard({ order, onClick, movedFrom }: Props) {
+// Card frame (border + background) for a given urgency. Priority deepens the colour
+// of an overdue/soon card; on neutral/upcoming cards priority keeps the gold accent.
+function frameClass(urgency: Props['urgency'], priority: boolean): string {
+  if (urgency === 'overdue') {
+    return priority
+      ? 'bg-red-50 border-l-[3px] border-l-red-500 border-t border-r border-b border-red-200'
+      : 'bg-red-50/40 border-l-[3px] border-l-red-300 border-t border-r border-b border-[#E5E5E2]'
+  }
+  if (urgency === 'soon') {
+    return priority
+      ? 'bg-amber-50 border-l-[3px] border-l-amber-500 border-t border-r border-b border-amber-200'
+      : 'bg-amber-50/40 border-l-[3px] border-l-amber-300 border-t border-r border-b border-[#E5E5E2]'
+  }
+  // upcoming / unset — default board appearance
+  return priority
+    ? 'bg-white border-l-[3px] border-l-[#C8952A] border-t border-t-[#E5E5E2] border-r border-r-[#E5E5E2] border-b border-b-[#E5E5E2]'
+    : 'bg-white border border-[#E5E5E2]'
+}
+
+export default function OrderCard({ order, onClick, movedFrom, urgency, showStatus }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isOverdue = order.delivery_date < todayStr && order.status !== 'Delivered'
@@ -25,11 +54,7 @@ export default function OrderCard({ order, onClick, movedFrom }: Props) {
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 ${
-        order.priority
-          ? 'border-l-[3px] border-l-[#C8952A] border-t border-t-[#E5E5E2] border-r border-r-[#E5E5E2] border-b border-b-[#E5E5E2]'
-          : 'border border-[#E5E5E2]'
-      }`}
+      className={`rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 ${frameClass(urgency, order.priority)}`}
     >
       {/* Customer + date */}
       <div className="flex items-start justify-between gap-2">
@@ -55,6 +80,11 @@ export default function OrderCard({ order, onClick, movedFrom }: Props) {
       {/* Order number + priority + paid/total (or plain bill when unbilled) */}
       <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#EBEBEA]">
         <div className="flex items-center gap-1.5">
+          {showStatus && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_PILL[order.status]}`}>
+              {order.status}
+            </span>
+          )}
           <span className="text-[11px] text-[#B0B0AC] tabular-nums font-medium">
             #{String(order.order_number).padStart(4, '0')}
           </span>

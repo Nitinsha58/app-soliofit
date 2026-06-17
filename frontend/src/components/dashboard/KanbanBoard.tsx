@@ -226,9 +226,9 @@ export default function KanbanBoard() {
         </DndContext>
       </div>
 
-      {/* Mobile board (single focused column) */}
+      {/* Mobile board (Urgent / All Orders) */}
       <div className="lg:hidden">
-        <MobileBoard activeFilter={activeFilter} setActiveFilter={setActiveFilter} filterFn={filterFn} />
+        <MobileBoard />
       </div>
 
       {/* Undo snackbar (shared) */}
