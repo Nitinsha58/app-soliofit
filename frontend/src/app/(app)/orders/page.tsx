@@ -97,17 +97,17 @@ function DayColumn({ date, orders, todayStr, onOrderClick }: DayColumnProps) {
   return (
     <div className="flex-shrink-0 flex flex-col" style={{ width: `${COLUMN_WIDTH}px` }}>
       {/* Header — fixed height, uniform across all columns */}
-      <div className={`flex items-center h-8 px-2.5 rounded-sm text-[11px] font-bold tracking-[0.01em] mb-2 flex-shrink-0 ${
+      <div className={`flex items-center h-8 px-2.5 rounded-sm text-[11px] font-semibold mb-2 flex-shrink-0 ${
         isToday
-          ? 'bg-[#FDF3E3] border-l-2 border-l-[#C8952A] border-t border-t-[#F0D9A8] border-r border-r-[#F0D9A8] border-b border-b-[#F0D9A8] text-[#C8952A]'
-          : 'bg-[#E8EAF0] border border-[#CDD2E0] text-[#1E293B]'
+          ? 'bg-[#FBF3E3] border border-[#F0D9A8] border-t-2 border-t-[#C8952A] text-[#C8952A]'
+          : 'bg-[#F7F7F5] border border-[#E5E5E2] text-[#6B6B67]'
       }`}>
         {dayHeaderLabel(date)}
       </div>
 
       {/* Cards — independently scrollable */}
       <div
-        className="flex flex-col gap-1.5 overflow-y-auto pb-3"
+        className="flex flex-col gap-2 overflow-y-auto pb-3"
         style={{ maxHeight: 'calc(100dvh - 166px)' }}
       >
         {sorted.length === 0 ? (
@@ -286,9 +286,9 @@ export default function OrdersSchedulePage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#F0F1F4]">
+    <div className="flex flex-col h-full bg-[#FAFAF8]">
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#D4D8E4] flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-[#E5E5E2] flex-shrink-0">
 
         <span className="text-[13px] font-semibold text-[#0A0F1E] flex-shrink-0 min-w-[72px]">
           {scrollLabel}
@@ -299,7 +299,7 @@ export default function OrdersSchedulePage() {
         <button
           type="button"
           onClick={scrollToToday}
-          className="flex items-center px-2.5 py-1 border border-[#BCC2D0] rounded bg-[#F0F0EE] text-[12px] font-semibold text-[#2D3748] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
+          className="flex items-center px-2.5 py-1 border border-[#E5E5E2] rounded bg-[#F7F7F5] text-[12px] font-semibold text-[#6B6B67] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
         >
           Today
         </button>
@@ -309,7 +309,7 @@ export default function OrdersSchedulePage() {
           href="/calendar"
           aria-label="Open calendar"
           title="Calendar"
-          className="w-[26px] h-[26px] flex items-center justify-center border border-[#BCC2D0] rounded bg-white text-[#2D3748] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
+          className="w-[26px] h-[26px] flex items-center justify-center border border-[#E5E5E2] rounded bg-white text-[#6B6B67] hover:border-[#C8952A] hover:text-[#C8952A] transition-colors flex-shrink-0"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />

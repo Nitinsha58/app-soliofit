@@ -16,21 +16,21 @@ export default function ScheduleCard({ order, onClick }: Props) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left bg-white rounded-md cursor-pointer transition-shadow hover:shadow-[0_2px_8px_rgba(10,15,30,0.13)] ${
+      className={`w-full text-left bg-white rounded-lg px-3 py-2.5 cursor-pointer transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.09)] ${
         order.priority
           ? 'border-l-[3px] border-l-[#C8952A] border-t border-t-[#E5E5E2] border-r border-r-[#E5E5E2] border-b border-b-[#E5E5E2]'
-          : 'border border-[#D4D8E4]'
+          : 'border border-[#E5E5E2]'
       }`}
-      style={{ padding: '8px 10px', boxShadow: '0 1px 2px rgba(10,15,30,0.07)' }}
+      style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
     >
-      {/* Customer name */}
-      <p className="text-[13px] font-extrabold text-[#0A0F1E] truncate leading-snug">
+      {/* Name */}
+      <p className="text-[13px] font-semibold text-[#1A1A18] truncate leading-snug">
         {order.customer_name}
       </p>
 
-      {/* Order# + status + delayed */}
-      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-        <span className="text-[10px] font-medium text-[#94A3B8] tabular-nums">
+      {/* Meta: order# · status pill · payment pill */}
+      <div className="flex items-center gap-1 mt-1 flex-wrap">
+        <span className="text-[10px] font-medium text-[#B0B0AC] tabular-nums">
           #{String(order.order_number).padStart(4, '0')}
         </span>
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_PILL[order.status]}`}>
@@ -43,13 +43,16 @@ export default function ScheduleCard({ order, onClick }: Props) {
         )}
       </div>
 
-      {/* Amount: paid / total (+ remaining), or plain bill when unbilled */}
+      {/* Divider */}
+      <div className="mt-1.5 border-t border-[#EBEBEA]" />
+
+      {/* Amount */}
       {pay ? (
-        <p className="text-[12px] tabular-nums mt-1.5 leading-none">
+        <p className="text-[11.5px] tabular-nums mt-1.5 leading-none">
           <span className="font-bold text-[#1A1A18]">₹{inr(order.amount_paid)}</span>
-          <span className="font-semibold text-[#94A3B8]"> / ₹{inr(order.total_amount)}</span>
+          <span className="font-medium text-[#A0A09C]"> / ₹{inr(order.total_amount)}</span>
           {remaining > 0 && (
-            <span className="font-medium text-[#64748B]"> · ₹{inr(order.remaining)} due</span>
+            <span className="font-medium text-[#6B6B67]"> · ₹{inr(order.remaining)} due</span>
           )}
         </p>
       ) : (
