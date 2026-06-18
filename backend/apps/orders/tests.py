@@ -1044,3 +1044,89 @@ class BillReadOnlyTests(_Fixture):
         self.assertEqual(resp.status_code, 200)
         self.order.refresh_from_db()
         self.assertEqual(str(self.order.delivery_date), new_date)
+
+
+class OrderMessageLogTests(_Fixture):
+    """VS-29.1 — POST /orders/{id}/messages/ creates a send log and the detail endpoint
+    exposes messages_sent. Board and list endpoints must not include messages_sent."""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self._create_order()
+        self.url = f'/api/orders/{self.order.id}/messages/'
+
+    def _post(self, order_status='Ready', template_key='status_ready', **kwargs):
+        return self.client.post(self.url, {
+            'order_status': order_status,
+            'template_key': template_key,
+            **kwargs,
+        }, format='json')
+
+    def test_creates_log_and_returns_201(self):
+        from apps.orders.models import OrderMessageLog
+        resp = self._post()
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(OrderMessageLog.objects.filter(order=self.order).count(), 1)
+        log = OrderMessageLog.objects.get(order=self.order)
+        self.assertEqual(log.order_status, 'Ready')
+        self.assertEqual(log.template_key, 'status_ready')
+        self.assertEqual(log.channel, 'whatsapp')
+        self.assertEqual(log.sent_by, self.user)
+
+    def test_messages_sent_in_response(self):
+        resp = self._post()
+        self.assertIn('messages_sent', resp.data)
+        self.assertIn('Ready', resp.data['messages_sent'])
+
+    def test_resend_appends_row_and_updates_timestamp(self):
+        from apps.orders.models import OrderMessageLog
+        self._post()
+        self._post()
+        self.assertEqual(
+            OrderMessageLog.objects.filter(order=self.order, order_status='Ready').count(), 2)
+        # messages_sent returns the latest (first in -sent_at ordering)
+        resp = self.client.get(f'/api/orders/{self.order.id}/')
+        self.assertIn('Ready', resp.data['messages_sent'])
+
+    def test_multiple_statuses_tracked_independently(self):
+        self._post(order_status='Ready', template_key='status_ready')
+        self._post(order_status='Booked', template_key='status_booked')
+        resp = self.client.get(f'/api/orders/{self.order.id}/')
+        self.assertIn('Ready', resp.data['messages_sent'])
+        self.assertIn('Booked', resp.data['messages_sent'])
+
+    def test_cross_boutique_returns_404(self):
+        other = _user_in_new_boutique('other@test.com')
+        other_client = APIClient()
+        other_client.force_authenticate(user=other)
+        resp = other_client.post(self.url, {'order_status': 'Ready', 'template_key': 'k'}, format='json')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_invalid_order_status_returns_400(self):
+        resp = self._post(order_status='NotAStatus')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_missing_template_key_returns_400(self):
+        resp = self.client.post(self.url, {'order_status': 'Ready'}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_detail_endpoint_includes_messages_sent(self):
+        self._post()
+        resp = self.client.get(f'/api/orders/{self.order.id}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('messages_sent', resp.data)
+        self.assertEqual(resp.data['messages_sent']['Ready'], resp.data['messages_sent']['Ready'])
+
+    def test_list_endpoint_excludes_messages_sent(self):
+        self._post()
+        resp = self.client.get('/api/orders/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(len(resp.data) > 0)
+        self.assertNotIn('messages_sent', resp.data[0])
+
+    def test_board_endpoint_excludes_messages_sent(self):
+        self._post()
+        resp = self.client.get('/api/orders/board/?status=Booked')
+        self.assertEqual(resp.status_code, 200)
+        if resp.data.get('results'):
+            self.assertNotIn('messages_sent', resp.data['results'][0])

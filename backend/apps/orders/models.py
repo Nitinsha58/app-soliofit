@@ -80,3 +80,32 @@ class OrderActivity(models.Model):
 
     def __str__(self):
         return f'{self.activity_type} on {self.order}'
+
+
+class OrderMessageLog(models.Model):
+    """Append-only send log — one row per send-initiated WhatsApp (or future channel)
+    message. Tenancy follows the order (boutique-scoped via order FK, like OrderActivity)."""
+
+    class Channel(models.TextChoices):
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order        = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='message_logs')
+    order_status = models.CharField(max_length=20, choices=Order.Status.choices)
+    channel      = models.CharField(max_length=20, choices=Channel.choices, default=Channel.WHATSAPP)
+    template_key = models.CharField(max_length=100)
+    # Attribution only — SET_NULL so removing a staff account never drops send history.
+    sent_by      = models.ForeignKey('users.User', on_delete=models.SET_NULL,
+                                     null=True, blank=True, related_name='sent_messages')
+    sent_at      = models.DateTimeField(auto_now_add=True)
+    metadata     = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = 'order_message_logs'
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['order', 'order_status'], name='msg_order_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.channel} {self.order_status} for {self.order}'

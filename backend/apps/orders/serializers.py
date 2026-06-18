@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 from apps.customers.models import Customer
-from .models import Order
+from .models import Order, OrderMessageLog
 
 
 class NewInstallmentSerializer(serializers.Serializer):
@@ -92,3 +92,32 @@ class OrderSerializer(serializers.ModelSerializer):
         # `status` is read-only here: status is a domain event changed only via
         # the /status/ action (sets/clears delivered_at + writes activity).
         read_only_fields = ['id', 'order_number', 'status', 'created_at', 'updated_at', 'delivered_at']
+
+
+class OrderMessageLogSerializer(serializers.Serializer):
+    """Input-only: body for POST /orders/{id}/messages/."""
+    order_status = serializers.ChoiceField(choices=Order.Status.choices)
+    channel      = serializers.ChoiceField(
+        choices=OrderMessageLog.Channel.choices, default=OrderMessageLog.Channel.WHATSAPP)
+    template_key = serializers.CharField(max_length=100)
+    metadata     = serializers.JSONField(required=False, default=dict)
+
+
+class OrderDetailSerializer(OrderSerializer):
+    """Extends OrderSerializer with messages_sent — used on retrieve and the messages
+    action only. Board/list callers use OrderSerializer directly so this field never
+    touches list querysets (no N+1 risk on large boards)."""
+    messages_sent = serializers.SerializerMethodField()
+
+    def get_messages_sent(self, obj) -> dict:
+        # message_logs ordered -sent_at; first seen per status = latest timestamp.
+        # Hits the prefetch cache when the queryset used prefetch_related('message_logs');
+        # falls back to a per-object query if called without the prefetch.
+        result = {}
+        for log in obj.message_logs.all():
+            if log.order_status not in result:
+                result[log.order_status] = log.sent_at.isoformat()
+        return result
+
+    class Meta(OrderSerializer.Meta):
+        fields = OrderSerializer.Meta.fields + ['messages_sent']

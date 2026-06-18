@@ -16,8 +16,8 @@ from rest_framework.response import Response
 
 from apps.media.s3 import delete_objects
 from apps.payments.models import Installment
-from .models import Order, OrderActivity
-from .serializers import OrderBillingSerializer, OrderSerializer
+from .models import Order, OrderActivity, OrderMessageLog
+from .serializers import OrderBillingSerializer, OrderDetailSerializer, OrderMessageLogSerializer, OrderSerializer
 from .services import create_order_activity
 
 TWO_PLACES = Decimal('0.01')
@@ -31,6 +31,12 @@ def _schedule_sum(items):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     pagination_class = None
+
+    def get_serializer_class(self):
+        # messages_sent is detail-only (board/list stay on OrderSerializer).
+        if getattr(self, 'action', None) in ('retrieve', 'messages'):
+            return OrderDetailSerializer
+        return OrderSerializer
 
     def get_queryset(self):
         qs = (
@@ -90,6 +96,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             has_delayed_installment=Exists(delayed),
             amount_paid=Coalesce(Subquery(paid, output_field=money), Value(0, output_field=money)),
         )
+        # Prefetch message logs only for the detail and messages actions — avoids an
+        # N+1 on list/board while keeping messages_sent accurate on the detail endpoint.
+        if getattr(self, 'action', None) in ('retrieve', 'messages'):
+            qs = qs.prefetch_related('message_logs')
         return qs
 
     def perform_create(self, serializer):
@@ -237,6 +247,30 @@ class OrderViewSet(viewsets.ModelViewSet):
             'metadata': a.metadata,
             'created_at': a.created_at.isoformat(),
         } for a in acts])
+
+    @action(detail=True, methods=['post'], url_path='messages')
+    def messages(self, request, pk=None):
+        """VS-29.1 — record a send-initiated WhatsApp (or future channel) message for this
+        order. One row per send; re-sending the same status appends a new row. Returns the
+        full order detail (with updated messages_sent) so the frontend can update in one round-trip."""
+        order = self.get_object()
+        payload = OrderMessageLogSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        d = payload.validated_data
+        OrderMessageLog.objects.create(
+            order=order,
+            order_status=d['order_status'],
+            channel=d.get('channel', OrderMessageLog.Channel.WHATSAPP),
+            template_key=d['template_key'],
+            sent_by=request.user,
+            metadata=d.get('metadata', {}),
+        )
+        # Re-fetch through the annotated + prefetched queryset so messages_sent is fresh.
+        order = self.get_queryset().get(pk=order.pk)
+        return Response(
+            OrderDetailSerializer(order, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=['put'], url_path='billing')
     def billing(self, request, pk=None):
