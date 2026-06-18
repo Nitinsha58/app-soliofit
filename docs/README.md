@@ -61,6 +61,9 @@ Development follows a vertical slice approach. Each slice delivers an observable
 | VS-24 | Add Order notes photos | Post-MVP — Done |
 | VS-25 | Batch camera capture | Post-MVP — Done |
 | VS-26 | Media intake polish | Post-MVP — Done |
+| VS-27 | Strict installment plan | Post-MVP — Pending |
+| VS-28 | Order Detail command screen | Post-MVP — In progress |
+| VS-29 | Order WhatsApp messaging | Post-MVP — Pending |
 
 _Execution order for the final batch: VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18. **MVP complete and live** (app.soliofit.com, 2026-06-11)._
 
@@ -84,3 +87,5 @@ ADRs are written incrementally as each slice requires a documented decision. No 
 | [ADR-0006](./adr/ADR-0006-orders-list-scaling.md) | Orders List Scaling via Keyset Cursor Pagination | Accepted | VS-20 |
 | [ADR-0007](./adr/ADR-0007-boutique-tenancy.md) | Boutique Tenancy — Single-Boutique Schema Foundation | Accepted | VS-23 |
 | [ADR-0008](./adr/ADR-0008-production-deployment.md) | Production Deployment — Single EC2, Docker Compose, GitHub Actions | Accepted | VS-18 |
+| [ADR-0009](./adr/ADR-0009-strict-installment-plan.md) | Strict Installment Plan — `bill = Σ installments`, atomic create + combined edit | Accepted | VS-27 |
+| [ADR-0010](./adr/ADR-0010-whatsapp-click-to-chat-messaging.md) | Customer Messaging via WhatsApp Click-to-Chat (`wa.me`) Deep Links | Accepted | VS-29 |

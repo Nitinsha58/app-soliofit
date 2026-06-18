@@ -23,6 +23,7 @@ ADRs capture significant technical choices: what was decided, why, what alternat
 | [ADR-0007](./ADR-0007-boutique-tenancy.md) | Boutique Tenancy — Single-Boutique Schema Foundation | Accepted | VS-23 |
 | [ADR-0008](./ADR-0008-production-deployment.md) | Production Deployment — Single EC2, Docker Compose, GitHub Actions | Accepted | VS-18 |
 | [ADR-0009](./ADR-0009-strict-installment-plan.md) | Strict Installment Plan — `bill = Σ installments`, atomic create + combined edit | Accepted | VS-27 |
+| [ADR-0010](./ADR-0010-whatsapp-click-to-chat-messaging.md) | Customer Messaging via WhatsApp Click-to-Chat (`wa.me`) Deep Links | Accepted | VS-29 |
 
 _Future ADRs will be added as each slice requires a documented decision._
 
