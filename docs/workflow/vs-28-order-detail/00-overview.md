@@ -1,6 +1,6 @@
 # VS-28 — Order Detail as a Command Screen (Program Overview)
 
-**Status:** In progress — 28.1 in development
+**Status:** Done — all four sub-slices shipped and verified
 **Created:** 2026-06-14
 **Depends on:** VS-27 (strict billing + drawer payment editor), merged to `main`.
 
@@ -61,10 +61,10 @@ The current drawer shows everything as one long editable scroll; VS-28 replaces 
 
 | Slice | Title | Layer | Status |
 |-------|-------|-------|--------|
-| [28.1](./vs-28.1-shell-overview.md) | Tab shell + Overview core (identity, attention card, stage-aware primary, read-only payment snapshot) | Frontend | **Implemented — in review** |
-| [28.2](./vs-28.2-work-tab.md) | Work tab — merge photos + voice into one "Work Instructions" card | Frontend | **Implemented — in review** |
-| [28.3](./vs-28.3-money-tab.md) | Money tab — attention-first pass over the VS-27.5 plan editor | Frontend | **Implemented — in review** |
-| [28.4](./vs-28.4-more-details.md) | More Details pushed screen — customer/order details, remarks, activity, danger zone | Frontend | Pending |
+| [28.1](./vs-28.1-shell-overview.md) | Tab shell + Overview core (identity, attention card, stage-aware primary, read-only payment snapshot) | Frontend | **Done** |
+| [28.2](./vs-28.2-work-tab.md) | Work tab — merge photos + voice into one "Work Instructions" card | Frontend | **Done** |
+| [28.3](./vs-28.3-money-tab.md) | Money tab — attention-first pass over the VS-27.5 plan editor | Frontend | **Done** |
+| [28.4](./vs-28.4-more-details.md) | More Details pushed screen — customer/order details, remarks, activity, danger zone | Frontend | **Done** |
 
 **Execution order:** 28.1 (shell) → 28.2 / 28.3 / 28.4 (refine each tab/screen). 28.1 mounts the
 existing sections as **interim** content under the new tabs so nothing regresses mid-program.
@@ -81,6 +81,8 @@ existing sections as **interim** content under the new tabs so nothing regresses
 
 ## Completion log
 
+- **2026-06-19 — VS-28 program closed — Done.** All four sub-slices shipped and verified. Order Detail is now a tabbed command screen (Overview · Work · Money) with a pushed More Details secondary screen. `OrderHeader.tsx`, `QuickActions.tsx`, and `OrderInfoSection.tsx` are orphaned (kept in place; remove in a later cleanup slice). No ADR was required — all decisions were UX/product-structure. Commit `838e24c` (VS-28.4).
+- **2026-06-19 — VS-28.4 verified (browser pass).** More Details pushed screen confirmed: Customer card (name → View customer nav, phone tel: link, address), Order details card (status neutral pill, order number + Ordered date quiet, delivery date read-first → tap → date input → autosave → auto-collapse, bill read-only "Edit in Money"), Order note card (remarks read-first → tap → textarea → autosave → auto-collapse), ActivityFeed, DangerZone. Back button returns to Overview. `tsc --noEmit` clean. No backend changes. Commit `838e24c`.
 - **2026-06-14 — VS-28.3 implemented (in review).** On `feat/vs-28-order-detail`. Money tab
   presentation pass over the already-complete VS-27.5 editor (no billing logic/math/endpoint/locking
   change). New `MoneyTab.tsx` frames `PaymentSchedule` in one **Payment Plan** card (parallels
