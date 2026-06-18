@@ -18,6 +18,9 @@ export interface Order {
   amount_paid: string
   remaining: string
   payment_state: 'completed' | 'overdue' | 'partial' | 'pending' | 'unbilled'
+  // VS-29 — present only on the detail fetch (GET /orders/{id}/ and the messages action).
+  // Map of order_status → latest send timestamp (ISO). Absent on list/board responses.
+  messages_sent?: Partial<Record<Order['status'], string>>
 }
 
 export const ORDER_STATUSES: Order['status'][] = [
@@ -127,6 +130,22 @@ export async function updateOrderStatus(
 // Soft-deletes the order (cascades to its installments/media + S3 cleanup, server-side).
 export async function deleteOrder(id: string): Promise<void> {
   await apiRequest<void>(`/api/orders/${id}/`, { method: 'DELETE' })
+}
+
+// VS-29 — records a send-initiated WhatsApp message (ADR-0010). Returns the full order
+// detail (incl. refreshed messages_sent) so the caller can thread the real timestamps in.
+export interface SendMessagePayload {
+  order_status: Order['status']
+  channel?: 'whatsapp'
+  template_key: string
+  metadata?: Record<string, unknown>
+}
+
+export async function sendOrderMessage(id: string, payload: SendMessagePayload): Promise<Order> {
+  return apiRequest<Order>(`/api/orders/${id}/messages/`, {
+    method: 'POST',
+    body: JSON.stringify({ channel: 'whatsapp', ...payload }),
+  })
 }
 
 export async function getDeliveryLoad(from: string, to: string): Promise<Record<string, number>> {

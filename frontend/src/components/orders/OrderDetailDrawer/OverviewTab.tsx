@@ -4,6 +4,7 @@ import type { Order } from '@/lib/api/orders'
 import StatusPriorityPills from './StatusPriorityPills'
 import AttentionSummaryCard from './AttentionSummaryCard'
 import PrimaryAction from './PrimaryAction'
+import WhatsAppAction from './WhatsAppAction'
 import OverviewWorkCard from './OverviewWorkCard'
 import OverviewPaymentCard from './OverviewPaymentCard'
 
@@ -42,6 +43,9 @@ export default function OverviewTab({ order, onOrderChange, onUpdated, onViewPla
       <AttentionSummaryCard order={order} />
 
       <PrimaryAction order={order} onOrderChange={onOrderChange} onUpdated={onUpdated} />
+
+      {/* WhatsApp send-status — secondary action, never out-weighs the primary (§0.7) */}
+      <WhatsAppAction order={order} onOrderChange={onOrderChange} />
 
       {/* Main work content sits above the business summary (§0.3 hierarchy) */}
       <OverviewWorkCard orderId={order.id} onViewWork={onViewWork} />
