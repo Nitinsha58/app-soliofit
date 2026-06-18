@@ -1,8 +1,8 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** Pending — specs only, awaiting build approval per sub-slice
+**Status:** Done — both sub-slices shipped and verified
 **Created:** 2026-06-19
-**Depends on:** VS-28 (Order Detail command screen), `feat/vs-28-order-detail`.
+**Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
 
 This is the **master tracker** for the VS-29 program: let the boutique notify a customer
@@ -53,8 +53,8 @@ delivery-mechanism and tracking decisions.
 
 | Slice | Title | Layer | Status |
 |-------|-------|-------|--------|
-| [29.1](./vs-29.1-backend-message-tracking.md) | `OrderMessageLog` model + `POST /orders/{id}/messages/` + `messages_sent` on detail serializer | Backend | Pending |
-| [29.2](./vs-29.2-send-status-button.md) | Send-status button on Overview — templates module, `wa.me` open, three-state styling + resend | Frontend | Pending |
+| [29.1](./vs-29.1-backend-message-tracking.md) | `OrderMessageLog` model + `POST /orders/{id}/messages/` + `messages_sent` on detail serializer | Backend | **Done** |
+| [29.2](./vs-29.2-send-status-button.md) | Send-status button on Overview — templates module, `wa.me` open, three-state styling + resend | Frontend | **Done** |
 
 **Execution order:** 29.1 (backend tracking) → 29.2 (frontend button). 29.1 is
 additive/non-breaking, so it can ship and be reviewed before the UI consumes it.
@@ -83,5 +83,27 @@ additive/non-breaking, so it can ship and be reviewed before the UI consumes it.
 
 ## Completion log
 
+- **2026-06-19 — VS-29 program closed — Done.** Both sub-slices shipped and verified. From the
+  Order Detail Overview, one tap opens a prefilled `wa.me` draft for the order's current status
+  (with a payment line when outstanding), records the send server-side, and flips the action to a
+  server-backed "sent" state with Resend. Commits `9400fb2` (29.1), `b557cd1` (29.2).
+  **Deferred follow-up (tracked, not a blocker):** no frontend unit tests cover
+  `whatsappTemplates` / `WhatsAppAction` — the project has no frontend test framework (verification
+  is type-check + browser by design, per the frontend-verification reality). Adding template/component
+  unit tests would require standing up Jest/Vitest first; that is its own infrastructure slice, not
+  part of VS-29. The template logic is pure and small and was browser-verified.
+- **2026-06-19 — VS-29.2 verified (browser pass).** On `#0022` (Started): `Send Started` renders
+  directly below `Mark Ready`; tap opened the WhatsApp draft with normalized phone `919000001005`,
+  the Started template, and the correct full-pending payment line (single ₹1,111); button flipped to
+  `Started sent · <time>` with Resend; the sent state persisted from the server after reload; one
+  `status_started` log row created. 375/768 viewport checks clean — the WhatsApp action reads as a
+  secondary, the primary stays dominant, no horizontal overflow. Empty-phone, already-`91…`, and
+  POST-failure/offline paths were source-reviewed (revert-optimistic + recovery message confirmed in
+  `catch`), not live-tested. `tsc --noEmit` clean.
+- **2026-06-19 — VS-29.1 verified (review pass).** `OrderMessageLog` additive backend: migration
+  `0009_ordermessagelog` applies cleanly, `makemigrations --check` no drift, `messages_sent` is
+  detail-only (list/board unchanged), resend appends a row + updates the exposed timestamp, invalid
+  status → 400, cross-boutique → 404. 10 new `OrderMessageLogTests`; **198/198 backend tests pass.**
+  Commit `9400fb2`.
 - _2026-06-19 — VS-29 program opened. ADR-0010 Accepted. Specs only; no implementation yet
   — awaiting build approval per sub-slice. Execution: 29.1 → 29.2._
