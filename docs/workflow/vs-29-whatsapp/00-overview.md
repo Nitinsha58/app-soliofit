@@ -1,6 +1,6 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** 29.1–29.7 shipped; 29.8 (pickup window + working-hours Settings UI) Pending build
+**Status:** 29.1–29.8 shipped (local) — program complete; awaiting production push of the 29.5–29.8 batch
 **Created:** 2026-06-19
 **Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
@@ -60,7 +60,7 @@ delivery-mechanism and tracking decisions.
 | [29.5](./vs-29.5-template-spec.md) | Finalized template spec — vault doc §10 (product source of truth + refined future schema) | Vault / product | **Done** |
 | [29.6](./vs-29.6-working-hours-backend.md) | Boutique working hours (`opening_time`/`closing_time`) — order-settings + `me` payload | Backend | **Done** |
 | [29.7](./vs-29.7-finalized-templates.md) | Finalized template copy — status-aware `paymentContext`, `{item}`="order", **Partial Delivery skipped** | Frontend | **Done** |
-| [29.8](./vs-29.8-pickup-window-settings.md) | Pickup window + working-hours Settings UI | Frontend | **Pending** |
+| [29.8](./vs-29.8-pickup-window-settings.md) | Pickup window + working-hours Settings UI | Frontend | **Done** |
 
 **Execution order:** 29.1 → 29.2 → 29.3 → 29.4 (all **Done**), then the finalized-template track:
 **29.5 (spec) → 29.6 (backend hours) → 29.7 (template copy) → 29.8 (pickup window + Settings UI)**.
@@ -99,6 +99,16 @@ until 29.8 wires the real value.
 
 ## Completion log
 
+- **2026-06-19 — VS-29.8 shipped (in review) — VS-29 program complete.** Working-hours pickup
+  window + Settings UI. `OrderSettings` + `AuthUser` gained `opening_time`/`closing_time`. The
+  Settings **Order settings** section now has two `<input type="time">` (Opens at / Closes at),
+  normalizing `"HH:MM:SS"`→`"HH:MM"` on load and sending `"HH:MM"`/`null`. UI enforces a
+  **both-or-neither** pairing rule and mirrors the server's open-before-close check before saving
+  (no silent half-config). On save the auth store's hours are synced (no `/me` refetch) so the draft
+  is immediately accurate. `useWhatsAppSend` derives the Ready window via `pickupWindowFromHours`
+  (e.g. "between 11 AM and 7 PM"); unset hours keep the 29.7 "during our working hours" fallback.
+  Commit `1598542`. Type-check clean. **The 29.5–29.8 batch is held local pending one production
+  push** (per owner: product polish — real pickup window — completes the customer-visible experience).
 - **2026-06-19 — VS-29.7 shipped (in review).** Finalized template copy. `whatsappTemplates.ts`
   rewritten to the vault §10 warm "ji"-tone set (Booked / Started / Ready / Delivered), multiline
   `Hi {customer} ji,` … `— {boutique_name}`, each with its stable `template_key`. Status-aware
