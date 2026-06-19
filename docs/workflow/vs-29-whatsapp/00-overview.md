@@ -1,6 +1,6 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** Done — 29.1 + 29.2 verified; 29.3 + 29.4 (follow-on) shipped, in review
+**Status:** 29.1–29.4 shipped; 29.5–29.8 (finalized template set) specced — Pending build
 **Created:** 2026-06-19
 **Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
@@ -57,18 +57,31 @@ delivery-mechanism and tracking decisions.
 | [29.2](./vs-29.2-send-status-button.md) | Send-status button on Overview — templates module, `wa.me` open, three-state styling + resend | Frontend | **Done** |
 | [29.3](./vs-29.3-board-card-action.md) | WhatsApp send-status footer on dashboard order cards (desktop hover overlay / mobile in-flow); `messages_sent` extended to the board action | Backend + Frontend | **Done** |
 | [29.4](./vs-29.4-post-create-modal.md) | Post-create "send booked message" modal → redirect to the new order's detail drawer | Frontend | **Done** |
+| [29.5](./vs-29.5-template-spec.md) | Finalized template spec — vault doc §10 (product source of truth + refined future schema) | Vault / product | **Pending** |
+| [29.6](./vs-29.6-working-hours-backend.md) | Boutique working hours (`opening_time`/`closing_time`) — order-settings + `me` payload | Backend | **Pending** |
+| [29.7](./vs-29.7-finalized-templates.md) | Finalized template copy — status-aware `paymentContext`, `{item}`="order", **Partial Delivery skipped** | Frontend | **Pending** |
+| [29.8](./vs-29.8-pickup-window-settings.md) | Pickup window + working-hours Settings UI | Frontend | **Pending** |
 
-**Execution order:** 29.1 (backend tracking) → 29.2 (frontend button) → 29.3 (board-card
-action, follow-on) → 29.4 (post-create modal, follow-on). 29.1 is additive/non-breaking; 29.3
-and 29.4 were added after the initial program closed, as follow-on enhancements.
+**Execution order:** 29.1 → 29.2 → 29.3 → 29.4 (all **Done**), then the finalized-template track:
+**29.5 (spec) → 29.6 (backend hours) → 29.7 (template copy) → 29.8 (pickup window + Settings UI)**.
+No broken-window risk: 29.6 lands before 29.8 needs hours; 29.7 ships with a pickup-window fallback
+until 29.8 wires the real value.
 
 ---
 
 ## Future (not in VS-29 scope yet)
 
 - **In-panel template management** — edit/manage message templates in the app instead of
-  the hard-coded module. The templates module (29.2) and `template_key` (29.1) are the
-  seams this will build on. New sub-slice when prioritized.
+  the hard-coded module. The templates module (29.2/29.7), `template_key` (29.1), and the refined
+  schema in vault §10 (`action_key`, `payment_context` as a resolved fragment) are the seams this
+  builds on. New sub-slice when prioritized.
+- **Partial Delivery messaging** — skipped for now (29.7); revisit once the Partial Delivery model
+  is fixed.
+- **Delay notice + payment reminders** (gentle / follow-up / consolidated) — separate
+  collection/notice track via `action_key`, needs installment-level data (`due_date`,
+  `days_overdue`, consolidated customer dues). Documented in vault §10; their own backend slice.
+- **Structured order-item capture** — replaces the interim `{item}`="order" with a real garment
+  label. Their own slice.
 - **WhatsApp Business API auto-send + delivery receipts** — remains Post-MVP
   (`02-feature-set §2.5`); would supersede the optimistic "sent" semantics with real
   delivery state.
@@ -86,6 +99,14 @@ and 29.4 were added after the initial program closed, as follow-on enhancements.
 
 ## Completion log
 
+- **2026-06-19 — VS-29.5–29.8 specced (Pending build).** Finalized WhatsApp template set
+  (warm "ji" tone, vault §10) decomposed into four buildable sub-slices: **29.5** vault spec doc
+  (source of truth, lands at build), **29.6** boutique working hours (additive backend), **29.7**
+  finalized template copy (status-aware `paymentContext`, `{item}`="order", **Partial Delivery
+  skipped — no send action**), **29.8** pickup window + working-hours Settings UI. Execution
+  29.5 → 29.6 → 29.7 → 29.8; 29.7 ships with a "during our working hours" fallback until 29.8 wires
+  real hours. Documented as future: Partial Delivery messaging, Delay notice, payment reminders,
+  `action_key` logging, structured item capture. Specs only — no implementation yet.
 - **2026-06-19 — VS-29.4 shipped (in review).** Post-create "send booked message" modal
   (`OrderCreatedModal`). After an order is created, a white success modal offers one dominant
   quick action — send the customer the Booked WhatsApp confirmation — then **every exit**
