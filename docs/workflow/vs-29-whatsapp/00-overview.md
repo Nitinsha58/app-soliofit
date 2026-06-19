@@ -1,6 +1,6 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** 29.1–29.4 shipped; 29.5–29.8 (finalized template set) specced — Pending build
+**Status:** 29.1–29.6 shipped; 29.7 + 29.8 (finalized template copy + pickup window) Pending build
 **Created:** 2026-06-19
 **Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
@@ -57,8 +57,8 @@ delivery-mechanism and tracking decisions.
 | [29.2](./vs-29.2-send-status-button.md) | Send-status button on Overview — templates module, `wa.me` open, three-state styling + resend | Frontend | **Done** |
 | [29.3](./vs-29.3-board-card-action.md) | WhatsApp send-status footer on dashboard order cards (desktop hover overlay / mobile in-flow); `messages_sent` extended to the board action | Backend + Frontend | **Done** |
 | [29.4](./vs-29.4-post-create-modal.md) | Post-create "send booked message" modal → redirect to the new order's detail drawer | Frontend | **Done** |
-| [29.5](./vs-29.5-template-spec.md) | Finalized template spec — vault doc §10 (product source of truth + refined future schema) | Vault / product | **Pending** |
-| [29.6](./vs-29.6-working-hours-backend.md) | Boutique working hours (`opening_time`/`closing_time`) — order-settings + `me` payload | Backend | **Pending** |
+| [29.5](./vs-29.5-template-spec.md) | Finalized template spec — vault doc §10 (product source of truth + refined future schema) | Vault / product | **Done** |
+| [29.6](./vs-29.6-working-hours-backend.md) | Boutique working hours (`opening_time`/`closing_time`) — order-settings + `me` payload | Backend | **Done** |
 | [29.7](./vs-29.7-finalized-templates.md) | Finalized template copy — status-aware `paymentContext`, `{item}`="order", **Partial Delivery skipped** | Frontend | **Pending** |
 | [29.8](./vs-29.8-pickup-window-settings.md) | Pickup window + working-hours Settings UI | Frontend | **Pending** |
 
@@ -99,6 +99,14 @@ until 29.8 wires the real value.
 
 ## Completion log
 
+- **2026-06-19 — VS-29.6 shipped (in review).** Boutique working hours: nullable
+  `opening_time`/`closing_time` on `Boutique` (migration `0006`), editable via
+  `order-settings` with paired `opening < closing` validation reported on a `working_hours` key,
+  and read-only on the `/me` payload. Additive/non-breaking. 203/203 backend tests pass. Commit `3d7a824`.
+- **2026-06-19 — VS-29.5 shipped.** Vault doc §10 (`10-whatsapp-message-templates.md`) finalized
+  and committed in the vault (`a86b4dc`); `payment_context` documented as a never-independently-sendable
+  fragment; Partial Delivery messaging skipped; `{item}`="order" interim; refined future schema with
+  `action_key`. (Consolidated an earlier draft onto the existing filename per owner choice.)
 - **2026-06-19 — VS-29.5–29.8 specced (Pending build).** Finalized WhatsApp template set
   (warm "ji" tone, vault §10) decomposed into four buildable sub-slices: **29.5** vault spec doc
   (source of truth, lands at build), **29.6** boutique working hours (additive backend), **29.7**
