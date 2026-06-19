@@ -1,10 +1,12 @@
 import logging
 
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import SimpleRateThrottle
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.tokens import default_token_generator
@@ -54,6 +56,45 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             samesite=jwt['AUTH_COOKIE_SAMESITE'],
             path='/',
             max_age=int(jwt['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+        )
+        return response
+
+
+class CookieTokenRefreshView(TokenRefreshView):
+    """Mint a fresh access_token cookie from the refresh_token cookie.
+
+    The SPA never sees the tokens (they are HttpOnly cookies), so the refresh
+    token is read from the cookie rather than the request body. This is what makes
+    the 30-day refresh lifetime real: the client calls this on a 401, gets a new
+    24h access cookie, and stays logged in across the access-token expiry and across
+    deploys (tokens are signed with the stable SECRET_KEY, not server-side session
+    state). Public endpoint — the refresh cookie itself is the credential.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        jwt = settings.SIMPLE_JWT
+        refresh = request.COOKIES.get(jwt['AUTH_COOKIE_REFRESH'])
+        if not refresh:
+            return Response({'detail': 'No refresh token.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = self.get_serializer(data={'refresh': refresh})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except (InvalidToken, TokenError):
+            return Response({'detail': 'Invalid or expired refresh token.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        response = Response({'detail': 'Token refreshed.'})
+        response.set_cookie(
+            key=jwt['AUTH_COOKIE'],
+            value=serializer.validated_data['access'],
+            httponly=jwt['AUTH_COOKIE_HTTP_ONLY'],
+            secure=jwt['AUTH_COOKIE_SECURE'],
+            samesite=jwt['AUTH_COOKIE_SAMESITE'],
+            path='/',
+            max_age=int(jwt['ACCESS_TOKEN_LIFETIME'].total_seconds()),
         )
         return response
 

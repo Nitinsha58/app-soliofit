@@ -318,3 +318,45 @@ class PasswordResetConfirmTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('oldpass123'))
+
+
+class TokenRefreshTests(TestCase):
+    """The refresh cookie keeps a logged-in user alive past the 24h access token
+    (and across deploys). Cookie-based, not body-based — the SPA never holds tokens."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='tailor@test.com', password='oldpass123', business_name='Boutique',
+        )
+        self.client = APIClient()
+
+    def _login(self):
+        return self.client.post('/api/auth/login/', {
+            'email': 'tailor@test.com', 'password': 'oldpass123',
+        }, format='json')
+
+    def test_refresh_with_cookie_issues_new_access(self):
+        self._login()
+        self.assertIn('refresh_token', self.client.cookies)
+        resp = self.client.post('/api/auth/refresh/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # A fresh access_token cookie is set on the response.
+        self.assertIn('access_token', resp.cookies)
+        self.assertTrue(resp.cookies['access_token'].value)
+
+    def test_refresh_without_cookie_returns_401(self):
+        resp = self.client.post('/api/auth/refresh/')
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_with_invalid_cookie_returns_401(self):
+        self.client.cookies['refresh_token'] = 'not-a-real-token'
+        resp = self.client.post('/api/auth/refresh/')
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refreshed_access_authenticates_me(self):
+        # After refresh, the new access cookie works on a protected endpoint.
+        self._login()
+        self.client.post('/api/auth/refresh/')
+        resp = self.client.get('/api/auth/me/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['email'], 'tailor@test.com')
