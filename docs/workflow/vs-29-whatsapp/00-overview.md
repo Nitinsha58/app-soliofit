@@ -1,6 +1,6 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** Done — both sub-slices shipped and verified
+**Status:** Done — 29.1 + 29.2 verified; 29.3 + 29.4 (follow-on) shipped, in review
 **Created:** 2026-06-19
 **Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
@@ -55,9 +55,12 @@ delivery-mechanism and tracking decisions.
 |-------|-------|-------|--------|
 | [29.1](./vs-29.1-backend-message-tracking.md) | `OrderMessageLog` model + `POST /orders/{id}/messages/` + `messages_sent` on detail serializer | Backend | **Done** |
 | [29.2](./vs-29.2-send-status-button.md) | Send-status button on Overview — templates module, `wa.me` open, three-state styling + resend | Frontend | **Done** |
+| [29.3](./vs-29.3-board-card-action.md) | WhatsApp send-status footer on dashboard order cards (desktop hover overlay / mobile in-flow); `messages_sent` extended to the board action | Backend + Frontend | **Done** |
+| [29.4](./vs-29.4-post-create-modal.md) | Post-create "send booked message" modal → redirect to the new order's detail drawer | Frontend | **Done** |
 
-**Execution order:** 29.1 (backend tracking) → 29.2 (frontend button). 29.1 is
-additive/non-breaking, so it can ship and be reviewed before the UI consumes it.
+**Execution order:** 29.1 (backend tracking) → 29.2 (frontend button) → 29.3 (board-card
+action, follow-on) → 29.4 (post-create modal, follow-on). 29.1 is additive/non-breaking; 29.3
+and 29.4 were added after the initial program closed, as follow-on enhancements.
 
 ---
 
@@ -83,6 +86,31 @@ additive/non-breaking, so it can ship and be reviewed before the UI consumes it.
 
 ## Completion log
 
+- **2026-06-19 — VS-29.4 shipped (in review).** Post-create "send booked message" modal
+  (`OrderCreatedModal`). After an order is created, a white success modal offers one dominant
+  quick action — send the customer the Booked WhatsApp confirmation — then **every exit**
+  (send success, "Go to order", X, backdrop, Escape) opens the new order's detail drawer via
+  `openOrderDetail`. Auto-redirects once the send is recorded (the drawer shows "Booked sent"
+  from fresh detail); on POST failure the modal stays open with a recoverable error and "Go to
+  order" still works. No-phone orders hide the WhatsApp button. `useWhatsAppSend.send()` now
+  returns `Promise<boolean>` so the modal redirects only on a recorded send (existing callers
+  ignore the return). `AddOrderFlow.onCreated` captures the order into AppShell state and shows
+  the modal; the board still refreshes underneath. Commit `e6e5854`. Type-check clean.
+- **2026-06-19 — VS-29.3 shipped (in review).** WhatsApp send-status footer on every dashboard
+  `OrderCard` — a merged green-hint strip. **Desktop:** hidden until card hover, shown as an
+  absolute overlay (no layout shift; hovered card lifts via `lg:hover:z-20`). **Touch:** always
+  visible, in-flow. Hidden when no phone; stops pointer/click propagation so taps never start a
+  drag or open the drawer. **Backend amendment (board action only):** `get_queryset` prefetches
+  `message_logs` for the `board` action and the board serializes `results` with
+  `OrderDetailSerializer`, so cards carry `messages_sent`. Bounded cost — **+1 query per page,
+  not N+1** (proved by a query-flatness test). The generic `GET /api/orders/` list stays on
+  `OrderSerializer`, unchanged — this is a scoped extension of ADR-0010's detail-only tracking,
+  not a new decision (no ADR). Shared `useWhatsAppSend` hook extracted (both the detail action
+  and the card footer use it; `WhatsAppAction` refactored onto it, behavior identical). The card
+  footer patches the board React Query cache in place on send — replacing only the matching
+  order's `messages_sent` across the status column's recent + older caches, preserving
+  `next_cursor` / `counts` / `value` exactly. `BoardColumn` gained bottom padding so the last
+  card's hover overlay isn't clipped. Commit `9256627`; **199 backend tests pass**; type-check clean.
 - **2026-06-19 — VS-29 program closed — Done.** Both sub-slices shipped and verified. From the
   Order Detail Overview, one tap opens a prefilled `wa.me` draft for the order's current status
   (with a payment line when outstanding), records the send server-side, and flips the action to a
