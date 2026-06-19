@@ -25,20 +25,28 @@ export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSen
   const [optimistic, setOptimistic] = useState<{ status: Order['status']; at: string } | null>(null)
 
   const hasPhone = Boolean((order.customer_phone || '').replace(/\D/g, ''))
+  // No template for the current status (Partial Delivery, §10) ⇒ there is nothing to send,
+  // so the surfaces (WhatsAppAction, CardWhatsAppFooter) render nothing for this order.
+  const hasTemplate = buildMessage(order, businessName) !== null
   const optimisticSentAt = optimistic?.status === order.status ? optimistic.at : null
   const sentAt = optimisticSentAt ?? order.messages_sent?.[order.status] ?? null
 
   // Resolves true when the send was recorded, false on failure — lets callers (e.g. the
   // post-create modal) redirect only on success. Existing callers can ignore the return.
   async function send(): Promise<boolean> {
-    window.open(whatsappUrl(order, businessName), '_blank', 'noopener,noreferrer')
+    const msg = buildMessage(order, businessName)
+    // Guard: no template (e.g. Partial Delivery). Do NOT open WhatsApp or optimistically
+    // mark sent — there is no message to record.
+    if (!msg) return false
+    const url = whatsappUrl(order, businessName)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
     const prev = optimistic
     const status = order.status
     setOptimistic({ status, at: new Date().toISOString() })
     setPending(true)
     setError(false)
     try {
-      const { templateKey } = buildMessage(order, businessName)
+      const { templateKey } = msg
       const fresh = await sendOrderMessage(order.id, {
         order_status: status,
         template_key: templateKey,
@@ -55,5 +63,5 @@ export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSen
     }
   }
 
-  return { hasPhone, sentAt, pending, error, send }
+  return { hasPhone, hasTemplate, sentAt, pending, error, send }
 }

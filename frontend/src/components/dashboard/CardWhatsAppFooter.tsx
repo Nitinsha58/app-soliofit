@@ -58,12 +58,13 @@ function patchBoardCache(
 // Stops pointer/click propagation so taps never start a drag or open the drawer.
 export default function CardWhatsAppFooter({ order }: Props) {
   const queryClient = useQueryClient()
-  const { hasPhone, sentAt, pending, error, send } = useWhatsAppSend(
+  const { hasPhone, hasTemplate, sentAt, pending, error, send } = useWhatsAppSend(
     order,
     (messages_sent) => patchBoardCache(queryClient, order, messages_sent),
   )
 
-  if (!hasPhone) return null
+  // Hide when there's no template for the status (Partial Delivery, §10) or no phone.
+  if (!hasTemplate || !hasPhone) return null
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
 

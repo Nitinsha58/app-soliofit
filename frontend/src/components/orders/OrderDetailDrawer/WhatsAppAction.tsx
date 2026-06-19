@@ -30,10 +30,13 @@ function CheckIcon() {
 // "Sent" = send-initiated (optimistic, ADR-0010 §5); Resend is always available.
 export default function WhatsAppAction({ order, onOrderChange }: Props) {
   // Persist the server's fresh messages_sent into the drawer's local order copy.
-  const { hasPhone, sentAt, pending, error, send } = useWhatsAppSend(
+  const { hasPhone, hasTemplate, sentAt, pending, error, send } = useWhatsAppSend(
     order,
     (messages_sent) => onOrderChange({ messages_sent }),
   )
+
+  // No template for this status (Partial Delivery, §10) → hide the action entirely.
+  if (!hasTemplate) return null
 
   // No phone → disabled. Nothing to send to.
   if (!hasPhone) {
