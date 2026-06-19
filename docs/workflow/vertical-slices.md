@@ -41,7 +41,7 @@ Each slice delivers an observable, end-to-end feature increment — from databas
 | VS-26 | Media intake polish | Two-bucket + batch intake tuned for 375/768/desktop; Review summarizes garment, notes, and voice | Post-MVP — **Done** |
 | VS-27 | Strict installment plan | Bill = Σ installments enforced atomically; default installment, combined bill+plan edit, legacy backfill — decomposed into [27.1–27.5](./vs-27-installments/00-overview.md) | Post-MVP — **Pending** |
 | VS-28 | Order Detail command screen | Tabbed Overview · Work · Money + pushed More Details; stage-aware primary action — decomposed into [28.1–28.4](./vs-28-order-detail/00-overview.md) | Post-MVP — **Done** |
-| VS-29 | Order WhatsApp messaging | Send-status WhatsApp message from Order Detail + dashboard cards + post-create modal; finalized warm template set + working-hours pickup window — decomposed into [29.1–29.8](./vs-29-whatsapp/00-overview.md) | Post-MVP — **29.1–29.6 Done; 29.7–29.8 Pending** |
+| VS-29 | Order WhatsApp messaging | Send-status WhatsApp message from Order Detail + dashboard cards + post-create modal; finalized warm template set + working-hours pickup window — decomposed into [29.1–29.8](./vs-29-whatsapp/00-overview.md) | Post-MVP — **29.1–29.7 Done; 29.8 Pending** |
 
 > **MVP execution order after VS-15:** VS-16 → VS-19 → VS-20 → VS-21 → VS-22 → VS-23 → VS-17 → VS-18.
 > VS-20 and VS-23 each require an ADR at activation. VS-23 (tenant) lands before VS-17/VS-18 so launch is on the final schema. Interim hardening (order_number race-fix, presign validation) ships as `fix` commits ahead of the slices.

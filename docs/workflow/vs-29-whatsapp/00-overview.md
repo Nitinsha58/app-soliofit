@@ -1,6 +1,6 @@
 # VS-29 — Order WhatsApp Messaging (Program Overview)
 
-**Status:** 29.1–29.6 shipped; 29.7 + 29.8 (finalized template copy + pickup window) Pending build
+**Status:** 29.1–29.7 shipped; 29.8 (pickup window + working-hours Settings UI) Pending build
 **Created:** 2026-06-19
 **Depends on:** VS-28 (Order Detail command screen), merged to `main`.
 **ADR:** [ADR-0010 — WhatsApp Click-to-Chat Messaging](../../adr/ADR-0010-whatsapp-click-to-chat-messaging.md) (Accepted)
@@ -59,7 +59,7 @@ delivery-mechanism and tracking decisions.
 | [29.4](./vs-29.4-post-create-modal.md) | Post-create "send booked message" modal → redirect to the new order's detail drawer | Frontend | **Done** |
 | [29.5](./vs-29.5-template-spec.md) | Finalized template spec — vault doc §10 (product source of truth + refined future schema) | Vault / product | **Done** |
 | [29.6](./vs-29.6-working-hours-backend.md) | Boutique working hours (`opening_time`/`closing_time`) — order-settings + `me` payload | Backend | **Done** |
-| [29.7](./vs-29.7-finalized-templates.md) | Finalized template copy — status-aware `paymentContext`, `{item}`="order", **Partial Delivery skipped** | Frontend | **Pending** |
+| [29.7](./vs-29.7-finalized-templates.md) | Finalized template copy — status-aware `paymentContext`, `{item}`="order", **Partial Delivery skipped** | Frontend | **Done** |
 | [29.8](./vs-29.8-pickup-window-settings.md) | Pickup window + working-hours Settings UI | Frontend | **Pending** |
 
 **Execution order:** 29.1 → 29.2 → 29.3 → 29.4 (all **Done**), then the finalized-template track:
@@ -99,6 +99,17 @@ until 29.8 wires the real value.
 
 ## Completion log
 
+- **2026-06-19 — VS-29.7 shipped (in review).** Finalized template copy. `whatsappTemplates.ts`
+  rewritten to the vault §10 warm "ji"-tone set (Booked / Started / Ready / Delivered), multiline
+  `Hi {customer} ji,` … `— {boutique_name}`, each with its stable `template_key`. Status-aware
+  `paymentContext(order)` splices the §10 money lines into Booked / Ready / Delivered (omitted for
+  `unbilled` and fully-settled Delivered; `paid > 0` discriminates partial vs full-pending). `{item}`
+  resolves to "order" (interim constant). Ready pickup window takes an optional param, falling back to
+  **"during our working hours"** until VS-29.8 wires real hours. **Partial Delivery has no template** —
+  `buildMessage()`/`whatsappUrl()` return `null`, `useWhatsAppSend` exposes `hasTemplate`, and
+  `WhatsAppAction` + `CardWhatsAppFooter` render nothing for that status; `send()` bails before opening
+  WhatsApp or flipping optimistic when there's no template. The Ready-settled line keeps the fixed warm
+  phrase "…nothing to carry but your outfit." Commit `ed72935`. Type-check clean.
 - **2026-06-19 — VS-29.6 shipped (in review).** Boutique working hours: nullable
   `opening_time`/`closing_time` on `Boutique` (migration `0006`), editable via
   `order-settings` with paired `opening < closing` validation reported on a `working_hours` key,
