@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 
 from apps.customers.models import Customer
 from apps.media.models import OrderPhoto, VoiceNote
-from apps.orders.models import Order, OrderActivity
+from apps.orders.models import Order, OrderActivity, OrderMessageLog
 from apps.payments.models import Installment
 from apps.users.models import User, Boutique
 
@@ -1124,9 +1124,39 @@ class OrderMessageLogTests(_Fixture):
         self.assertTrue(len(resp.data) > 0)
         self.assertNotIn('messages_sent', resp.data[0])
 
-    def test_board_endpoint_excludes_messages_sent(self):
+    def test_board_endpoint_includes_messages_sent(self):
+        # VS-29.3 — the board action carries messages_sent on each card (prefetched).
         self._post()
         resp = self.client.get('/api/orders/board/?status=Booked')
         self.assertEqual(resp.status_code, 200)
-        if resp.data.get('results'):
-            self.assertNotIn('messages_sent', resp.data['results'][0])
+        self.assertTrue(resp.data['results'])
+        first = resp.data['results'][0]
+        self.assertIn('messages_sent', first)
+        # The order we sent for is order #1 (Booked); find it and assert the timestamp.
+        sent_row = next(r for r in resp.data['results'] if r['id'] == str(self.order.id))
+        self.assertIn('Ready', sent_row['messages_sent'])
+
+    def test_board_messages_sent_query_count_is_flat(self):
+        # prefetch_related keeps the board query count constant as orders + message logs
+        # grow (no N+1). Measure with a few rows, add many more, measure again, assert equal.
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def seed(start, end):
+            for n in range(start, end):
+                o = Order.objects.create(
+                    created_by=self.user, customer=self.customer, order_number=n,
+                    delivery_date=date.today() + timedelta(days=30), total_amount=Decimal('100.00'),
+                )
+                OrderMessageLog.objects.create(order=o, order_status='Booked',
+                                               template_key='status_booked', sent_by=self.user)
+
+        seed(2, 5)  # order #1 already exists from setUp
+        with CaptureQueriesContext(connection) as ctx1:
+            self.client.get('/api/orders/board/?status=Booked')
+        baseline = len(ctx1)
+
+        seed(5, 25)  # 20 more orders, each with a message log
+        with CaptureQueriesContext(connection) as ctx2:
+            self.client.get('/api/orders/board/?status=Booked')
+        self.assertEqual(len(ctx2), baseline)  # flat — prefetch, not N+1

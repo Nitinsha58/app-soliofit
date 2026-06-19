@@ -96,9 +96,11 @@ class OrderViewSet(viewsets.ModelViewSet):
             has_delayed_installment=Exists(delayed),
             amount_paid=Coalesce(Subquery(paid, output_field=money), Value(0, output_field=money)),
         )
-        # Prefetch message logs only for the detail and messages actions — avoids an
-        # N+1 on list/board while keeping messages_sent accurate on the detail endpoint.
-        if getattr(self, 'action', None) in ('retrieve', 'messages'):
+        # Prefetch message logs for the detail, messages, and board actions. The board
+        # (VS-29.3) surfaces messages_sent on each card; prefetch keeps that to +1 query
+        # per page (the page is ≤50 rows), not an N+1. The generic list path (no action
+        # match) stays clean — GET /api/orders/ never carries messages_sent.
+        if getattr(self, 'action', None) in ('retrieve', 'messages', 'board'):
             qs = qs.prefetch_related('message_logs')
         return qs
 
@@ -435,7 +437,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             value[row['status']] = str(row['v'] or Decimal('0.00'))
 
         return Response({
-            'results': OrderSerializer(rows, many=True, context={'request': request}).data,
+            # VS-29.3 — OrderDetailSerializer adds messages_sent (prefetched above) so board
+            # cards can show the WhatsApp send/sent state. Detail-only field stays off the
+            # generic list serializer.
+            'results': OrderDetailSerializer(rows, many=True, context={'request': request}).data,
             'next_cursor': next_cursor,
             'counts': counts,
             'value': value,

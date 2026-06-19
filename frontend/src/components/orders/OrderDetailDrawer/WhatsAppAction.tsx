@@ -1,11 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import type { Order } from '@/lib/api/orders'
-import { sendOrderMessage } from '@/lib/api/orders'
 import { lastChanged } from '@/lib/orderPayment'
-import { buildMessage, whatsappUrl } from '@/lib/whatsappTemplates'
-import { useAuthStore } from '@/stores/useAuthStore'
+import { useWhatsAppSend } from '@/lib/useWhatsAppSend'
 
 interface Props {
   order: Order
@@ -32,17 +29,11 @@ function CheckIcon() {
 // on the Overview. Secondary outline weight (§0.7 — never out-weighs the gold/emerald primary).
 // "Sent" = send-initiated (optimistic, ADR-0010 §5); Resend is always available.
 export default function WhatsAppAction({ order, onOrderChange }: Props) {
-  const businessName = useAuthStore((s) => s.user?.business_name)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState(false)
-  // Optimistic flip: set immediately on tap so the button restyles before the POST resolves.
-  // Keyed by the status it applies to, so a status change (via PrimaryAction) doesn't make the
-  // new status read as "sent". Server truth (order.messages_sent) is the fallback.
-  const [optimistic, setOptimistic] = useState<{ status: Order['status']; at: string } | null>(null)
-
-  const hasPhone = Boolean((order.customer_phone || '').replace(/\D/g, ''))
-  const optimisticSentAt = optimistic?.status === order.status ? optimistic.at : null
-  const sentAt = optimisticSentAt ?? order.messages_sent?.[order.status] ?? null
+  // Persist the server's fresh messages_sent into the drawer's local order copy.
+  const { hasPhone, sentAt, pending, error, send } = useWhatsAppSend(
+    order,
+    (messages_sent) => onOrderChange({ messages_sent }),
+  )
 
   // No phone → disabled. Nothing to send to.
   if (!hasPhone) {
@@ -55,33 +46,6 @@ export default function WhatsAppAction({ order, onOrderChange }: Props) {
         <WhatsAppIcon /> No phone number
       </button>
     )
-  }
-
-  async function send() {
-    // Open the WhatsApp draft first (ADR-0010 optimistic semantics: "sent" = send-initiated),
-    // then record the log. A POST failure reverts the flip but leaves the action clickable.
-    window.open(whatsappUrl(order, businessName), '_blank', 'noopener,noreferrer')
-    const prev = optimistic
-    const status = order.status
-    setOptimistic({ status, at: new Date().toISOString() })
-    setPending(true)
-    setError(false)
-    try {
-      const { templateKey } = buildMessage(order, businessName)
-      const fresh = await sendOrderMessage(order.id, {
-        order_status: status,
-        template_key: templateKey,
-        metadata: { phone: (order.customer_phone || '').replace(/\D/g, '') },
-      })
-      // Thread the server's real messages_sent into the drawer's order copy so the sent
-      // state persists across re-renders and matches what a reload would show.
-      onOrderChange({ messages_sent: fresh.messages_sent })
-    } catch {
-      setOptimistic(prev) // revert — falls back to server state (unsent ⇒ Send returns)
-      setError(true)
-    } finally {
-      setPending(false)
-    }
   }
 
   if (sentAt) {

@@ -3,6 +3,7 @@
 import { STATUS_ACCENT, type Order } from '@/lib/api/orders'
 import { paymentMeta, inr, lastChanged, paidColorClass } from '@/lib/orderPayment'
 import { STATUS_PILL } from '@/lib/orderStatus'
+import CardWhatsAppFooter from './CardWhatsAppFooter'
 
 interface Props {
   order: Order
@@ -54,7 +55,7 @@ export default function OrderCard({ order, onClick, movedFrom, urgency, showStat
   return (
     <div
       onClick={onClick}
-      className={`rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 ${frameClass(urgency, order.priority)}`}
+      className={`group relative rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.09)] transition-shadow cursor-pointer px-3.5 py-3 lg:hover:z-20 ${frameClass(urgency, order.priority)}`}
     >
       {/* Customer + date */}
       <div className="flex items-start justify-between gap-2">
@@ -126,6 +127,10 @@ export default function OrderCard({ order, onClick, movedFrom, urgency, showStat
           {lastChanged(order.updated_at)}
         </span>
       </div>
+
+      {/* WhatsApp send-status — merged green strip. Desktop: reveal on hover (overlay, no layout
+          shift). Touch: always visible, in-flow. Hidden when no phone. (VS-29.3) */}
+      <CardWhatsAppFooter order={order} />
     </div>
   )
 }
