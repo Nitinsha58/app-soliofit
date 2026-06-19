@@ -84,7 +84,10 @@ class OrderSettingsTests(_Fixture):
         # Settings live on the boutique now (ADR-0007), created with the user.
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data, {'delivery_buffer_days': 0, 'daily_capacity': 6})
+        self.assertEqual(resp.data, {
+            'delivery_buffer_days': 0, 'daily_capacity': 6,
+            'opening_time': None, 'closing_time': None,
+        })
 
     def test_patch_persists(self):
         resp = self.client.patch(self.url, {
@@ -102,6 +105,36 @@ class OrderSettingsTests(_Fixture):
     def test_zero_capacity_rejected(self):
         resp = self.client.patch(self.url, {'daily_capacity': 0}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_working_hours_persist(self):
+        resp = self.client.patch(self.url, {
+            'opening_time': '11:00', 'closing_time': '19:00',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.boutique.refresh_from_db()
+        self.assertEqual(str(self.user.boutique.opening_time), '11:00:00')
+        self.assertEqual(str(self.user.boutique.closing_time), '19:00:00')
+
+    def test_opening_after_closing_rejected_on_working_hours_key(self):
+        resp = self.client.patch(self.url, {
+            'opening_time': '19:00', 'closing_time': '11:00',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('working_hours', resp.data)
+
+    def test_partial_working_hours_validates_against_existing(self):
+        # Setting only one side must still validate against the stored other side.
+        self.client.patch(self.url, {'opening_time': '11:00', 'closing_time': '19:00'}, format='json')
+        resp = self.client.patch(self.url, {'opening_time': '20:00'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('working_hours', resp.data)
+
+    def test_me_payload_exposes_working_hours(self):
+        self.client.patch(self.url, {'opening_time': '11:00', 'closing_time': '19:00'}, format='json')
+        resp = self.client.get('/api/auth/me/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['opening_time'], '11:00:00')
+        self.assertEqual(resp.data['closing_time'], '19:00:00')
 
 
 class NotificationPreferenceTests(_Fixture):

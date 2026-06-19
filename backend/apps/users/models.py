@@ -80,6 +80,10 @@ class Boutique(models.Model):
     owner                = models.ForeignKey(User, on_delete=models.PROTECT, related_name='owned_boutiques')
     delivery_buffer_days = models.PositiveSmallIntegerField(default=0)
     daily_capacity       = models.PositiveSmallIntegerField(default=6)
+    # Working hours — drive the WhatsApp Ready message's pickup window (VS-29.6/29.8).
+    # Nullable: unset means the message falls back to "during our working hours".
+    opening_time         = models.TimeField(null=True, blank=True)
+    closing_time         = models.TimeField(null=True, blank=True)
     created_at           = models.DateTimeField(auto_now_add=True)
     updated_at           = models.DateTimeField(auto_now=True)
 

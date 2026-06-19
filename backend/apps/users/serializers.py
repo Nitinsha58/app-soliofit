@@ -8,9 +8,15 @@ from .models import User, Boutique, NotificationPreference
 
 
 class UserSerializer(serializers.ModelSerializer):
+    # Boutique working hours surfaced read-only on the `me` payload so the frontend
+    # can derive the WhatsApp pickup window without a separate fetch (VS-29.6/29.8).
+    opening_time = serializers.TimeField(source='boutique.opening_time', read_only=True, default=None)
+    closing_time = serializers.TimeField(source='boutique.closing_time', read_only=True, default=None)
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'business_name', 'owner_name', 'phone', 'created_at']
+        fields = ['id', 'email', 'business_name', 'owner_name', 'phone', 'created_at',
+                  'opening_time', 'closing_time']
         read_only_fields = ['id', 'email', 'created_at']
 
 
@@ -35,10 +41,25 @@ class BoutiqueSettingsSerializer(serializers.ModelSerializer):
     # which would silently hide the Add-Order suggestion. Bounds mirror the form.
     delivery_buffer_days = serializers.IntegerField(min_value=0, max_value=60, required=False)
     daily_capacity = serializers.IntegerField(min_value=1, max_value=100, required=False)
+    # Working hours feed the WhatsApp Ready pickup window (VS-29.6). Nullable — unset
+    # means the message falls back to "during our working hours".
+    opening_time = serializers.TimeField(required=False, allow_null=True)
+    closing_time = serializers.TimeField(required=False, allow_null=True)
 
     class Meta:
         model = Boutique
-        fields = ['delivery_buffer_days', 'daily_capacity']
+        fields = ['delivery_buffer_days', 'daily_capacity', 'opening_time', 'closing_time']
+
+    def validate(self, attrs):
+        # The invalid state is the *pair*, so report on a non-field key. Resolve each
+        # side against the incoming patch first, then the existing instance, so a
+        # partial update that sets only one side still validates against the other.
+        opening = attrs.get('opening_time', getattr(self.instance, 'opening_time', None))
+        closing = attrs.get('closing_time', getattr(self.instance, 'closing_time', None))
+        if opening is not None and closing is not None and opening >= closing:
+            raise serializers.ValidationError(
+                {'working_hours': 'Opening time must be before closing time.'})
+        return attrs
 
 
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
