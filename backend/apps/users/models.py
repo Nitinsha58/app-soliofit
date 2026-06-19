@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
+from datetime import time
 import uuid
 
 
@@ -81,9 +82,11 @@ class Boutique(models.Model):
     delivery_buffer_days = models.PositiveSmallIntegerField(default=0)
     daily_capacity       = models.PositiveSmallIntegerField(default=6)
     # Working hours — drive the WhatsApp Ready message's pickup window (VS-29.6/29.8).
-    # Nullable: unset means the message falls back to "during our working hours".
-    opening_time         = models.TimeField(null=True, blank=True)
-    closing_time         = models.TimeField(null=True, blank=True)
+    # Default to 11:00–20:00 (11 AM–8 PM) so every boutique ships with a real pickup
+    # window. Still nullable: a deliberate clear in Settings (both-or-neither) falls back
+    # to "during our working hours".
+    opening_time         = models.TimeField(null=True, blank=True, default=time(11, 0))
+    closing_time         = models.TimeField(null=True, blank=True, default=time(20, 0))
     created_at           = models.DateTimeField(auto_now_add=True)
     updated_at           = models.DateTimeField(auto_now=True)
 

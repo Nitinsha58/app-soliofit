@@ -86,7 +86,8 @@ class OrderSettingsTests(_Fixture):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data, {
             'delivery_buffer_days': 0, 'daily_capacity': 6,
-            'opening_time': None, 'closing_time': None,
+            # New boutiques default to 11:00–20:00 working hours.
+            'opening_time': '11:00:00', 'closing_time': '20:00:00',
         })
 
     def test_patch_persists(self):

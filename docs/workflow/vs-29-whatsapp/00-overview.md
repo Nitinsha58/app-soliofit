@@ -99,6 +99,12 @@ until 29.8 wires the real value.
 
 ## Completion log
 
+- **2026-06-19 — Default working hours 11:00–20:00 (post-29.8).** Every boutique now ships with
+  11 AM–8 PM working hours so the WhatsApp Ready pickup window is real out of the box. `Boutique.
+  opening_time`/`closing_time` gained model defaults (`time(11,0)`/`time(20,0)`, still nullable so a
+  deliberate Settings clear falls back). Migration `0007_default_working_hours` alters the fields and
+  one-time-backfills existing NULL-hours boutiques (already-set hours untouched). 203/203 backend
+  tests pass; no migration drift; dev DB migrated.
 - **2026-06-19 — Template tone refinement (post-29.7).** Reworded all four `order_status`
   templates and the `payment_context` lines to a warmer, familiar family-boutique voice (respectful +
   clear, less system-generated) — "has been received", "We'll take care of it", "ready for pickup",
