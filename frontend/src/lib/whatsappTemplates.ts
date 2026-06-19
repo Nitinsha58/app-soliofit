@@ -61,9 +61,8 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
       lines(
         `Hi ${customer} ji,`,
         `Your ${item} has been received at ${shop}.`,
-        deliveryDate ? `We’ll try to keep it ready by ${deliveryDate}.` : '',
+        deliveryDate ? `We'll try to keep it ready by ${deliveryDate}.` : '',
         payment,
-        `We’ll take care of it and update you once it moves ahead.`,
         `— ${shop}`,
       ),
   },
@@ -72,8 +71,8 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop }) =>
       lines(
         `Hi ${customer} ji,`,
-        `We’ve started work on your ${item}.`,
-        `Our tailor will handle it carefully. We’ll message you once it is ready.`,
+        `We've started work on your ${item}.`,
+        `We'll message you once it is ready.`,
         `— ${shop}`,
       ),
   },
@@ -93,8 +92,9 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop, payment }) =>
       lines(
         `Hi ${customer} ji,`,
-        `Thank you for trusting ${shop} with your ${item}.`,
-        `Please check the fitting once. If any small adjustment is needed, just tell us.`,
+        `Your ${item} has been delivered.`,
+        `Please check the fitting once. We hope it fits you well.`,
+        `Thank you for choosing ${shop}!`,
         payment,
         `— ${shop}`,
       ),
@@ -122,7 +122,7 @@ function paymentContext(order: Order): string {
     case 'Booked':
       return state === 'completed'
         ? `Payment received in full. Thank you.`
-        : `Total bill: ₹${total}. Paid: ₹${paid}. Balance: ₹${remaining}.`
+        : `Total bill: ₹${total}. Paid: ₹${paid}.`
     case 'Ready':
       if (state === 'completed') return `Payment is complete.`
       return paidNum > 0
