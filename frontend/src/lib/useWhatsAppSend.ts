@@ -28,7 +28,9 @@ export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSen
   const optimisticSentAt = optimistic?.status === order.status ? optimistic.at : null
   const sentAt = optimisticSentAt ?? order.messages_sent?.[order.status] ?? null
 
-  async function send() {
+  // Resolves true when the send was recorded, false on failure — lets callers (e.g. the
+  // post-create modal) redirect only on success. Existing callers can ignore the return.
+  async function send(): Promise<boolean> {
     window.open(whatsappUrl(order, businessName), '_blank', 'noopener,noreferrer')
     const prev = optimistic
     const status = order.status
@@ -43,9 +45,11 @@ export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSen
         metadata: { phone: (order.customer_phone || '').replace(/\D/g, '') },
       })
       onSent(fresh.messages_sent)
+      return true
     } catch {
       setOptimistic(prev) // revert — falls back to server state (unsent ⇒ Send returns)
       setError(true)
+      return false
     } finally {
       setPending(false)
     }

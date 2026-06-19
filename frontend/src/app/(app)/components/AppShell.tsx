@@ -13,7 +13,9 @@ import MobileNav from './MobileNav'
 import ToastHost from './ToastHost'
 import AddOrderFlow from '@/components/orders/AddOrderFlow'
 import OrderDetailDrawer from '@/components/orders/OrderDetailDrawer'
+import OrderCreatedModal from '@/components/orders/OrderCreatedModal'
 import SearchSheet from '@/components/search/SearchSheet'
+import type { Order } from '@/lib/api/orders'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -24,9 +26,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     showAddOrder, closeAddOrder,
     triggerOrdersRefresh,
     ordersRefreshKey,
-    selectedOrderId, closeOrderDetail,
+    selectedOrderId, openOrderDetail, closeOrderDetail,
     searchOpen,
   } = useUIStore()
+
+  // VS-29.4 — the just-created order awaiting the post-create "send booked message" modal.
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
 
   const queryClient = useQueryClient()
   useEffect(() => {
@@ -84,9 +89,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {showAddOrder && (
         <AddOrderFlow
           onClose={closeAddOrder}
-          onCreated={() => {
+          onCreated={(order) => {
             closeAddOrder()
             triggerOrdersRefresh()
+            setCreatedOrder(order) // show the post-create "send booked message" modal
+          }}
+        />
+      )}
+      {createdOrder && (
+        <OrderCreatedModal
+          order={createdOrder}
+          onGoToOrder={() => {
+            const id = createdOrder.id
+            setCreatedOrder(null)
+            openOrderDetail(id) // every exit lands on the new order's detail drawer
           }}
         />
       )}
