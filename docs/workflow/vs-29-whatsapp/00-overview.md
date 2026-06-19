@@ -99,6 +99,13 @@ until 29.8 wires the real value.
 
 ## Completion log
 
+- **2026-06-19 — Template tone refinement (post-29.7).** Reworded all four `order_status`
+  templates and the `payment_context` lines to a warmer, familiar family-boutique voice (respectful +
+  clear, less system-generated) — "has been received", "We'll take care of it", "ready for pickup",
+  "Please check the fitting once… just tell us"; simpler money lines ("Total bill: … Paid: … Balance:
+  …", "Balance ₹… can be paid at pickup", "… pay when convenient"). Pure copy change in
+  `whatsappTemplates.ts` (structure / keys / placeholders / Partial-Delivery + pickup-window rules
+  untouched); vault §10 synced to v1.1. Type-check clean.
 - **2026-06-19 — VS-29.8 shipped (in review) — VS-29 program complete.** Working-hours pickup
   window + Settings UI. `OrderSettings` + `AuthUser` gained `opening_time`/`closing_time`. The
   Settings **Order settings** section now has two `<input type="time">` (Opens at / Closes at),

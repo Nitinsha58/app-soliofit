@@ -60,10 +60,10 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop, deliveryDate, payment }) =>
       lines(
         `Hi ${customer} ji,`,
-        `Your ${item} is booked with ${shop}.`,
-        deliveryDate ? `Ready by: ${deliveryDate}` : '',
+        `Your ${item} has been received at ${shop}.`,
+        deliveryDate ? `We’ll try to keep it ready by ${deliveryDate}.` : '',
         payment,
-        `We'll keep you posted as it comes along.`,
+        `We’ll take care of it and update you once it moves ahead.`,
         `— ${shop}`,
       ),
   },
@@ -72,8 +72,8 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop }) =>
       lines(
         `Hi ${customer} ji,`,
-        `Good news — your ${item} is now on the tailor's table at ${shop}.`,
-        `We'll message you the moment it's ready for pickup.`,
+        `We’ve started work on your ${item}.`,
+        `Our tailor will handle it carefully. We’ll message you once it is ready.`,
         `— ${shop}`,
       ),
   },
@@ -82,7 +82,8 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop, pickupWindow, payment }) =>
       lines(
         `Hi ${customer} ji,`,
-        `Your ${item} is ready! You can collect it at ${shop}, ${pickupWindow}.`,
+        `Your ${item} is ready for pickup from ${shop}.`,
+        pickupWindow ? `You can collect it ${pickupWindow}.` : '',
         payment,
         `— ${shop}`,
       ),
@@ -92,8 +93,8 @@ const STATUS_TEMPLATES: Partial<Record<Order['status'], StatusTemplate>> = {
     build: ({ customer, item, shop, payment }) =>
       lines(
         `Hi ${customer} ji,`,
-        `Thank you for choosing ${shop} — we hope your ${item} fits beautifully.`,
-        `If it needs even a small adjustment, just message us; we're happy to help.`,
+        `Thank you for trusting ${shop} with your ${item}.`,
+        `Please check the fitting once. If any small adjustment is needed, just tell us.`,
         payment,
         `— ${shop}`,
       ),
@@ -120,18 +121,18 @@ function paymentContext(order: Order): string {
   switch (order.status) {
     case 'Booked':
       return state === 'completed'
-        ? `Total: ₹${total}, paid in full. Thank you!`
-        : `Total: ₹${total} — ₹${paid} paid, ₹${remaining} balance.`
+        ? `Payment received in full. Thank you.`
+        : `Total bill: ₹${total}. Paid: ₹${paid}. Balance: ₹${remaining}.`
     case 'Ready':
-      if (state === 'completed') return `Payment's all settled — nothing to carry but your outfit.`
+      if (state === 'completed') return `Payment is complete.`
       return paidNum > 0
-        ? `₹${paid} received, ₹${remaining} to clear at pickup (UPI or cash).`
-        : `Bill is ₹${total}, payable at pickup (UPI or cash).`
+        ? `Balance ₹${remaining} can be paid at pickup.`
+        : `Bill amount ₹${total} can be paid at pickup.`
     case 'Delivered':
       // Omit when fully settled; otherwise a gentle open-balance line.
       return state === 'completed'
         ? ''
-        : `A balance of ₹${remaining} is still open — pay whenever it's convenient.`
+        : `Balance ₹${remaining} is pending. You can pay when convenient.`
     default:
       return ''
   }
