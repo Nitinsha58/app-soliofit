@@ -139,22 +139,50 @@ export default function SettingsPage() {
   }
 
   // --- Order settings ---
+  // Working-hours times are held as "HH:MM" (the <input type="time"> form); the API stores
+  // "HH:MM:SS". '' = unset. Pairing rule (VS-29.8): fill both or leave both empty.
   const { data: orderSettings } = useQuery({ queryKey: ['order-settings'], queryFn: getOrderSettings })
-  const [os, setOs] = useState({ delivery_buffer_days: 0, daily_capacity: 6 })
+  const [os, setOs] = useState({ delivery_buffer_days: 0, daily_capacity: 6, opening_time: '', closing_time: '' })
   const [osSaving, setOsSaving] = useState(false)
   const [osMsg, setOsMsg] = useState<{ ok: boolean; msg: string } | null>(null)
 
   useEffect(() => {
-    if (orderSettings) setOs(orderSettings)
+    if (orderSettings) {
+      setOs({
+        delivery_buffer_days: orderSettings.delivery_buffer_days,
+        daily_capacity: orderSettings.daily_capacity,
+        opening_time: (orderSettings.opening_time ?? '').slice(0, 5), // "HH:MM:SS" → "HH:MM"
+        closing_time: (orderSettings.closing_time ?? '').slice(0, 5),
+      })
+    }
   }, [orderSettings])
 
   async function saveOrderSettings(e: React.FormEvent) {
     e.preventDefault()
+    // Pairing + order rules, mirrored client-side (the backend validates the pair too).
+    const open = os.opening_time
+    const close = os.closing_time
+    if (Boolean(open) !== Boolean(close)) {
+      setOsMsg({ ok: false, msg: 'Set both opening and closing time, or leave both empty.' })
+      return
+    }
+    if (open && close && open >= close) {
+      setOsMsg({ ok: false, msg: 'Opening time must be before closing time.' })
+      return
+    }
     setOsSaving(true)
     setOsMsg(null)
     try {
-      const updated = await updateOrderSettings(os)
+      const updated = await updateOrderSettings({
+        delivery_buffer_days: os.delivery_buffer_days,
+        daily_capacity: os.daily_capacity,
+        opening_time: open || null,
+        closing_time: close || null,
+      })
       queryClient.setQueryData(['order-settings'], updated)
+      // Keep the auth store's working hours in sync so the WhatsApp pickup window is accurate
+      // immediately, without forcing a /me refetch (VS-29.8).
+      if (user) setUser({ ...user, opening_time: updated.opening_time, closing_time: updated.closing_time })
       setOsMsg({ ok: true, msg: 'Order settings saved.' })
     } catch (err) {
       setOsMsg({ ok: false, msg: err instanceof Error ? err.message : 'Could not save settings.' })
@@ -254,6 +282,17 @@ export default function SettingsPage() {
                 onChange={(e) => setOs({ ...os, daily_capacity: Math.max(1, Number(e.target.value) || 1) })} />
               <p className="text-xs text-[#6B6B67] mt-1">Drives the calendar workload colouring and date suggestions.</p>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Opens at" htmlFor="opening_time">
+                <input id="opening_time" type="time" className={inputClass} value={os.opening_time}
+                  onChange={(e) => setOs({ ...os, opening_time: e.target.value })} />
+              </Field>
+              <Field label="Closes at" htmlFor="closing_time">
+                <input id="closing_time" type="time" className={inputClass} value={os.closing_time}
+                  onChange={(e) => setOs({ ...os, closing_time: e.target.value })} />
+              </Field>
+            </div>
+            <p className="text-xs text-[#6B6B67] -mt-2">Shown to customers as the pickup window in WhatsApp messages. Set both, or leave both empty.</p>
             <div className="flex items-center gap-3">
               <SaveButton saving={osSaving}>Save order settings</SaveButton>
               <Status ok={osMsg?.ok ?? false} msg={osMsg?.msg ?? null} />

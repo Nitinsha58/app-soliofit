@@ -137,6 +137,32 @@ function paymentContext(order: Order): string {
   }
 }
 
+// Format an "HH:MM[:SS]" 24h time as a friendly 12-hour label, dropping ":00" minutes:
+// "11:00:00" → "11 AM", "19:30:00" → "7:30 PM".
+function formatTime12(hms: string): string {
+  const [hStr, mStr] = hms.split(':')
+  let h = Number(hStr)
+  const m = Number(mStr) || 0
+  if (Number.isNaN(h)) return hms
+  const meridiem = h >= 12 ? 'PM' : 'AM'
+  h = h % 12
+  if (h === 0) h = 12
+  return m === 0 ? `${h} ${meridiem}` : `${h}:${String(m).padStart(2, '0')} ${meridiem}`
+}
+
+/**
+ * Derive the Ready pickup-window string from the boutique's working hours, e.g.
+ * "between 11 AM and 7 PM". Returns null when either side is unset — `buildMessage` then
+ * uses the "during our working hours" fallback. (VS-29.8; pairing is enforced in Settings.)
+ */
+export function pickupWindowFromHours(
+  opening?: string | null,
+  closing?: string | null,
+): string | null {
+  if (!opening || !closing) return null
+  return `between ${formatTime12(opening)} and ${formatTime12(closing)}`
+}
+
 /**
  * Build the WhatsApp message for an order's CURRENT status, with the status-aware payment
  * line spliced in when applicable. Returns the message text + the template_key to record

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { Order } from './api/orders'
 import { sendOrderMessage } from './api/orders'
-import { buildMessage, whatsappUrl } from './whatsappTemplates'
+import { buildMessage, whatsappUrl, pickupWindowFromHours } from './whatsappTemplates'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 type MessagesSent = Order['messages_sent']
@@ -20,6 +20,11 @@ type MessagesSent = Order['messages_sent']
  */
 export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSent) => void) {
   const businessName = useAuthStore((s) => s.user?.business_name)
+  // Ready pickup window derived from the boutique's working hours (VS-29.8). Null when hours
+  // are unset → buildMessage falls back to "during our working hours".
+  const openingTime = useAuthStore((s) => s.user?.opening_time)
+  const closingTime = useAuthStore((s) => s.user?.closing_time)
+  const pickupWindow = pickupWindowFromHours(openingTime, closingTime)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState(false)
   const [optimistic, setOptimistic] = useState<{ status: Order['status']; at: string } | null>(null)
@@ -27,18 +32,18 @@ export function useWhatsAppSend(order: Order, onSent: (messagesSent: MessagesSen
   const hasPhone = Boolean((order.customer_phone || '').replace(/\D/g, ''))
   // No template for the current status (Partial Delivery, §10) ⇒ there is nothing to send,
   // so the surfaces (WhatsAppAction, CardWhatsAppFooter) render nothing for this order.
-  const hasTemplate = buildMessage(order, businessName) !== null
+  const hasTemplate = buildMessage(order, businessName, pickupWindow) !== null
   const optimisticSentAt = optimistic?.status === order.status ? optimistic.at : null
   const sentAt = optimisticSentAt ?? order.messages_sent?.[order.status] ?? null
 
   // Resolves true when the send was recorded, false on failure — lets callers (e.g. the
   // post-create modal) redirect only on success. Existing callers can ignore the return.
   async function send(): Promise<boolean> {
-    const msg = buildMessage(order, businessName)
+    const msg = buildMessage(order, businessName, pickupWindow)
     // Guard: no template (e.g. Partial Delivery). Do NOT open WhatsApp or optimistically
     // mark sent — there is no message to record.
     if (!msg) return false
-    const url = whatsappUrl(order, businessName)
+    const url = whatsappUrl(order, businessName, pickupWindow)
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
     const prev = optimistic
     const status = order.status

@@ -7,6 +7,10 @@ export interface AuthUser {
   owner_name: string
   phone: string
   created_at: string
+  // Boutique working hours surfaced read-only on /me (VS-29.6). "HH:MM:SS" or null.
+  // useWhatsAppSend derives the Ready pickup window from these.
+  opening_time?: string | null
+  closing_time?: string | null
 }
 
 interface AuthState {

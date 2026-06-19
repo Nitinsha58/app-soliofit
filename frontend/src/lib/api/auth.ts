@@ -60,6 +60,10 @@ export async function confirmPasswordReset(
 export interface OrderSettings {
   delivery_buffer_days: number
   daily_capacity: number
+  // Boutique working hours (VS-29.6/29.8). "HH:MM:SS" or null when unset. Feed the
+  // WhatsApp Ready pickup window. The pair is validated server-side (open < close).
+  opening_time: string | null
+  closing_time: string | null
 }
 
 export async function getOrderSettings(): Promise<OrderSettings> {
